@@ -129,13 +129,12 @@ The contract's **Gate proofs** section maps diff shapes to the repo's proof comm
 
 ### The record
 
-The loop's comments exist to feed the retro: capture judgment and handles, not metrics.
-Token accounting is post-factum, never a session duty - the ids below are the handles, and [`telemetry-claude-code.md`](telemetry-claude-code.md) plus the runner files say where the numbers live on disk when an analysis wants them.
+The tracker's comments are what a later retro reads.
 
 **Per ticket** - the shipped comment carries:
 
 - what shipped and the commit shas
-- takes used; for each bounce, the defect the gate caught, quoted - bounce records are prime retro material
+- takes used; for each bounce, the defect the gate caught, quoted
 - the driver session id and each take's session or subagent id
 
 ## Session end
@@ -144,5 +143,7 @@ Every session, however it exits:
 
 - **Teardown** - stop loop-owned dev servers and browser sessions.
 - **Report** - exactly one spec-level comment: the closing comment when the spec closes, a status comment otherwise.
-  It is retro material first: tickets shipped with takes and bounces (what each bounce caught), escalations, commits, environment or tooling friction hit along the way, observations filed, and the session ids (driver + takes); it ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
+  It carries: tickets shipped with takes and bounces, escalations, commits, environment or tooling friction hit along the way, observations filed, and the session ids (driver + takes).
+  Then a short **reflection**, a line or two each: the hardest call of the session and the alternatives rejected; the least-confident spots and the assumptions under them; what a wider scope would have done differently.
+  It ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
 - **Observations** - anything actionable (a tooling defect, a gate blind spot, a skill gap) becomes its own issue labelled `needs-triage`; narrative context goes in the report's Observations section.

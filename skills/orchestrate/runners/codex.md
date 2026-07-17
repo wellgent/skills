@@ -31,18 +31,6 @@ codex exec resume "$SID" --dangerously-bypass-approvals-and-sandbox --json \
   -o <scratch>/take-<N>-2.md - <"$P2" > <scratch>/take-<N>-2.jsonl 2> <scratch>/take-<N>-2.err
 ```
 
-## Post-factum accounting
-
-Record the codex session id in the shipped comment - it is the handle.
-The `--json` event streams persist in the scratchpad; when an analysis wants token numbers, sum the `turn.completed` usage records there (input / cached / output / reasoning):
-
-```bash
-jq -s '[.[] | select(.type=="turn.completed").usage]
-  | {input: map(.input_tokens) | add, cached: map(.cached_input_tokens) | add,
-     output: map(.output_tokens) | add, reasoning: map(.reasoning_output_tokens) | add}' \
-  <scratch>/take-<N>-*.jsonl
-```
-
 ## Operational notes
 
 - Auth is host-level and fails only at token-refresh time; `codex login status` can still report logged-in on a revoked refresh token.
