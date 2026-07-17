@@ -143,6 +143,7 @@ Every session, however it exits:
 
 - **Teardown** - stop loop-owned dev servers and browser sessions.
 - **Report** - exactly one spec-level comment: the closing comment when the spec closes, a status comment otherwise.
+  A session that touched no spec lands the same report on the last ticket it delivered.
   It carries: tickets shipped with takes and bounces, escalations, commits, environment or tooling friction hit along the way, observations filed, and the session ids (driver + takes).
   Then a short **reflection**, a line or two each: the hardest call of the session and the alternatives rejected; the least-confident spots and the assumptions under them; what a wider scope would have done differently.
   It ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
