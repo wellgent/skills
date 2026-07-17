@@ -31,28 +31,16 @@ codex exec resume "$SID" --dangerously-bypass-approvals-and-sandbox --json \
   -o <scratch>/take-<N>-2.md - <"$P2" > <scratch>/take-<N>-2.jsonl 2> <scratch>/take-<N>-2.err
 ```
 
-## Take metering
+## Post-factum accounting
 
-Each take's `--json` event stream carries per-turn usage; sum it across the ticket's takes and record the totals plus the codex session id.
-These are exact per-ticket numbers, category-labeled input / cached / output / reasoning:
+Record the codex session id in the shipped comment - it is the handle.
+The `--json` event streams persist in the scratchpad; when an analysis wants token numbers, sum the `turn.completed` usage records there (input / cached / output / reasoning):
 
 ```bash
 jq -s '[.[] | select(.type=="turn.completed").usage]
   | {input: map(.input_tokens) | add, cached: map(.cached_input_tokens) | add,
      output: map(.output_tokens) | add, reasoning: map(.reasoning_output_tokens) | add}' \
   <scratch>/take-<N>-*.jsonl
-```
-
-A killed run's partial usage never lands in a `turn.completed` event - flag it as uncounted in the shipped comment rather than estimating.
-
-## Coverage scan
-
-Codex runs its whole take - self-review included - inside the one session its event stream meters.
-The take streams record every command, so scan them for nested agent spawns and flag any in the shipped comment:
-
-```bash
-jq -r 'select(.type=="command_execution").command' <scratch>/take-<N>-*.jsonl \
-  | grep -E 'codex exec|claude ' || true
 ```
 
 ## Operational notes

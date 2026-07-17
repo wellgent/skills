@@ -77,7 +77,7 @@ Start from a **clean working tree** on the branch the ticket lands on - the diff
 4. **Bounce**: comment the specific defect on the issue - the auditable record of what review found - then **continue the same take session** with the finding and the fix expectation, same contract. Re-gate at step 3.
    Budget is **three takes**; if the third still misses, escalate: label `needs-human`, drop `in-progress`, unassign, and leave the commits and comments in place as the record.
    The driver stays out of the code - escalation, not takeover.
-5. **Land and close**: scan the take's commit messages for wrong `#<N>` mentions and for closing-keyword + `#<N>` collisions, amend any before pushing, then push the take commits, comment what shipped (including token telemetry - see Telemetry), and close the issue - closing is what unblocks its dependents.
+5. **Land and close**: scan the take's commit messages for wrong `#<N>` mentions and for closing-keyword + `#<N>` collisions, amend any before pushing, then push the take commits, comment what shipped (see The record), and close the issue - closing is what unblocks its dependents.
    **Push only on green**: red takes never reach the remote - in most setups a push to main deploys production.
 6. **Teardown**: stop any dev server or browser session the gate started.
 
@@ -106,7 +106,6 @@ Every take prompt carries:
 - proof expected: the project's exact check command, plus every deploy-shaped proof the diff will trigger per the contract's Gate proofs section - the take runs them too, so bounces are cheap
 - runtime rules: if the take needs a running app, it spins up its own ephemeral server via the dev-server script and takes-port the contract names, and stops it on exit
 - commit rules: commit locally referencing `#<N>` as a plain mention - the mention must not directly follow any GitHub closing keyword (fix, fixes, fixed, close, closes, closed, resolve, resolves, resolved), even in ordinary prose, since GitHub would auto-close the issue before the gate runs; reword the sentence if needed - and **never push**
-- delegation rule: the take does its own work - it never spawns nested agent sessions or shells out to another agent CLI, which would hide tokens and code provenance from the loop
 - output shape: a terse report only - what shipped, proofs green (y/n), files touched, commit shas, blockers hit
 
 ### The gate
@@ -128,25 +127,16 @@ The contract's **Gate proofs** section maps diff shapes to the repo's proof comm
 
 **Advisory signals.** The same section names the repo's review skills and analyzers per surface (UI guidelines, stack analyzers, copy review); run the ones the diff touches and weigh their findings as review input on the standards/elegance axes - never as a pass/fail gate step.
 
-### Telemetry
+### The record
 
-Token accounting is measured, never estimated, and covers everything the session ran: the driver's own session, every subagent it spawned, and every take on the executor.
-How to read the numbers is harness-specific; what must be recorded is not.
+The loop's comments exist to feed the retro: capture judgment and handles, not metrics.
+Token accounting is post-factum, never a session duty - the ids below are the handles, and [`telemetry-claude-code.md`](telemetry-claude-code.md) plus the runner files say where the numbers live on disk when an analysis wants them.
 
-**What a number is.** Token categories differ in cost by orders of magnitude, so a number is only a measurement with its category label on it: record every category the harness reports - output at minimum, plus fresh-input, cache-creation, and cache-read input where reported.
+**Per ticket** - the shipped comment carries:
 
-**Per ticket** - the shipped comment carries the numbers, so every issue thread is self-sufficient for later cost analysis:
-
-1. The takes: record each take's token usage from its executor's native accounting (subagent completion reports where the harness meters subagents individually; the runner file's metering recipe for an external executor), plus whatever session or subagent id the executor assigns - the handle later analysis needs.
-2. The driver: record a cumulative snapshot at ticket close, keyed by the driver session id, and say explicitly whether subagent tokens sit inside or outside that counter - so later analysis can diff consecutive snapshots sharing a session id without double-counting or dropping a side.
-   Where the harness shows no live counter, its session log on disk is the measured source - sum the per-call usage records there.
-   When Claude Code is the driving harness, [`telemetry-claude-code.md`](telemetry-claude-code.md) carries the exact transcript paths and queries.
-
-**At session end** - the session report repeats the final snapshot and the per-take numbers across the session's tickets: the total accounting for the session.
-
-**Coverage invariant** - every token the session caused lands in some recorded counter.
-Subagents and runner takes are metered by their own harnesses; the only leak is a take shelling out to a nested agent CLI (`codex exec`, `claude -p`, ...) whose tokens no recorded counter carries.
-The prompt contract forbids it; still scan the take's report and command history for nested agent spawns and flag any in the shipped comment rather than silently under-counting.
+- what shipped and the commit shas
+- takes used; for each bounce, the defect the gate caught, quoted - bounce records are prime retro material
+- the driver session id and each take's session or subagent id
 
 ## Session end
 
@@ -154,5 +144,5 @@ Every session, however it exits:
 
 - **Teardown** - stop loop-owned dev servers and browser sessions.
 - **Report** - exactly one spec-level comment: the closing comment when the spec closes, a status comment otherwise.
-  It summarizes tickets shipped, bounces, escalations, and commits, carries the session telemetry block (driver, grooming subagents, takes - see Telemetry), and ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
+  It is retro material first: tickets shipped with takes and bounces (what each bounce caught), escalations, commits, environment or tooling friction hit along the way, observations filed, and the session ids (driver + takes); it ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
 - **Observations** - anything actionable (a tooling defect, a gate blind spot, a skill gap) becomes its own issue labelled `needs-triage`; narrative context goes in the report's Observations section.

@@ -1,5 +1,6 @@
-# Telemetry mechanics: Claude Code as the driving harness
+# Post-factum token accounting: Claude Code
 
+Nothing here is a session duty - run these queries only when an analysis wants numbers for sessions the reports' ids point at.
 Claude Code shows no live cumulative counter in-session; the transcript on disk is the measured source.
 
 ## Driver + inline subagents
