@@ -1,17 +1,17 @@
 ---
 name: orchestrate
-description: Run one dev-loop session as the driver - preflight, select, one spec end to end. Harness-generic - grooming drafts and takes both run in fresh subagent sessions spawned by whatever harness is driving; the gate stays yours.
+description: Run one dev-loop session as the driver - preflight, select, one spec end to end. Harness-generic - grooming drafts run in fresh subagents of the driving harness; takes run on the executor the project contract names (native subagents by default, or an external harness via a runner file); the gate stays yours.
 argument-hint: "[spec issue ref or URL - omit to let the session-start procedure select]"
 disable-model-invocation: true
 ---
 
-# Orchestrate (harness-generic driver)
+# Orchestrate (dev-loop driver)
 
 One orchestrator session: preflight, select, drive **one spec** end to end, tear down, report.
 Roles are fixed.
 You (the agent running this skill, in whatever harness) are the **driver**: you groom, gate, land, push, and own every tracker write.
-**Subagents** implement: every take runs in a fresh subagent session at token-zero, spawned by your harness's native subagent mechanism.
-Grooming breakdowns come from a fresh subagent too - one session shapes spec, another builds to spec, and review never leaves you.
+The **executor** implements: every take runs in a fresh session at token-zero on the take executor the contract names - your harness's native subagent mechanism unless the contract names an external runner (see The take).
+Grooming breakdowns come from a fresh subagent of your own harness - one session shapes spec, another builds to spec, and review never leaves you.
 
 The state contract is `docs/agents/dev-loop.md`; tracker mechanics are `docs/agents/issue-tracker.md`.
 Read both before the first write - the contract's rules win over this summary.
@@ -72,7 +72,7 @@ One ticket → closed, atomic in-session: take + gate + land.
 Start from a **clean working tree** on the branch the ticket lands on - the diff you gate must be exactly the take.
 
 1. **Claim**: flip `ready-for-agent` → `in-progress`, assign yourself - before any work.
-2. **Take**: spawn a fresh subagent session (see The take). Each attempt is a **take**; every take commits, so the issue timeline reads as the full attempt history.
+2. **Take**: spawn a fresh take session on the contract's executor (see The take). Each attempt is a **take**; every take commits, so the issue timeline reads as the full attempt history.
 3. **Gate** (see The gate). Green → step 5; not green → step 4.
 4. **Bounce**: comment the specific defect on the issue - the auditable record of what review found - then **continue the same take session** with the finding and the fix expectation, same contract. Re-gate at step 3.
    Budget is **three takes**; if the third still misses, escalate: label `needs-human`, drop `in-progress`, unassign, and leave the commits and comments in place as the record.
@@ -83,15 +83,19 @@ Start from a **clean working tree** on the branch the ticket lands on - the diff
 
 ### The take
 
-Every take is a fresh subagent session at token-zero, spawned by your harness's native mechanism, working in the same checkout on the same branch.
+Every take is a fresh session at token-zero on the **take executor**, working in the same checkout on the same branch.
+The contract's implementer section names the executor; the branch decides the mechanics:
+
+- **Native subagents** (the default) - spawn the take with your harness's native subagent mechanism.
+  Bounces continue the same take session where your harness can resume one - cheaper than fresh, and the take's context survives; where it cannot, spawn a fresh subagent whose prompt carries the original contract verbatim, the prior take's report, and the bounce finding.
+- **External runner** - the contract names a runner file in this skill's `runners/` folder; follow it for spawn, resume, and take metering.
+  [`runners/codex.md`](runners/codex.md) runs takes as `codex exec` sessions.
+
+Either way a bounce continuation counts against the three-take budget.
 Long takes run in the background where the harness supports it; let quiet runs under 30 minutes keep working.
-Your context takes only the subagent's final report - never pull the take's transcript, diffs, or file dumps into the driver session; the gate reads the diff from git, not from the report.
+Your context takes only the take's final report - never pull the take's transcript, diffs, or file dumps into the driver session; the gate reads the diff from git, not from the report.
 
-Bounces continue the same take session when your harness can resume a subagent - cheaper than fresh, and the take's context survives.
-When it cannot, spawn a fresh subagent whose prompt carries the original contract verbatim, the prior take's report, and the bounce finding.
-Either way it counts against the three-take budget.
-
-**The prompt contract.** The take subagent starts with zero context - no spec thread, no driver conversation, no house rules beyond what the harness injects.
+**The prompt contract.** The take starts with zero context - no spec thread, no driver conversation, no house rules beyond what its harness injects.
 Spec quality decides the take.
 Every take prompt carries:
 
@@ -126,22 +130,22 @@ The contract's **Gate proofs** section maps diff shapes to the repo's proof comm
 
 ### Telemetry
 
-Token accounting is measured, never estimated, and covers everything the session ran: the driver's own session and every subagent it spawned - grooming drafts and takes alike.
+Token accounting is measured, never estimated, and covers everything the session ran: the driver's own session, every subagent it spawned, and every take on the executor.
 How to read the numbers is harness-specific; what must be recorded is not.
 
 **What a number is.** Token categories differ in cost by orders of magnitude, so a number is only a measurement with its category label on it: record every category the harness reports - output at minimum, plus fresh-input, cache-creation, and cache-read input where reported.
 
 **Per ticket** - the shipped comment carries the numbers, so every issue thread is self-sufficient for later cost analysis:
 
-1. The takes: record each take's token usage from the harness's native accounting (subagent completion reports carry it where the harness meters subagents individually), plus whatever session or subagent id the harness assigns - the handle later analysis needs.
+1. The takes: record each take's token usage from its executor's native accounting (subagent completion reports where the harness meters subagents individually; the runner file's metering recipe for an external executor), plus whatever session or subagent id the executor assigns - the handle later analysis needs.
 2. The driver: record a cumulative snapshot at ticket close, keyed by the driver session id, and say explicitly whether subagent tokens sit inside or outside that counter - so later analysis can diff consecutive snapshots sharing a session id without double-counting or dropping a side.
    Where the harness shows no live counter, its session log on disk is the measured source - sum the per-call usage records there.
-   When Claude Code is the driving harness, the Telemetry section of `orchestrate-claude` carries the exact transcript paths and query.
+   When Claude Code is the driving harness, [`telemetry-claude-code.md`](telemetry-claude-code.md) carries the exact transcript paths and queries.
 
 **At session end** - the session report repeats the final snapshot and the per-take numbers across the session's tickets: the total accounting for the session.
 
 **Coverage invariant** - every token the session caused lands in some recorded counter.
-Subagents spawned through the harness are metered by it; the only leak is a take shelling out to a nested agent CLI (`codex exec`, `claude -p`, ...) whose tokens no recorded counter carries.
+Subagents and runner takes are metered by their own harnesses; the only leak is a take shelling out to a nested agent CLI (`codex exec`, `claude -p`, ...) whose tokens no recorded counter carries.
 The prompt contract forbids it; still scan the take's report and command history for nested agent spawns and flag any in the shipped comment rather than silently under-counting.
 
 ## Session end
