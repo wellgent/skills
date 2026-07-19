@@ -105,6 +105,7 @@ Every take prompt carries:
 - constraints and non-goals lifted from the issue
 - proof expected: the project's exact check command, plus every deploy-shaped proof the diff will trigger per the contract's Gate proofs section - the take runs them too, so bounces are cheap
 - runtime rules: if the take needs a running app, it spins up its own ephemeral server via the dev-server script and takes-port the contract names, and stops it on exit
+- review rules: the implement skill ends with a code-review step whose own instructions spawn parallel review sub-agents - the take must not follow that: it runs both review axes sequentially inline in its own context. More generally a take never spawns sub-agents and never blocks waiting on agent messages or notifications - sub-agent replies are not guaranteed to reach a take, and not every executor can spawn them; when an awaited result has not arrived, proceed with what is on disk and note it in the report
 - commit rules: commit locally referencing `#<N>` as a plain mention - the mention must not directly follow any GitHub closing keyword (fix, fixes, fixed, close, closes, closed, resolve, resolves, resolved), even in ordinary prose, since GitHub would auto-close the issue before the gate runs; reword the sentence if needed - and **never push**
 - output shape: a terse report only - what shipped, proofs green (y/n), files touched, commit shas, blockers hit
 
