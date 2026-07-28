@@ -12,15 +12,13 @@ The tracker is the loop's only memory: any session must be able to decide what t
 - Roles are fixed.
   The **driver** grooms, gates, lands, pushes, and owns every tracker write.
   The **implementer** is always a spawned fresh session - never the driver's own context.
-- There is no scheduled loop.
-  The protocol is schedulable by construction (nothing below assumes a human), but scheduling waits until the workflow has proven itself in real use.
 - Sessions are single-flight: at most one orchestrator session runs at a time.
   The crash-recovery rules below depend on this.
 
 ## Invocation
 
 `/orchestrate [spec]` launches a session.
-The no-arg form is canonical: run the session-start procedure and take what it selects - the exact form a future scheduled trigger would invoke.
+The no-arg form is canonical: run the session-start procedure and take what it selects.
 The argument is a human override that picks among legal choices only: it refuses a blocked or claimed spec, and an open `fix-main` ticket still outranks it.
 One spec at a time, never a guaranteed deliverable - a session may fix main, clear a standalone ticket, only groom, or exit mid-board at a ticket boundary.
 A closed spec is a continuation seam: when real context headroom remains, the session may re-run selection and roll into the next spec - one spec remains the normal session; continuation is the exception headroom earns, and never starts a spec the session might not finish gating.
@@ -151,6 +149,6 @@ Both the gate and take prompts consume it.
 
 ## Skill map
 
-- `/to-spec` - conversation → spec issue (upstream, unchanged).
+- `/to-spec` - conversation → spec issue (from the engineering skill set).
 - `/orchestrate` - the driver loop: session-start procedure, then specs end to end - grooms via a fresh subagent following `/to-tickets`, delivers via fresh takes following `/implement`, gates itself.
 - Source of truth for the driver skill and this protocol is wellgent/skills, pinned in `skills-lock.json`.
