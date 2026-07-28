@@ -15,6 +15,7 @@ Grooming breakdowns come from a fresh subagent of your own harness - one session
 
 The state contract is `docs/agents/dev-loop.md`; tracker mechanics are `docs/agents/issue-tracker.md`.
 Read both before the first write - the contract's rules win over this summary.
+The contract's canonical shape ships with this skill at [references/dev-loop-reference.md](references/dev-loop-reference.md): scaffold new projects from it, and after a skill update diff the project's contract against it and reconcile deliberately - the project contract stays authoritative.
 The tracker is the loop's only memory: a session can die at any point, and the next one recovers from tracker state alone.
 
 ## Invocation
