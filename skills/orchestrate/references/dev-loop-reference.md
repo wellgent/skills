@@ -21,8 +21,8 @@ Mechanics (the exact `gh` commands) live in [issue-tracker.md](issue-tracker.md)
 
 ## Operating model
 
-- Work runs in **orchestrator sessions**: human-launched, one spec per session.
-  The session grooms the spec if ungroomed, delivers its board, closes the spec, and ends - the spec boundary is the handoff seam.
+- Work runs in **orchestrator sessions**: human-launched, one spec at a time.
+  The session grooms the spec if ungroomed, delivers its board, and closes the spec - the spec boundary is the handoff seam: the session ends there, or rolls into the next spec when real context headroom remains.
 - Roles are fixed.
   The **driver** grooms, gates, lands, pushes, and owns every tracker write.
   The **implementer** is always a spawned fresh session - never the driver's own context.
@@ -37,7 +37,9 @@ Mechanics (the exact `gh` commands) live in [issue-tracker.md](issue-tracker.md)
 The driver is harness-generic; takes run on the executor named in The implementer contract below - native subagents by default, or an external runner such as `codex exec` per the skill's `runners/` reference.
 The no-arg form is canonical: run the session-start procedure and take what it selects - the exact form a future scheduled trigger would invoke.
 The argument is a human override that picks among legal choices only: it refuses a blocked or claimed spec, and an open `fix-main` ticket still outranks it.
-One spec per session is the ceiling, not a guaranteed deliverable - a session may fix main, clear a standalone ticket, only groom, or exit mid-board at a ticket boundary.
+One spec at a time, never a guaranteed deliverable - a session may fix main, clear a standalone ticket, only groom, or exit mid-board at a ticket boundary.
+A closed spec is a continuation seam: when real context headroom remains, the session may re-run selection and roll into the next spec - one spec remains the normal session; continuation is the exception headroom earns, and never starts a spec the session might not finish gating.
+Every continuation is declared in its reports (see Session end).
 
 ## Hierarchy: specs and tickets
 
@@ -115,8 +117,8 @@ Every orchestrator session runs this before any work:
 Every session, however it exits:
 
 - **Teardown** - stop loop-owned dev servers and browser sessions.
-- **Report** - exactly one spec-level comment per session: the closing comment when the spec closes, a status comment otherwise.
-  It summarizes tickets shipped, bounces, escalations, and commits, and ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
+- **Report** - one spec-level comment per spec driven: the closing comment when the spec closes, a status comment otherwise.
+  It summarizes tickets shipped, bounces, escalations, and commits, names the driver session id literally (never "this session") plus, when the session drove more than one spec, this spec's ordinal within it - the anchor for post-factum cost attribution - and ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
 - **Observations** - anything actionable (a tooling defect, a gate blind spot, a skill gap) becomes an issue labelled `needs-triage`; narrative context goes in the report's Observations section.
 
 Mid-board exits happen at ticket boundaries only.

@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # Orchestrate (dev-loop driver)
 
-One orchestrator session: preflight, select, drive **one spec** end to end, tear down, report.
+One orchestrator session: preflight, select, drive **one spec** end to end, tear down, report - and at a closed-spec seam with real context headroom, optionally roll into the next.
 Roles are fixed.
 You (the agent running this skill, in whatever harness) are the **driver**: you groom, gate, land, push, and own every tracker write.
 The **executor** implements: every take runs in a fresh session at token-zero on the take executor the contract names - your harness's native subagent mechanism unless the contract names an external runner (see The take).
@@ -22,7 +22,9 @@ The tracker is the loop's only memory: a session can die at any point, and the n
 
 The no-arg form is canonical: run the session-start procedure and take what it selects.
 A spec argument is a human override that picks among **legal choices only**: refuse a blocked or claimed spec, and an open `fix-main` ticket still outranks it.
-One spec per session is the ceiling, not a guaranteed deliverable - a session may fix main, clear a standalone ticket, only groom, or exit mid-board at a ticket boundary.
+One spec at a time, never a guaranteed deliverable - a session may fix main, clear a standalone ticket, only groom, or exit mid-board at a ticket boundary.
+A **closed spec is a continuation seam**: when real context headroom remains, the session may re-run selection and roll into the next spec - one spec remains the normal session; continuation is the exception headroom earns, and never starts a spec the session might not finish gating.
+Every continuation is declared in its reports (see Session end).
 
 ## Session start
 
@@ -47,7 +49,8 @@ Per the contract's session-start procedure, in order:
 - **Ticket boundaries are the exit seams.** At each boundary check your own context pressure and stop rather than start a take you might not gate - take commits are local and die with the session.
   Anything the next session needs goes as a comment on the relevant ticket; the tracker is the only handoff surface.
   Resuming is just invoking this skill again.
-- All sub-issues closed → **close the spec**; the closed spec is the durable done-marker that unblocks its dependent specs, and its closing comment is the session report.
+- All sub-issues closed → **close the spec**; the closed spec is the durable done-marker that unblocks its dependent specs, and its closing comment is the spec report.
+  Then the continuation check: with real context headroom remaining, you may re-run Select and drive the next spec; otherwise tear down and end.
 
 ## Grooming a spec
 
@@ -144,9 +147,9 @@ The tracker's comments are what a later retro reads.
 Every session, however it exits:
 
 - **Teardown** - stop loop-owned dev servers and browser sessions.
-- **Report** - exactly one spec-level comment: the closing comment when the spec closes, a status comment otherwise.
+- **Report** - one spec-level comment per spec driven: the closing comment when the spec closes, a status comment otherwise.
   A session that touched no spec lands the same report on the last ticket it delivered.
-  It carries: tickets shipped with takes and bounces, escalations, commits, environment or tooling friction hit along the way, observations filed, and the session ids (driver + takes).
+  It carries: tickets shipped with takes and bounces, escalations, commits, environment or tooling friction hit along the way, observations filed, and the session ids (driver + takes) - the driver session id stated literally, never as "this session", and, when the session drove more than one spec, this spec's ordinal within it ("second spec this session, after #63") so post-factum accounting can split the transcript at spec boundaries.
   Then a short **reflection**, a line or two each: the hardest call of the session and the alternatives rejected; the least-confident spots and the assumptions under them; what a wider scope would have done differently.
   It ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
 - **Observations** - anything actionable (a tooling defect, a gate blind spot, a skill gap) becomes its own issue labelled `needs-triage`; narrative context goes in the report's Observations section.
