@@ -1,6 +1,7 @@
 # Wellgent Agent Skills
 
-Reusable skills for AI coding agents, by [Wellgent](https://wellgent.ai).
+Reusable skills for AI coding agents, by [Wellgent](https://wellgent.ai): the skills we design and run in production, published for anyone to adopt.
+The collection grows as our workflow does - `orchestrate` is the first.
 
 Install into a project with the [skills](https://www.skills.sh/) CLI:
 
@@ -21,10 +22,12 @@ npx skills add wellgent/skills -s orchestrate
 
 ## Conventions these skills assume
 
-`orchestrate` drives a spec-based dev loop and expects the project to carry:
+`orchestrate` is an **add-on to [mattpocock/skills](https://github.com/mattpocock/skills)**, not a standalone workflow: it drives that set's `to-tickets` (grooming) and `implement` (takes), and rides the triage-label conventions its `setup-matt-pocock-skills` establishes.
+Install the mattpocock set into the project first.
 
-- a dev-loop state contract at `docs/agents/dev-loop.md` and tracker mechanics at `docs/agents/issue-tracker.md` - the contract is authoritative; the skill is the driver's procedure on top of it. The contract's implementer section names the take executor (`Takes: native subagents` or `Takes: codex exec`)
-- an engineering skill set providing `to-tickets` and `implement` (for example [mattpocock/skills](https://github.com/mattpocock/skills))
+On top of that, the project carries:
+
+- a dev-loop state contract at `docs/agents/dev-loop.md` and tracker mechanics at `docs/agents/issue-tracker.md` - the contract is authoritative; the skill is the driver's procedure on top of it. The contract's implementer section names the take executor (`Takes: native subagents` or `Takes: codex exec`). The canonical contract shape ships with the skill at [`skills/orchestrate/references/dev-loop-reference.md`](skills/orchestrate/references/dev-loop-reference.md) - scaffold from it, and diff your contract against the installed copy after skill updates
 - a GitHub-style issue tracker with labels (`ready-for-agent`, `in-progress`, `needs-human`, `needs-triage`, `needs-info`), sub-issues, and blocking edges
 
 A project missing these can still read the skill as a reference workflow, but the loop's guarantees come from the contract documents.
