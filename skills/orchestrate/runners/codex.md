@@ -1,7 +1,7 @@
 # Runner: codex exec takes
 
 Takes run as fresh `codex exec` sessions; the driver stays in its own harness and gates as usual.
-A project selects this runner by naming it in its dev-loop contract's implementer section (`Takes: codex exec`).
+This runner is used only on explicit invocation-time request ("run takes via codex"); absent that request, takes always run on the driving harness's native subagent mechanism.
 
 ## Spawn
 

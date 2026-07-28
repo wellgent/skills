@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Run one dev-loop session as the driver - preflight, select, one spec end to end. Harness-generic - grooming drafts run in fresh subagents of the driving harness; takes run on the executor the project contract names (native subagents by default, or an external harness via a runner file); the gate stays yours.
+description: Run one dev-loop session as the driver - preflight, select, one spec end to end. Harness-generic - grooming drafts and takes run in fresh native subagents of whatever harness drives (an explicit invocation request may route takes through a runner file instead); the gate stays yours.
 argument-hint: "[spec issue ref or URL - omit to let the session-start procedure select]"
 disable-model-invocation: true
 ---
@@ -10,12 +10,12 @@ disable-model-invocation: true
 One orchestrator session: preflight, select, drive **one spec** end to end, tear down, report - and at a closed-spec seam with real context headroom, optionally roll into the next.
 Roles are fixed.
 You (the agent running this skill, in whatever harness) are the **driver**: you groom, gate, land, push, and own every tracker write.
-The **executor** implements: every take runs in a fresh session at token-zero on the take executor the contract names - your harness's native subagent mechanism unless the contract names an external runner (see The take).
+The **implementer** is always a fresh session at token-zero on your harness's native subagent mechanism - whichever harness drives runs the takes; only an explicit invocation-time request routes them through an external runner (see The take).
 Grooming breakdowns come from a fresh subagent of your own harness - one session shapes spec, another builds to spec, and review never leaves you.
 
-The state contract is `docs/agents/dev-loop.md`; tracker mechanics are `docs/agents/issue-tracker.md`.
-Read both before the first write - the contract's rules win over this summary.
-The contract's canonical shape ships with this skill at [references/dev-loop-reference.md](references/dev-loop-reference.md): scaffold new projects from it, and after a skill update diff the project's contract against it and reconcile deliberately - the project contract stays authoritative.
+The loop's semantics ship with this skill at [references/dev-loop-protocol.md](references/dev-loop-protocol.md) - read in place, never copied into projects.
+The project's contract is `docs/agents/dev-loop.md`: its declarations only (ports, scripts, gate proofs, deliberate deviations); on conflict the contract wins. Tracker mechanics are `docs/agents/issue-tracker.md`.
+Read protocol and contract before the first write. No contract file → stop and point at [references/dev-loop-declarations.md](references/dev-loop-declarations.md) to scaffold one, rather than guessing.
 The tracker is the loop's only memory: a session can die at any point, and the next one recovers from tracker state alone.
 
 ## Invocation
@@ -87,12 +87,12 @@ Start from a **clean working tree** on the branch the ticket lands on - the diff
 
 ### The take
 
-Every take is a fresh session at token-zero on the **take executor**, working in the same checkout on the same branch.
-The contract's implementer section names the executor; the branch decides the mechanics:
+Every take is a fresh session at token-zero, working in the same checkout on the same branch.
+Takes spawn on your harness's **native subagent mechanism** - only an explicit invocation-time request routes them through an external runner:
 
-- **Native subagents** (the default) - spawn the take with your harness's native subagent mechanism.
+- **Native subagents** - spawn the take with your harness's native subagent mechanism.
   Bounces continue the same take session where your harness can resume one - cheaper than fresh, and the take's context survives; where it cannot, spawn a fresh subagent whose prompt carries the original contract verbatim, the prior take's report, and the bounce finding.
-- **External runner** - the contract names a runner file in this skill's `runners/` folder; follow it for spawn, resume, and take metering.
+- **External runner** (explicit request only) - the invocation names a runner file in this skill's `runners/` folder; follow it for spawn, resume, and take metering.
   [`runners/codex.md`](runners/codex.md) runs takes as `codex exec` sessions.
 
 Either way a bounce continuation counts against the three-take budget.

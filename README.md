@@ -25,12 +25,16 @@ npx skills add wellgent/skills -s orchestrate
 `orchestrate` is an **add-on to [mattpocock/skills](https://github.com/mattpocock/skills)**, not a standalone workflow: it drives that set's `to-tickets` (grooming) and `implement` (takes), and rides the triage-label conventions its `setup-matt-pocock-skills` establishes.
 Install the mattpocock set into the project first.
 
-On top of that, the project carries:
+The loop's semantics ship with the skill and are read in place - [`dev-loop-protocol.md`](skills/orchestrate/references/dev-loop-protocol.md) - so skill updates carry protocol updates with no per-project reconcile.
+Takes always run on the driving harness's native subagent mechanism (Claude Code spawns Claude subagents, Codex its own way); an explicit invocation request may route takes through a runner file instead (`runners/codex.md`).
 
-- a dev-loop state contract at `docs/agents/dev-loop.md` and tracker mechanics at `docs/agents/issue-tracker.md` - the contract is authoritative; the skill is the driver's procedure on top of it. The contract's implementer section names the take executor (`Takes: native subagents` or `Takes: codex exec`). The canonical contract shape ships with the skill at [`skills/orchestrate/references/dev-loop-reference.md`](skills/orchestrate/references/dev-loop-reference.md) - scaffold from it, and diff your contract against the installed copy after skill updates
+On top of that, the project carries only what is project-specific:
+
+- a slim declarations contract at `docs/agents/dev-loop.md` - ports, scripts, gate proofs, and any deliberate protocol deviations; on conflict the contract wins. Scaffold it from [`dev-loop-declarations.md`](skills/orchestrate/references/dev-loop-declarations.md)
+- tracker mechanics at `docs/agents/issue-tracker.md`, and a project-local `verify` skill for runtime verification (scaffold: [`verify-reference.md`](skills/orchestrate/references/verify-reference.md))
 - a GitHub-style issue tracker with labels (`ready-for-agent`, `in-progress`, `needs-human`, `needs-triage`, `needs-info`), sub-issues, and blocking edges
 
-A project missing these can still read the skill as a reference workflow, but the loop's guarantees come from the contract documents.
+A project missing these can still read the skill as a reference workflow, but the loop's guarantees come from the protocol plus the contract.
 
 ## License
 
