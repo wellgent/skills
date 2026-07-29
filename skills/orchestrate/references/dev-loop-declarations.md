@@ -29,6 +29,7 @@ Tracker mechanics live in [issue-tracker.md](issue-tracker.md); label strings in
 
 - Check command: <command> - the single quality gate (typecheck + lint + tests); the proof command in take prompts and the gate's baseline fact re-run.
 - Dev-server script: <path> - start/stop/status on an explicit port; servers are ephemeral and session-owned.
+- Worktree scaffold: <what a fresh take worktree needs before it can run - untracked env files to copy from the main checkout, the dependency install command>.
 - Browser-tooling health check: <command>.
 - Verify skill: `.agents/skills/verify/` - repo-specific runtime verification; the gate calls it for any ticket with runtime surface.
 

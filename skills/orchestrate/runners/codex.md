@@ -13,6 +13,7 @@ cat >"$P" <<'EOF'
 <the take prompt>
 EOF
 codex exec --yolo --json \
+  -C <take worktree> \
   -c model_reasoning_effort="xhigh" \
   -o <scratch>/take-<N>-1.md - <"$P" \
   > <scratch>/take-<N>-1.jsonl 2> <scratch>/take-<N>-1.err
@@ -28,6 +29,7 @@ Bounces resume the same session - cheaper than fresh, and the take's context sur
 
 ```bash
 codex exec resume "$SID" --dangerously-bypass-approvals-and-sandbox --json \
+  -C <take worktree> \
   -o <scratch>/take-<N>-2.md - <"$P2" > <scratch>/take-<N>-2.jsonl 2> <scratch>/take-<N>-2.err
 ```
 

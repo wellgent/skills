@@ -72,7 +72,7 @@ Under single-flight, **any assigned item at session start is a died session**.
 Recovery is mechanical, per state:
 
 - Ticket `in-progress` + assigned → revert to `ready-for-agent`, unassign.
-  Take commits were local to the dead session; nothing to salvage.
+  Take commits sit on the dead session's take worktree, which the workspace preflight removes; nothing to salvage.
 - Spec `in-progress` + assigned → **wipe-and-regroom**: close the orphaned sub-issues, revert the spec to `ready-for-agent`, unassign.
   Grooming is cheap; a partial-publish reconciliation protocol is not.
 
@@ -81,7 +81,7 @@ Recovery is mechanical, per state:
 Every orchestrator session runs this before any work:
 
 1. **Workspace preflight** - a dirty tree hard-stops the session with a report of what it found; only work the session can identify may be stashed, committed, or discarded.
-   Then `git fetch` and rebase onto the default branch, health-check the browser-verification tooling, and reap stale loop-owned dev servers on the contract's gate and takes ports via its dev-server script - never the human's interactive port.
+   Then `git fetch` and rebase onto the default branch, health-check the browser-verification tooling, reap stale loop-owned dev servers on the contract's gate and takes ports via its dev-server script - never the human's interactive port - and remove stale take worktrees with their branches (leftovers are died sessions).
    No dev server is started here: servers stay ephemeral, spun up when a gate needs one.
 2. **Recovery sweep** - find assigned items, apply the crash-safety table above.
 3. **Tracker preflight** - read CI and deploy status on the default branch's head.
@@ -128,7 +128,10 @@ Only an explicit invocation-time request routes takes through an external runner
 Whichever way a take spawns, the contract holds:
 
 - Fresh session at token-zero; the prompt carries the complete spec and grounding pointers.
-- The session is continuable - the groom quiz loop and delivery bounces resume the same session.
+- The take works in its **own worktree** on a take branch, never in another session's working copy - the harness's native worktree isolation when it has one, plain `git worktree` otherwise.
+  The driver scaffolds it per the contract's worktree scaffold line (untracked env files, dependency install) and removes it, branch included, once the ticket lands or escalates.
+- Worktrees isolate files, not shared runtime: the dev backend is still one per project, so sessions stay single-flight.
+- The session is continuable - the groom quiz loop and delivery bounces resume the same session, same worktree.
 - A terse report comes back; the driver never reads raw logs wholesale.
 - Commits stay local and unpushed; every tracker write and every push belongs to the driver.
 

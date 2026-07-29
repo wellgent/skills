@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Run one dev-loop session as the driver - preflight, select, one spec end to end. Harness-generic - grooming drafts and takes run in fresh native subagents of whatever harness drives (an explicit invocation request may route takes through a runner file instead); the gate stays yours.
+description: Run one dev-loop session as the driver - preflight, select, one spec end to end. Harness-generic - grooming drafts and takes run in fresh native subagents of whatever harness drives, takes in their own worktrees (an explicit invocation request may route takes through a runner file instead); the gate stays yours.
 argument-hint: "[spec issue ref or URL - omit to let the session-start procedure select]"
 disable-model-invocation: true
 ---
@@ -31,7 +31,7 @@ Every continuation is declared in its reports (see Session end).
 Per the contract's session-start procedure, in order:
 
 1. **Workspace preflight** - a dirty tree hard-stops the session with a report of what you found; only work you can identify may be stashed, committed, or discarded.
-   Then `git fetch` + rebase onto `origin/main`, health-check the browser tooling, and reap stale loop-owned dev servers on the contract's gate and takes ports - the human's interactive port is untouchable.
+   Then `git fetch` + rebase onto `origin/main`, health-check the browser tooling, reap stale loop-owned dev servers on the contract's gate and takes ports - the human's interactive port is untouchable - and remove stale take worktrees with their branches (leftovers are died sessions).
    Servers stay ephemeral: spun up when a gate needs one, none started here.
 2. **Recovery sweep** - any assigned open item is a died session (the loop is single-flight).
    Apply the contract's recovery table: `in-progress` ticket → revert to `ready-for-agent` and unassign; `in-progress` spec → **wipe-and-regroom** (close its orphaned sub-issues, revert, unassign).
@@ -73,21 +73,22 @@ Never groom ahead: a spec is groomable only when its blocking specs are closed, 
 ## Delivering a ticket
 
 One ticket → closed, atomic in-session: take + gate + land.
-Start from a **clean working tree** on the branch the ticket lands on - the diff you gate must be exactly the take.
+Start from a **clean working tree** on the branch the ticket lands on; the take runs in its own worktree, so the diff you gate is exactly the take.
 
 1. **Claim**: flip `ready-for-agent` → `in-progress`, assign yourself - before any work.
-2. **Take**: spawn a fresh take session on the contract's executor (see The take). Each attempt is a **take**; every take commits, so the issue timeline reads as the full attempt history.
+2. **Take**: spawn a fresh take session in its own worktree (see The take). Each attempt is a **take**; every take commits, so the issue timeline reads as the full attempt history.
 3. **Gate** (see The gate). Green → step 5; not green → step 4.
 4. **Bounce**: comment the specific defect on the issue - the auditable record of what review found - then **continue the same take session** with the finding and the fix expectation, same contract. Re-gate at step 3.
    Budget is **three takes**; if the third still misses, escalate: label `needs-human`, drop `in-progress`, unassign, and leave the commits and comments in place as the record.
    The driver stays out of the code - escalation, not takeover.
-5. **Land and close**: scan the take's commit messages for wrong `#<N>` mentions and for closing-keyword + `#<N>` collisions, amend any before pushing, then push the take commits, comment what shipped (see The record), and close the issue - closing is what unblocks its dependents.
+5. **Land and close**: scan the take's commit messages for wrong `#<N>` mentions and for closing-keyword + `#<N>` collisions, amend any before pushing, then land the take branch onto the landing branch (rebase it first if the landing branch has moved, then fast-forward), push, comment what shipped (see The record), and close the issue - closing is what unblocks its dependents.
    **Push only on green**: red takes never reach the remote - in most setups a push to main deploys production.
-6. **Teardown**: stop any dev server or browser session the gate started.
+6. **Teardown**: stop any dev server or browser session the gate started, and remove the take's worktree and branch - on landing and on escalation alike; the tracker comments are the record, not the leftover worktree.
 
 ### The take
 
-Every take is a fresh session at token-zero, working in the same checkout on the same branch.
+Every take is a fresh session at token-zero, working in its **own worktree** on a take branch cut from the landing branch - never in a shared working copy, so concurrent sessions cannot sweep each other's uncommitted work into a commit or push each other's ungated commits.
+Create it with your harness's native worktree isolation when it has one, plain `git worktree add` otherwise, and scaffold it per the contract's worktree scaffold line (untracked env files, dependency install) before the take starts.
 Takes spawn on your harness's **native subagent mechanism** - only an explicit invocation-time request routes them through an external runner:
 
 - **Native subagents** - spawn the take with your harness's native subagent mechanism.
@@ -108,7 +109,7 @@ Every take prompt carries:
 - grounding pointers: the repo's domain glossary (`CONTEXT.md`), any generated stack guidelines the repo ships (they override trained knowledge), and the design-direction docs when the issue has UI surface
 - constraints and non-goals lifted from the issue
 - proof expected: the project's exact check command, plus every deploy-shaped proof the diff will trigger per the contract's Gate proofs section - the take runs them too, so bounces are cheap
-- runtime rules: if the take needs a running app, it spins up its own ephemeral server via the dev-server script and takes-port the contract names, and stops it on exit
+- runtime rules: if the take needs a running app, it spins up its own ephemeral server from inside its worktree via the dev-server script and takes-port the contract names, and stops it on exit
 - review rules: the implement skill ends with a code-review step whose own instructions spawn parallel review sub-agents - the take must not follow that: it runs both review axes sequentially inline in its own context. More generally a take never spawns sub-agents and never blocks waiting on agent messages or notifications - sub-agent replies are not guaranteed to reach a take, and not every executor can spawn them; when an awaited result has not arrived, proceed with what is on disk and note it in the report
 - commit rules: commit locally referencing `#<N>` as a plain mention - the mention must not directly follow any GitHub closing keyword (fix, fixes, fixed, close, closes, closed, resolve, resolves, resolved), even in ordinary prose, since GitHub would auto-close the issue before the gate runs; reword the sentence if needed - and **never push**
 - output shape: a terse report only - what shipped, proofs green (y/n), files touched, commit shas, blockers hit
@@ -124,8 +125,8 @@ Review is never delegated and never skipped.
 - **Design direction** - UI diffs against the repo's standing design docs; flag drift rather than restyling by taste.
 - **Elegance** - the diff earns its size: reuse over reinvention, no gratuitous abstraction, tests assert behavior at settled seams rather than implementation detail.
 
-**Then the facts.** The report is a claim; the fact is your own re-run.
-Run the project's check command yourself, and verify the app end to end (the repo's verify skill, if it ships one) when the issue has runtime surface - on your own ephemeral dev server (the contract's gate port), with the human's interactive port untouched.
+**Then the facts.** The report is a claim; the fact is your own re-run in the take's worktree - deps installed, diff checked out.
+Run the project's check command yourself, and verify the app end to end (the repo's verify skill, if it ships one) when the issue has runtime surface - on your own ephemeral dev server from that worktree (the contract's gate port), with the human's interactive port untouched.
 
 **Deploy-shaped proofs.** The local check chain structurally cannot see deploy-only failures; the gate runs what production runs.
 The contract's **Gate proofs** section maps diff shapes to the repo's proof commands (schema changes, destructive data changes, production-build-only errors); run every proof the diff triggers.
