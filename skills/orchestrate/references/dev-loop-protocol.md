@@ -81,7 +81,7 @@ Recovery is mechanical, per state:
 Every orchestrator session runs this before any work:
 
 1. **Workspace preflight** - a dirty tree hard-stops the session with a report of what it found; only work the session can identify may be stashed, committed, or discarded.
-   Then `git fetch` and rebase onto the default branch, health-check the browser-verification tooling, reap stale loop-owned dev servers on the contract's gate and takes ports via its dev-server script - never the human's interactive port - and remove stale take worktrees with their branches (leftovers are died sessions).
+   Then `git fetch` and rebase onto the default branch, health-check the browser-verification tooling, reap stale loop-owned dev servers on the contract's gate and takes ports via its dev-server script - never the off-loop port, which belongs to work outside the loop - and remove stale take worktrees with their branches (leftovers are died sessions).
    No dev server is started here: servers stay ephemeral, spun up when a gate needs one.
 2. **Recovery sweep** - find assigned items, apply the crash-safety table above.
 3. **Tracker preflight** - read CI and deploy status on the default branch's head.

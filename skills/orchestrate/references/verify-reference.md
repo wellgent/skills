@@ -9,7 +9,7 @@ Scaffold two artifacts, resolving every `<placeholder>` from the project.
 ## 1. The dev-server script: `scripts/dev-server.sh`
 
 Ephemeral, session-owned servers on explicit ports - so an agent's server can die with its session without taking anyone else's down.
-Ports come from the contract's port map (`docs/agents/dev-loop.md`): the human's interactive port (agents keep off it), the gate port for verification, the takes port for implementers.
+Ports come from the contract's port map (`docs/agents/dev-loop.md`): the off-loop port (work outside the loop, manual or agent-driven - loop sessions keep off it), the gate port for verification, the takes port for implementers.
 
 ```bash
 #!/usr/bin/env bash

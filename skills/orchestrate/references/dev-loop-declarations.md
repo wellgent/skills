@@ -20,7 +20,7 @@ Tracker mechanics live in [issue-tracker.md](issue-tracker.md); label strings in
 
 ## Ports
 
-- Human (interactive): <port> - agents never touch it.
+- Off-loop: <port> - work outside orchestrator sessions, manual or agent-driven; the loop never binds or reaps it.
 - Gate (verification): <port>.
 - Takes (implementers): <port>.
 <any further port rules, e.g. a neighboring production port on the same machine that agents must never touch>
@@ -92,8 +92,8 @@ Verify each in the target and flag gaps - the loop runs degraded without them:
 
 - **A check command** - the repo's single quality-gate command (typecheck + lint + tests), named in its instructions file and declared in the contract.
 - **A `/verify` skill** - repo-specific runtime verification (how to launch, sign in, and drive the app); the gate calls it for any ticket with runtime surface. Scaffold it from [verify-reference.md](verify-reference.md).
-- **An ephemeral dev-server script** - start/stop/status on an explicit port, so takes and gates own their servers and the human's interactive port stays untouched; declared in the contract and scaffolded by the same verify reference.
+- **An ephemeral dev-server script** - start/stop/status on an explicit port, so takes and gates own their servers and the off-loop port stays untouched; declared in the contract and scaffolded by the same verify reference.
 - **GitHub sub-issues and issue dependencies** enabled on the repo - the hierarchy and blocking edges are native, not body conventions.
 - **The `codex` CLI installed and authenticated** on the machine only when takes will be routed through the codex runner by explicit invocation - and `jq` for reading its event streams.
 - **Provider credentials on the machine, verified at scaffold time** - whatever auth the stack's tickets will need: `npx convex whoami`, `vercel whoami`, `gh auth status` (with the scopes the tracker mechanics use), DNS/registrar access when the spec includes domains. A gap found here is a line in the setup report; a gap found mid-board stalls every remaining ticket behind a `needs-human`.
-- **A machine-unique port map** - the contract's human/gate/takes (and production) ports must not collide with any other project or service on the same machine. Where a machine-level port registry exists, claim a free block there before writing the contract.
+- **A machine-unique port map** - the contract's off-loop/gate/takes (and production) ports must not collide with any other project or service on the same machine. Where a machine-level port registry exists, claim a free block there before writing the contract.

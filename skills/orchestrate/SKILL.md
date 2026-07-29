@@ -31,7 +31,7 @@ Every continuation is declared in its reports (see Session end).
 Per the contract's session-start procedure, in order:
 
 1. **Workspace preflight** - a dirty tree hard-stops the session with a report of what you found; only work you can identify may be stashed, committed, or discarded.
-   Then `git fetch` + rebase onto `origin/main`, health-check the browser tooling, reap stale loop-owned dev servers on the contract's gate and takes ports - the human's interactive port is untouchable - and remove stale take worktrees with their branches (leftovers are died sessions).
+   Then `git fetch` + rebase onto `origin/main`, health-check the browser tooling, reap stale loop-owned dev servers on the contract's gate and takes ports - the off-loop port belongs to work outside the loop and is untouchable - and remove stale take worktrees with their branches (leftovers are died sessions).
    Servers stay ephemeral: spun up when a gate needs one, none started here.
 2. **Recovery sweep** - any assigned open item is a died session (the loop is single-flight).
    Apply the contract's recovery table: `in-progress` ticket → revert to `ready-for-agent` and unassign; `in-progress` spec → **wipe-and-regroom** (close its orphaned sub-issues, revert, unassign).
@@ -126,7 +126,7 @@ Review is never delegated and never skipped.
 - **Elegance** - the diff earns its size: reuse over reinvention, no gratuitous abstraction, tests assert behavior at settled seams rather than implementation detail.
 
 **Then the facts.** The report is a claim; the fact is your own re-run in the take's worktree - deps installed, diff checked out.
-Run the project's check command yourself, and verify the app end to end (the repo's verify skill, if it ships one) when the issue has runtime surface - on your own ephemeral dev server from that worktree (the contract's gate port), with the human's interactive port untouched.
+Run the project's check command yourself, and verify the app end to end (the repo's verify skill, if it ships one) when the issue has runtime surface - on your own ephemeral dev server from that worktree (the contract's gate port), with the off-loop port untouched.
 
 **Deploy-shaped proofs.** The local check chain structurally cannot see deploy-only failures; the gate runs what production runs.
 The contract's **Gate proofs** section maps diff shapes to the repo's proof commands (schema changes, destructive data changes, production-build-only errors); run every proof the diff triggers.
