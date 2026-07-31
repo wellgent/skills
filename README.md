@@ -20,6 +20,17 @@ npx skills add wellgent/skills -s orchestrate
 - **orchestrate** - run one dev-loop session as the driver: preflight, select, drive one spec end to end, tear down, report.
   Harness-generic: grooming drafts run in fresh subagents of the driving harness; implementation takes run on the executor the project contract names - the harness's native subagents by default, or an external harness via a runner file (`runners/codex.md` ships takes as `codex exec` sessions). Review and every tracker write stay with the driver.
 
+## What belongs here
+
+Skills graduate into this collection from the projects that bred them; a skill is promoted only when it passes all three tests:
+
+- **A second project wants it** - proven demand beyond its birthplace, not speculative reuse.
+- **It is internals-free** - any coupling to a specific product, company, or environment is expressed generically.
+- **It works unmodified in a stranger's repo** - install it, read it, run it, with no tribal knowledge required.
+
+Skills that are one project's specifics stay in that project.
+Once here, a skill is distributed like any third-party skill: an ordinary `npx skills` pin in the consuming repo's `skills-lock.json`.
+
 ## Conventions these skills assume
 
 `orchestrate` is an **add-on to [mattpocock/skills](https://github.com/mattpocock/skills)**, not a standalone workflow: it drives that set's `to-tickets` (grooming) and `implement` (takes), and rides the triage-label conventions its `setup-matt-pocock-skills` establishes.
