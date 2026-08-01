@@ -1,8 +1,8 @@
 # Verify reference
 
 Scaffold for a target project's `verify` skill - the repo-specific manual for launching, signing in, and driving the app at runtime.
-Agents observe what they actually built through it: browser review during development, and the dev-loop gate (`orchestrate`) calls it for any ticket with runtime surface.
-It is a living skill: each verification session appends the gotchas it earns, so the manual sharpens with use.
+The shared mechanics live in [verify-protocol.md](verify-protocol.md) and are read in place from the installed skill; the scaffolded skill holds only what is unique to the repo, and each verification session appends the gotchas it earns.
+Launch-the-app content belongs in this one skill - launch is its first chapter, not a companion skill.
 
 Scaffold two artifacts, resolving every `<placeholder>` from the project.
 
@@ -13,7 +13,7 @@ Ports come from the contract's port map (`docs/agents/dev-loop.md`): the off-loo
 
 ```bash
 #!/usr/bin/env bash
-# Ephemeral dev-server lifecycle for verification runs (see the run/verify skills).
+# Ephemeral dev-server lifecycle for verification runs (see the verify skill).
 # One server per checkout at a time - concurrent dev processes share build state and corrupt it.
 set -euo pipefail
 
@@ -82,49 +82,40 @@ Fill what is knowable at scaffold time and leave the rest as headed sections tha
 ```markdown
 ---
 name: verify
-description: How to launch and drive this app for runtime verification - dev servers, agent sign-in, and browser driving. Use when verifying a change end-to-end in the running app.
+description: How to launch and drive this app at runtime - dev servers, agent sign-in, and browser driving. Use when verifying a change end-to-end in the running app, or when asked to run, start, or screenshot the app.
 ---
 
 # Verifying <project> at runtime
 
+Protocol first: read `../orchestrate/references/verify-protocol.md` - dev-server discipline, the browser preflight, the review loop, the universal gotchas.
+This skill declares what is unique to this repo.
+
+## Ports
+
+<The role map - every port a session must know, including any it must never touch:
+- <off-loop port> - work outside the loop, manual or agent-driven. Loop sessions keep off it.
+- <gate port> - gate verification.
+- <takes port> - implementer takes.
+- <production port, when the host co-runs the production service> - never touch it, never kill anything on it.>
+
 ## Launch
 
-Use `scripts/dev-server.sh start <gate port>` for a fresh, session-owned server.
-Always `scripts/dev-server.sh stop <gate port>` at the end of the session - teardown is part of the loop, not optional.
+Use `scripts/dev-server.sh start <gate port>` for a fresh, session-owned server; stop it at session end.
 
-## Browser health preflight
-
-Default tool: **`agent-browser`**.
-Before a verification session, prove the daemon spawns:
-
-    agent-browser open about:blank && agent-browser session info --json && agent-browser close
-
-Healthy output has `"browserLaunched":true` and `"success":true`.
-If the daemon fails with `Resource temporarily unavailable` (EAGAIN), the likely cause is per-user process-limit exhaustion: diagnose with `ps aux | wc -l` vs `ulimit -u`, recover by reaping strays (`agent-browser close --all`, leftover dev servers, headless Chrome) rather than reinstalling.
+<What start actually runs and anything launch-specific: backend sync steps, the dev command, per-port build-dir isolation, interactive-dev notes.>
 
 ## Sign-in for agents
 
 <How an agent signs in without a human: the dev-only backdoor (test accounts, logged OTPs or magic links, seeded sessions) and its exact steps.
 Whatever the mechanism, it must be dev-deployment-only - production keeps the real flow, and the backdoor never ships or runs there.>
 
-## Driving the browser
-
-The known-good review loop, against your session's own port:
-
-    agent-browser open http://localhost:<gate port> && agent-browser wait --load networkidle
-    agent-browser set viewport 375 812 && agent-browser screenshot --full mobile.png
-    agent-browser set viewport 1280 800 && agent-browser screenshot --full desktop.png
-    agent-browser close
-
-Pass **absolute paths** to `agent-browser screenshot` - relative paths resolve against the daemon's working directory, not the caller's.
+## Driving gotchas
 
 <Project-specific driving gotchas, appended as sessions earn them: selectors that need `type` over fill, modals that trap Escape, forms that only enable on dirty+valid, waits that hang on persistent sockets.>
 
 ## Environment gotchas
 
-<Appended as sessions earn them.
-Universal seed: a production build clobbers a running dev server's build dir - stop the server before `next build`, and restart clean if it 500s.
-Saved browser auth state goes stale; re-run sign-in at the start of each session rather than trusting yesterday's.>
+<Checkout-specific hazards, appended as sessions earn them.>
 
 ## Checks that work well
 

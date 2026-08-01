@@ -91,7 +91,7 @@ Then record them in `docs/agents/triage-labels.md` (same deferral rule as the tr
 Verify each in the target and flag gaps - the loop runs degraded without them:
 
 - **A check command** - the repo's single quality-gate command (typecheck + lint + tests), named in its instructions file and declared in the contract.
-- **A `/verify` skill** - repo-specific runtime verification (how to launch, sign in, and drive the app); the gate calls it for any ticket with runtime surface. Scaffold it from [verify-reference.md](verify-reference.md).
+- **A `/verify` skill** - repo-specific runtime verification (how to launch, sign in, and drive the app); the gate calls it for any ticket with runtime surface. The shared mechanics are read in place from [verify-protocol.md](verify-protocol.md); scaffold the skill from [verify-reference.md](verify-reference.md).
 - **An ephemeral dev-server script** - start/stop/status on an explicit port, so takes and gates own their servers and the off-loop port stays untouched; declared in the contract and scaffolded by the same verify reference.
 - **GitHub sub-issues and issue dependencies** enabled on the repo - the hierarchy and blocking edges are native, not body conventions.
 - **The `codex` CLI installed and authenticated** on the machine only when takes will be routed through the codex runner by explicit invocation - and `jq` for reading its event streams.

@@ -42,7 +42,7 @@ Takes always run on the driving harness's native subagent mechanism (Claude Code
 On top of that, the project carries only what is project-specific:
 
 - a slim declarations contract at `docs/agents/dev-loop.md` - ports, scripts, gate proofs, and any deliberate protocol deviations; on conflict the contract wins. Scaffold it from [`dev-loop-declarations.md`](skills/orchestrate/references/dev-loop-declarations.md)
-- tracker mechanics at `docs/agents/issue-tracker.md`, and a project-local `verify` skill for runtime verification (scaffold: [`verify-reference.md`](skills/orchestrate/references/verify-reference.md))
+- tracker mechanics at `docs/agents/issue-tracker.md`, and a project-local `verify` skill for runtime verification (shared mechanics read in place from [`verify-protocol.md`](skills/orchestrate/references/verify-protocol.md); scaffold: [`verify-reference.md`](skills/orchestrate/references/verify-reference.md))
 - a GitHub-style issue tracker with labels (`ready-for-agent`, `in-progress`, `needs-human`, `needs-triage`, `needs-info`), sub-issues, and blocking edges
 
 A project missing these can still read the skill as a reference workflow, but the loop's guarantees come from the protocol plus the contract.
