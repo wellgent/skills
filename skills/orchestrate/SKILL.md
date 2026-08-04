@@ -64,6 +64,8 @@ Never groom ahead: a spec is groomable only when its blocking specs are closed, 
    - **Edges** - only genuine gates, nothing serialized out of caution.
    - **Coverage** - every requirement of the spec lands in some ticket.
    - **Reality** - verify any "already exists, no ticket needed" claim against the code yourself before accepting it.
+     The same goes for any assertion about a reference repo or the environment ("X already does this, copy it"): verify it against the actual repo state at groom time, never inherit it from the spec or issue body - a stale claim promoted into a ticket carries the groomer's authority, and the gate checks the diff, not the brief's premises.
+     A reference unreachable from this machine turns the claim into an explicitly marked unverified assumption the take must check before relying on it - never established fact.
    Iterate by continuing the same subagent when your harness can resume one; otherwise spawn a fresh subagent carrying the prior breakdown plus your objections.
 4. **Publish it yourself** - every tracker write is the driver's, running `to-tickets`' publish step: one ticket per slice using its issue template, in dependency order (blockers first, so edges reference real ids), each a native sub-issue of the spec with native blocking edges among siblings and `ready-for-agent` on it.
    Verify the publication: enumerate the sub-issues, spot-check the edges.
