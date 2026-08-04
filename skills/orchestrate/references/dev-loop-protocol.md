@@ -106,6 +106,8 @@ Every session, however it exits:
   A session that touched no spec lands the same report on the last ticket it delivered.
   It summarizes tickets shipped, bounces, escalations, and commits, names the driver session id literally (never "this session") plus, when the session drove more than one spec, this spec's ordinal within it - the anchor for post-factum cost attribution - and ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.
 - **Observations** - anything actionable (a tooling defect, a gate blind spot, a skill gap) becomes an issue labelled `needs-triage`; narrative context goes in the report's Observations section.
+  Route by home at filing time: a lesson about a shared asset (a distributed skill, a fleet standard, a machine) files on that asset's home tracker, and the project tracker keeps only project-local observations.
+  When the machine's identity cannot write the destination tracker, file on the project tracker with an `[upstream:<home>]` title marker - retros sweep those up; the marker makes local pooling protocol, not a miss.
 
 Mid-board exits happen at ticket boundaries only.
 At each boundary the driver checks its own context pressure and stops rather than starting a take it might not gate - the take's commits are local and die with the session.
