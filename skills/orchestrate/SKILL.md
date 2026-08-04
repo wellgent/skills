@@ -34,7 +34,7 @@ Per the contract's session-start procedure, in order:
    Then `git fetch` + rebase onto `origin/main`, health-check the browser tooling, reap stale loop-owned dev servers on the contract's gate and takes ports - the off-loop port belongs to work outside the loop and is untouchable - and remove stale take worktrees with their branches (leftovers are died sessions).
    Servers stay ephemeral: spun up when a gate needs one, none started here.
 2. **Recovery sweep** - any assigned open item is a died session (the loop is single-flight).
-   Apply the contract's recovery table: `in-progress` ticket → revert to `ready-for-agent` and unassign; `in-progress` spec → **wipe-and-regroom** (close its orphaned sub-issues, revert, unassign).
+   Apply the contract's recovery table: `in-progress` ticket → revert to `ready-for-agent` and unassign; `in-progress` spec → **wipe-and-regroom** (close its orphaned sub-issues, revert, unassign); any other assigned issue (umbrella, epic, tracking issue - neither ticket nor spec) → clear the claim (unassign, drop any lifecycle label), no regroom.
 3. **Tracker preflight** - read CI and deploy status on `main`'s head.
    Either red → find-or-create the single open `fix-main` ticket (title names the failing check and sha, body carries the evidence).
    Green with a stale open `fix-main` → close it with a note.

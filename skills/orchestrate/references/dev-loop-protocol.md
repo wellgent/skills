@@ -75,6 +75,8 @@ Recovery is mechanical, per state:
   Take commits sit on the dead session's take worktree, which the workspace preflight removes; nothing to salvage.
 - Spec `in-progress` + assigned → **wipe-and-regroom**: close the orphaned sub-issues, revert the spec to `ready-for-agent`, unassign.
   Grooming is cheap; a partial-publish reconciliation protocol is not.
+- Any other issue assigned (umbrella, epic, tracking issue - neither a ticket nor a spec) → clear the claim: unassign and drop any lifecycle label, nothing else.
+  Such issues carry no board or take state to reconcile.
 
 ## Session-start procedure
 
