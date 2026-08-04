@@ -31,8 +31,9 @@ case "$CMD" in
       echo "already running (pid $(cat "$PIDFILE"), port ${PORT}) - stop it first; never reuse a stale server" >&2
       exit 1
     fi
-    if lsof -ti "tcp:${PORT}" >/dev/null 2>&1; then
-      echo "port ${PORT} is taken by a process this script does not own - pick another port" >&2
+    # Listeners only (-sTCP:LISTEN) - client keep-alive sockets on the port are not a server.
+    if lsof -ti "tcp:${PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
+      echo "port ${PORT} has a listener this script does not own - pick another port" >&2
       exit 1
     fi
     cd "$REPO_ROOT"
@@ -55,8 +56,9 @@ case "$CMD" in
       kill "$(cat "$PIDFILE")" 2>/dev/null || true
       rm -f "$PIDFILE"
     fi
-    # Reap stragglers, scoped to this port only - never a broad pkill.
-    lsof -ti "tcp:${PORT}" 2>/dev/null | xargs kill 2>/dev/null || true
+    # Reap straggler listeners, scoped to this port only - never a broad pkill.
+    # -sTCP:LISTEN keeps client keep-alive sockets out of the kill list.
+    lsof -ti "tcp:${PORT}" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
     echo "stopped (port ${PORT})"
     ;;
   status)
