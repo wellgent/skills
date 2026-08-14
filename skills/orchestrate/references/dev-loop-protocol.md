@@ -101,7 +101,7 @@ Every orchestrator session runs this before any work:
 
 Every session, however it exits:
 
-- **Teardown** - stop loop-owned dev servers and browser sessions.
+- **Teardown** - stop loop-owned dev servers, browser sessions, and any background process a take left, via its recorded handle (contract stop command or process group); before removing a take worktree, verify no process still holds its path (`lsof +D <worktree>`) - a survivor runs on from the deleted path, burning quota and writing debris the next take gets blamed for.
 - **Report** - one spec-level comment per spec driven: the closing comment when the spec closes, a status comment otherwise.
   A session that touched no spec lands the same report on the last ticket it delivered.
   It summarizes tickets shipped, bounces, escalations, and commits, names the driver session id literally (never "this session") plus, when the session drove more than one spec, this spec's ordinal within it - the anchor for post-factum cost attribution - and ends with the loop's blockers: open `needs-human` items and whether any ready spec remains.

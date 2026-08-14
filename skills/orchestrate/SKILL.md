@@ -85,7 +85,9 @@ Start from a **clean working tree** on the branch the ticket lands on; the take 
    The driver stays out of the code - escalation, not takeover.
 5. **Land and close**: scan the take's commit messages for wrong `#<N>` mentions and for closing-keyword + `#<N>` collisions, amend any before pushing, then land the take branch onto the landing branch (rebase it first if the landing branch has moved, then fast-forward), push, comment what shipped (see The record), and close the issue - closing is what unblocks its dependents.
    **Push only on green**: red takes never reach the remote - in most setups a push to main deploys production.
-6. **Teardown**: stop any dev server or browser session the gate started, and remove the take's worktree and branch - on landing and on escalation alike; the tracker comments are the record, not the leftover worktree.
+6. **Teardown**: stop any dev server or browser session the gate started, then any background process the take left, via its recorded handle (the contract's stop command, or the process group of a recorded pid) - a pattern-matched kill misses a parent sleeping between retries, so anything killed by pattern gets a re-check after a quiet interval to confirm nothing respawned.
+   Before removing the take's worktree and branch, verify no process still holds the worktree path (`lsof +D <worktree>`) - a survivor runs on from the deleted path, burning quota and writing debris the next take gets blamed for.
+   Teardown runs the same on landing, on escalation, and whenever a take is stopped early (re-scope, interrupt); the tracker comments are the record, not the leftover worktree.
 
 ### The take
 
@@ -111,7 +113,7 @@ Every take prompt carries:
 - grounding pointers: the repo's domain glossary (`CONTEXT.md`), any generated stack guidelines the repo ships (they override trained knowledge), and the design-direction docs when the issue has UI surface
 - constraints and non-goals lifted from the issue
 - proof expected: the project's exact check command, plus every deploy-shaped proof the diff will trigger per the contract's Gate proofs section - the take runs them too, so bounces are cheap
-- runtime rules: if the take needs a running app, it spins up its own ephemeral server from inside its worktree via the dev-server script and takes-port the contract names, and stops it on exit
+- runtime rules: if the take needs a running app, it spins up its own ephemeral server from inside its worktree via the dev-server script and takes-port the contract names, and stops it on exit; any other long-running process it starts must be stoppable by handle - launched through a contract-declared lifecycle script, or in its own process group with the pid recorded - and stopped on exit or named in the report; a take never leaves a detached process with no handle
 - review rules: the implement skill ends with a code-review step whose own instructions spawn parallel review sub-agents - the take must not follow that: it runs both review axes sequentially inline in its own context. More generally a take never spawns sub-agents and never blocks waiting on agent messages or notifications - sub-agent replies are not guaranteed to reach a take, and not every executor can spawn them; when an awaited result has not arrived, proceed with what is on disk and note it in the report
 - commit rules: commit locally referencing `#<N>` as a plain mention - the mention must not directly follow any GitHub closing keyword (fix, fixes, fixed, close, closes, closed, resolve, resolves, resolved), even in ordinary prose, since GitHub would auto-close the issue before the gate runs; reword the sentence if needed - and **never push**
 - output shape: a terse report only - what shipped, proofs green (y/n), files touched, commit shas, blockers hit
