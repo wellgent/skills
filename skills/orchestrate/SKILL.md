@@ -35,8 +35,8 @@ Per the contract's session-start procedure, in order:
    Servers stay ephemeral: spun up when a gate needs one, none started here.
 2. **Recovery sweep** - any assigned open item is a died session (the loop is single-flight).
    Apply the contract's recovery table: `in-progress` ticket → revert to `ready-for-agent` and unassign; `in-progress` spec → **wipe-and-regroom** (close its orphaned sub-issues, revert, unassign); any other assigned issue (umbrella, epic, tracking issue - neither ticket nor spec) → clear the claim (unassign, drop any lifecycle label), no regroom.
-3. **Tracker preflight** - read CI and deploy status on `main`'s head.
-   Either red → find-or-create the single open `fix-main` ticket (title names the failing check and sha, body carries the evidence).
+3. **Tracker preflight** - read the main-health signals the contract declares (deploy status, CI checks) on `main`'s head; a contract declaring no remote signal substitutes a local run of the check command on the rebased head.
+   Any red → find-or-create the single open `fix-main` ticket (title names the failing check and sha, body carries the evidence).
    Green with a stale open `fix-main` → close it with a note.
 4. **Select**, in priority order: the open `fix-main` ticket; else the oldest open, unblocked, unassigned `ready-for-agent` ticket; else the first open, unblocked, ungroomed `ready-for-agent` spec; else say so and stop.
    `needs-triage` and `needs-info` items are invisible to the loop.

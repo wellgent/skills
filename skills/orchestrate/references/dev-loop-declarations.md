@@ -28,6 +28,7 @@ Tracker mechanics live in [issue-tracker.md](issue-tracker.md); label strings in
 ## Runtime
 
 - Check command: <command> - the single quality gate (typecheck + lint + tests); the proof command in take prompts and the gate's baseline fact re-run.
+- Main-health signals: <what the tracker preflight reads on the default branch's head - deploy status, CI checks, or "None: preflight runs the check command locally on the rebased head.">.
 - Dev-server script: <path> - start/stop/status on an explicit port; servers are ephemeral and session-owned.
 - Background-process stop: <stop command per class of loop-owned long-running process beyond the dev server (collectors, workers, watchers) - or "None."> Teardown runs these before worktree removal.
 - Worktree scaffold: <what a fresh take worktree needs before it can run - untracked env files to copy from the main checkout, the dependency install command>.
@@ -69,7 +70,7 @@ Semantics live in the installed skill's `references/dev-loop-protocol.md`; decla
 - **Ungroomed specs**: `gh issue list --label spec --label ready-for-agent --state open --json number,title` then keep those with no sub-issues (`gh api repos/<owner>/<repo>/issues/<n>/sub_issues` empty) and no open blockers (`issue_dependencies_summary.blocked_by == 0`).
 - **Actionable tickets**: `gh issue list --label ready-for-agent --state open` (excluding `spec`-labelled issues), then drop any with an assignee or `issue_dependencies_summary.blocked_by > 0`; oldest first.
 - **Recovery sweep**: `gh issue list --state open --assignee "*" --json number,title,labels,assignees` at session start; apply the protocol's crash-safety table.
-- **Preflight**: `gh api repos/<owner>/<repo>/commits/<head-sha>/status` for combined CI + deploy state; red → find-or-create the single open `fix-main` ticket.
+- **Preflight**: `gh api repos/<owner>/<repo>/commits/<head-sha>/status` for the combined state of the contract's declared main-health signals; red → find-or-create the single open `fix-main` ticket. With no remote signal declared, skip the API read - the preflight proof is the local check run.
 - **Escalation**: flip to `needs-human` (`--remove-label in-progress --add-label needs-human`), unassign, leave the record in comments.
 ```
 
@@ -81,7 +82,7 @@ Create any that are missing:
 ```bash
 gh label create spec --description "Spec issue - parent of its tickets (sub-issues)" --color 1D76DB
 gh label create in-progress --description "An agent session is actively working this issue" --color FBCA04
-gh label create fix-main --description "Main is red (CI or deploy) - outranks all other work" --color B60205
+gh label create fix-main --description "Main is red - outranks all other work" --color B60205
 gh label create needs-human --description "Blocked on human input - human unblocks, agents implement" --color D93F0B
 ```
 
