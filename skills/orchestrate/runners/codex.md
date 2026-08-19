@@ -12,8 +12,7 @@ P=$(mktemp)
 cat >"$P" <<'EOF'
 <the take prompt>
 EOF
-codex exec --yolo --json \
-  -C <take worktree> \
+codex -C <take worktree> exec --yolo --json \
   -c model_reasoning_effort="xhigh" \
   -o <scratch>/take-<N>-1.md - <"$P" \
   > <scratch>/take-<N>-1.jsonl 2> <scratch>/take-<N>-1.err
@@ -25,11 +24,10 @@ Long takes run in the background; collect the `-o` file on exit, and let quiet r
 
 ## Bounce
 
-Bounces resume the same session - cheaper than fresh, and the take's context survives (`resume` has no `--yolo` shorthand):
+Bounces resume the same session - cheaper than fresh, and the take's context survives (`resume` has no `--yolo` shorthand and rejects a trailing `-C`; the flag is global and rides the root command in both examples):
 
 ```bash
-codex exec resume "$SID" --dangerously-bypass-approvals-and-sandbox --json \
-  -C <take worktree> \
+codex -C <take worktree> exec resume "$SID" --dangerously-bypass-approvals-and-sandbox --json \
   -o <scratch>/take-<N>-2.md - <"$P2" > <scratch>/take-<N>-2.jsonl 2> <scratch>/take-<N>-2.err
 ```
 
