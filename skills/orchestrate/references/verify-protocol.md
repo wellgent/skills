@@ -26,6 +26,7 @@ Before a verification session, prove the daemon spawns:
 
     agent-browser open about:blank && agent-browser session info --json && agent-browser close
 
+Run the session's **first** `agent-browser` command from a stable directory (the main checkout or /tmp), never from a take or gate worktree - the daemon it spawns keeps that directory as its cwd for its whole lifetime and blocks the worktree's removal at teardown.
 Healthy output has `"browserLaunched":true` and `"success":true`.
 If the daemon fails with `Resource temporarily unavailable` (EAGAIN), the likely cause is per-user process-limit exhaustion: diagnose with `ps aux | wc -l` vs `ulimit -u`, recover by reaping strays (`agent-browser close --all`, leftover dev servers, headless Chrome) rather than reinstalling.
 

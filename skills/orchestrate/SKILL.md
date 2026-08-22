@@ -87,6 +87,7 @@ Start from a **clean working tree** on the branch the ticket lands on; the take 
    **Push only on green**: red takes never reach the remote - in most setups a push to main deploys production.
 6. **Teardown**: stop any dev server or browser session the gate started, then any background process the take left, via its recorded handle (the contract's stop command, or the process group of a recorded pid) - a pattern-matched kill misses a parent sleeping between retries, so anything killed by pattern gets a re-check after a quiet interval to confirm nothing respawned.
    Before removing the take's worktree and branch, verify no process still holds the worktree path (`lsof +D <worktree>`) - a survivor runs on from the deleted path, burning quota and writing debris the next take gets blamed for.
+   `agent-browser close` closes the browser session but leaves the daemon running; a daemon whose first invocation ran from the worktree holds it as cwd, so stop that daemon by pid before the removal.
    Teardown runs the same on landing, on escalation, and whenever a take is stopped early (re-scope, interrupt); the tracker comments are the record, not the leftover worktree.
 
 ### The take
