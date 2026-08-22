@@ -1,0 +1,157 @@
+# Web stack catalog
+
+Directory of community skills, tools, and known-good configs for web projects. This is not a checklist - read the target project, pick what serves it, skip the rest.
+
+Rationale lives here; membership does not. The rules are in [`standards/web-products.md`](../../standards/web-products.md); a team's skill membership is declared in its own private registry - this catalog explains what each entry is for.
+
+## Design and UI quality
+
+- `impeccable` from `pbakaus/impeccable` - the go-to for UI/UX/branding work: design direction and quality bar for any project with a visual surface
+- `web-design-guidelines` from `vercel-labs/agent-skills` - accessibility and UX audit during review
+- `vercel-composition-patterns` from `vercel-labs/agent-skills` - compound components, render props, context patterns
+- `vercel-react-best-practices` from `vercel-labs/agent-skills` - React/Next performance patterns
+- `react-view-transitions` from `vercel-labs/agent-skills` - React View Transition API for page transitions, shared-element and list animations; only for projects doing that kind of motion work
+- Next.js docs ship inside the `next` package (`node_modules/next/dist/docs/`), not as a skill. On 16.3+ nothing to install: `next dev` maintains a small marker-delimited rules block in `AGENTS.md` pointing agents at the bundled docs. On 16.1 and earlier run `npx @next/codemod@latest agents-md` to copy version-matched docs into a gitignored `.next-docs/` indexed from `AGENTS.md`, and re-run it after Next upgrades. Next.js workflow skills live in `vercel/next.js` `/skills`
+- `next-cache-components-adoption` and `next-cache-components-optimizer` from `vercel/next.js` - Next 16+ projects turning on or tuning `cacheComponents`: adoption flips the flag and works through the blocking routes it surfaces, the optimizer tunes the static shell and route navigation once it's on
+
+## Knowledge and writing
+
+- `find-docs` from `upstash/context7` - library docs lookup instead of guessing APIs; requires the `ctx7` CLI authenticated on the machine
+- `writing-guidelines` from `vercel-labs/agent-skills` - reviews docs and prose against Vercel's writing guidelines; useful in nearly any project with user-facing text
+
+## Browser verification
+
+For any project with a UI a user opens in a browser - it is how an agent observes what it actually built.
+
+- `agent-browser` from `vercel-labs/agent-browser` - navigate, interact, screenshot, extract. Native Rust CLI over CDP, no Playwright dependency: install once per machine with `brew install agent-browser && agent-browser install` (npm works where brew isn't an option). Its SKILL.md is a discovery stub - usage is served version-matched by `agent-browser skills get core`, so load that rather than trusting remembered syntax
+- `next-dev-loop` from `vercel/next.js` - Next.js projects only: verifies runtime behavior after edits by combining Next's `/_next/mcp` with `agent-browser`; needs a running `next dev`. agent-browser is the sole browser driver - Playwright stays a test engine where a project runs Playwright tests, never a second reviewer
+- A repo `verify` skill plus an ephemeral dev-server script - scaffold both from the installed orchestrate skill's `references/verify-reference.md` (source: wellgent/skills): the project-specific manual for launching, signing in as an agent, and driving the app, and the port-scoped `scripts/dev-server.sh` it rides on. The dev-loop workflow's gate calls `/verify` for any ticket with runtime surface, and the skill is where hard-won driving gotchas accumulate
+
+Known-good review loop - never verify visually with naive fetching (JS-rendered content comes back blank):
+
+```bash
+agent-browser open http://localhost:3000 && agent-browser wait --load networkidle
+agent-browser set viewport 375 812 && agent-browser screenshot --full mobile.png
+agent-browser set viewport 1280 800 && agent-browser screenshot --full desktop.png
+agent-browser close
+```
+
+If scroll-reveal animations hide content, try `agent-browser set media reduced-motion` first - built in, but only helps when the site respects `prefers-reduced-motion`. For sites that don't, force-reveal before capturing:
+
+```bash
+agent-browser eval --stdin <<'EVALEOF'
+document.querySelectorAll('*').forEach(el => {
+  const s = getComputedStyle(el);
+  if (parseFloat(s.opacity) < 0.1 || s.transform !== 'none') {
+    el.style.setProperty('opacity', '1', 'important');
+    el.style.setProperty('transform', 'none', 'important');
+    el.style.setProperty('transition', 'none', 'important');
+  }
+});
+EVALEOF
+```
+
+## Quality gate (devDependencies, not skills)
+
+A fast deterministic gate pays off disproportionately with agents: they run it dozens of times per session, and "error, never warn" forces fixes where warnings get ignored. Worth proposing for any JS/TS project. For products built the preached way the composition is normative - see the quality gate section of [`standards/web-products.md`](../../standards/web-products.md).
+
+```bash
+pnpm add -D typescript oxlint @nkzw/oxlint-config oxlint-tsgolint oxfmt
+```
+
+TypeScript 7 installs under the plain `typescript` package name (never the `@typescript/native` alias split - it breaks `convex typecheck`); Next apps set `experimental.useTypeScriptCli: true`.
+
+Scripts (pnpm shape; adapt the `check` chain for npm):
+
+```json
+{
+  "format": "oxfmt .",
+  "lint": "oxlint",
+  "lint:format": "oxfmt --check .",
+  "typecheck": "tsc --noEmit",
+  "test": "vitest run",
+  "check": "pnpm typecheck && pnpm lint && pnpm lint:format && pnpm test && pnpm build"
+}
+```
+
+`check` is the single command agents gate on - the gate runs what production runs, so the full test suite and the real production build are inside it. Notes:
+
+- Canonical `oxlint.config.ts` (nkzw preset, tsgolint `typeAware`, react/nextjs plugins) and `.oxfmtrc.json` baseline: copy the designated canonical project's files verbatim, per the standard
+- Existing eslint + prettier projects: offer the migration, don't force it; if accepted, get `check` green and remove the replaced tooling in the same change
+- On-demand React scan that complements code review: `pnpm dlx react-doctor@latest . --diff main --verbose`
+
+References: <https://cpojer.net/posts/fastest-frontend-tooling>, <https://github.com/nkzw-tech/oxlint-config>
+
+## Vercel deployment
+
+For projects delivered through Vercel Git integration (branch push → preview, merge to main → production).
+
+- `deploy-to-vercel` from `vercel-labs/agent-skills` - preview deploys, project linking, git-push setup
+- `vercel-cli-with-tokens` from `vercel-labs/agent-skills` - drives the Vercel CLI via `VERCEL_TOKEN` (plus `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID` instead of `vercel link`) where interactive `vercel login` isn't possible; for headless environments (CI, cloud agents) - auth plumbing that complements `deploy-to-vercel`, not a second deploy path
+- `vercel-optimize` from `vercel-labs/agent-skills` - metric-backed cost and performance recommendations for deployed projects (bill, slow or expensive routes, caching, Core Web Vitals)
+- Machine tools: `gh` and `vercel`, both authenticated; brew-install both (`vercel-cli`), never `npm i -g`
+
+Skip builds for markdown-only commits - `vercel.json`:
+
+```json
+{
+  "ignoreCommand": "bash scripts/vercel-ignore-docs.sh"
+}
+```
+
+`scripts/vercel-ignore-docs.sh`:
+
+```bash
+#!/usr/bin/env bash
+# Skip Vercel builds when only markdown files changed.
+set -euo pipefail
+
+current_sha="${VERCEL_GIT_COMMIT_SHA:-HEAD}"
+prev_sha="${VERCEL_GIT_PREVIOUS_SHA:-}"
+
+if [ -n "$prev_sha" ] && git cat-file -e "$prev_sha^{commit}" 2>/dev/null; then
+  files="$(git diff --name-only "$prev_sha" "$current_sha")"
+else
+  files="$(git show --name-only --pretty=format: "$current_sha")"
+fi
+
+if echo "$files" | grep -qvE '(^$|.*\.md$)'; then
+  exit 1  # non-markdown changed -> build
+else
+  exit 0  # only markdown -> skip
+fi
+```
+
+Protected previews (Deployment Protection): configure Protection Bypass for Automation before feature work, store the secret as `VERCEL_AUTOMATION_BYPASS_SECRET`, and keep it out of commits and messages. This is HTTP-layer access to the deployed URL - `VERCEL_TOKEN` auth (`vercel-cli-with-tokens`) authenticates the CLI to the API and does not get requests past protection.
+
+```bash
+# needs a recent vercel CLI (the protection subcommand is not in older majors);
+# on enable, Vercel generates a secret if none is passed
+vercel project protection enable --protection-bypass --protection-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
+
+# smoke test (expect 200) - vercel curl resolves the deployment URL and
+# applies the bypass from VERCEL_AUTOMATION_BYPASS_SECRET automatically
+vercel curl / -- -sS -o /dev/null -w "%{http_code}\n"
+
+# raw equivalent, for arbitrary URLs or older CLIs
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+  "https://<preview-url>"
+
+# browser review through the protection
+agent-browser set headers "{\"x-vercel-protection-bypass\":\"$VERCEL_AUTOMATION_BYPASS_SECRET\",\"x-vercel-set-bypass-cookie\":\"true\"}"
+agent-browser open https://<preview-url> && agent-browser wait --load networkidle
+```
+
+## Greenfield scaffolding
+
+Defaults for a brand-new web project, when the user hasn't specified otherwise:
+
+- Next.js App Router, TypeScript strict, `src/` directory, `@/*` alias, Tailwind on by default (drop `--tailwind` only when the project genuinely styles another way):
+
+```bash
+pnpm create next-app@latest . --typescript --app --src-dir --tailwind --import-alias '@/*'
+```
+
+- pnpm as package manager (commit `pnpm-lock.yaml`); existing projects keep whatever manager they already use - package scripts stay the command interface either way
+- Tailwind CSS v4 for styling: tokens in the global stylesheet, component-level composition over one-off utility sprawl, design decisions recorded in the project's docs
