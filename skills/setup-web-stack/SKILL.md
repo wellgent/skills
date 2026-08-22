@@ -1,6 +1,6 @@
 ---
 name: setup-web-stack
-description: Equip a target web project from a curated catalog of community skills, tooling, and known-good configs - the agent decides what fits the project and installs just that.
+description: Equip a target web project from a curated catalog of community skills, tooling, and known-good configs - two routes, decided by whether the target exists yet: scaffold greenfield from the defaults reference, or read an existing project and install just what fits it.
 argument-hint: "<path to target project>"
 disable-model-invocation: true
 ---
@@ -11,11 +11,18 @@ Equip a target project with the web-stack skills and tooling that actually fit i
 
 One of this repo's setup skills, independent of the others. Run from a checkout of this repo; the argument is the path to the target project (ask if missing). Idempotent - re-running revisits the selection against the project's current state.
 
+## Two routes
+
+Decide the route up front from one fact - does the target have a `package.json`?
+
+- **Greenfield** (no `package.json`): follow [greenfield.md](./greenfield.md) - agree the stack with the user, scaffold with the defaults, then continue below from step 2 with the fresh app as the target.
+- **Existing**: start at step 1 and let the project's current state drive the selection.
+
 ## Process
 
 ### 1. Read the project
 
-Understand what it is before proposing anything: framework and dependencies, package manager, scripts, whether it has a UI a user opens in a browser, how it deploys, what `skills-lock.json` already pins, what `AGENTS.md` already says. Greenfield (no `package.json`) means the stack is a conversation, not a detection - agree it with the user, scaffolding per the catalog's greenfield defaults.
+Understand what it is before proposing anything: framework and dependencies, package manager, scripts, whether it has a UI a user opens in a browser, how it deploys, what `skills-lock.json` already pins, what `AGENTS.md` already says. The project keeps whatever package manager it already uses - package scripts stay the command interface either way.
 
 ### 2. Propose from the catalog
 

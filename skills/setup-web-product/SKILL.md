@@ -25,7 +25,7 @@ Cache Components defaults on for greenfield (the user can decline).
 
 ## 2. Drive the stages, in order
 
-1. **Scaffold** - run `/setup-web-stack` against the new checkout: create-next-app greenfield defaults, toolchain, gate scripts, AGENTS.md/CLAUDE.md convention.
+1. **Scaffold** - run `/setup-web-stack` against the new checkout, on its greenfield route: scaffold from the defaults reference, then toolchain, gate scripts, AGENTS.md/CLAUDE.md convention.
 2. **Claim** - registration writes up front, so nothing downstream uses placeholders.
    This stage is pluggable: where the operator keeps a project registry (port map, capability declarations, skill membership), add the project there now - next free port block on the target machine, capability declarations, pack assignment.
    With no registry, record the port choices in the project's own dev-loop contract and move on.

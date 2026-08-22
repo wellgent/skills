@@ -19,7 +19,7 @@ npx skills add wellgent/skills -s orchestrate
 - **orchestrate** - run one dev-loop session as the driver: preflight, select, drive one spec end to end, tear down, report.
   Harness-generic: grooming drafts run in fresh subagents of the driving harness; implementation takes run on the executor the project contract names - the harness's native subagents by default, or an external harness via a runner file (`runners/codex.md` ships takes as `codex exec` sessions). Review and every tracker write stay with the driver.
 - **setup-matts-skills** - set up Matt Pocock's engineering workflow in a target project: the curated `mattpocock/skills` selection (declared in the skill - it is the stance), the AGENTS.md convention, and the orchestrate driver on top.
-- **setup-web-stack** - equip a web project from a curated [catalog](skills/setup-web-stack/catalog.md) of community skills, quality tooling, and known-good configs; the agent judges what fits and installs just that.
+- **setup-web-stack** - equip a web project from a curated [catalog](skills/setup-web-stack/catalog.md) of community skills, quality tooling, and known-good configs: two routes - scaffold greenfield from the defaults reference, or read an existing project and install just what fits it.
 - **setup-web-product** - the golden path for a new web product: four inputs, then scaffold, claim, skills, workflow, contract, hosting, and first ship, each stage deferred to its installer.
 
 `orchestrate` installs into projects as an ordinary pin. The `setup-*` skills are checkout-run: clone this repo and invoke them against a target project path.

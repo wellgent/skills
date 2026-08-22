@@ -143,15 +143,3 @@ agent-browser set headers "{\"x-vercel-protection-bypass\":\"$VERCEL_AUTOMATION_
 agent-browser open https://<preview-url> && agent-browser wait --load networkidle
 ```
 
-## Greenfield scaffolding
-
-Defaults for a brand-new web project, when the user hasn't specified otherwise:
-
-- Next.js App Router, TypeScript strict, `src/` directory, `@/*` alias, Tailwind on by default (drop `--tailwind` only when the project genuinely styles another way):
-
-```bash
-pnpm create next-app@latest . --typescript --app --src-dir --tailwind --import-alias '@/*'
-```
-
-- pnpm as package manager (commit `pnpm-lock.yaml`); existing projects keep whatever manager they already use - package scripts stay the command interface either way
-- Tailwind CSS v4 for styling: tokens in the global stylesheet, component-level composition over one-off utility sprawl, design decisions recorded in the project's docs
