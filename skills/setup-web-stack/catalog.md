@@ -82,6 +82,24 @@ Scripts (pnpm shape; adapt the `check` chain for npm):
 
 References: <https://cpojer.net/posts/fastest-frontend-tooling>, <https://github.com/nkzw-tech/oxlint-config>
 
+## Convex backend
+
+For any project with a `convex/` directory. All from `get-convex/agent-skills`; upstream ships many more - most are thin task cards or prod-ops loops built for Convex's own agent harness, and `convex-improve-convex-plugin` sends session transcripts to Convex, so pick deliberately rather than installing `--all`.
+
+- `convex` - entry-point router: recognizes Convex work and routes to the specific convex-* skill
+- `convex-auth` - wire authentication (`@convex-dev/auth`, OAuth/passkeys) including the auth.config.ts plumbing
+- `convex-authz` - deterministic 4-shape authorization audit (identity-from-arg, missing ownership check, PII-leaking query, parent-reference-on-write) plus canonical requireIdentity/requireOwner hardening and tsc verify; targets the measured top defect class in agent-built Convex backends
+- `convex-create-component` - build a reusable Convex component with clear boundaries; the deepest skill in the set
+- `convex-deploy-guard` - identify and announce the target deployment before any deployment-affecting command, fresh per-action consent for prod, read-only session mode, MCP prod-flag discipline; other convex skills compose it as step 0
+- `convex-docs` - version-currency discipline: pin the installed convex/component versions and fetch current docs or node_modules types instead of writing a possibly-stale API from memory
+- `convex-migrate` - schema change + data backfill on a deployed app via `@convex-dev/migrations`
+- `convex-optimize` - broad audit of an existing app: security, scale, upgrades, observability
+- `convex-quickstart` - stand up a new Convex + web project; greenfield path
+- `convex-reviewer` - Convex-specific review checklist (auth checks, `.filter()` table scans, `Date.now()` in queries, validator coverage, `internal.*` scheduling) for the review stage; catches what generic code review misses
+- `convex-verify` - prove a built feature: seed, drive as owner / other user / unauthenticated via convex-test `withIdentity`, assert positive and negative behavior; the negative authz assertions are the load-bearing half
+
+Situational, adopt per project when the need is real: `convex-migrate-rehearse` and `convex-backup` (snapshot-rehearsed schema changes and restore drills once production data matters), `convex-advisor` (read-limit/OCC insights on large tables), `convex-billing` (Stripe), `convex-agent` (`@convex-dev/agent` backends), `convex-launch-readiness` (pre-launch composite audit).
+
 ## Vercel deployment
 
 For projects delivered through Vercel Git integration (branch push → preview, merge to main → production).
