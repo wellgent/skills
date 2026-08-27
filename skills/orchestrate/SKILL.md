@@ -140,7 +140,7 @@ The contract's **Gate proofs** section maps diff shapes to the repo's proof comm
 
 ### The record
 
-The tracker's comments are what a later retro reads.
+The tracker's comments are the record later sessions and cross-project sweeps read.
 
 **Per ticket** - the shipped comment carries:
 

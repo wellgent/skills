@@ -157,16 +157,10 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
 
 ## Learning propagation
 
-- **Retro cadence**: window-triggered per project, no calendar.
-  A retro follows a completed burst of work; the trigger is sessions-since-last-retro on the observation surface.
-  Scoped invocations (`/retro <project>`) are the normal form; full-fleet passes are reserved for several simultaneously open windows.
-- **Two propagation lanes**:
-  - Lane 1, primary - route at the moment of observation: a lesson about a shared asset files on that asset's home tracker when it is made (skill and approach lessons on this repo's tracker, machine lessons on the operator's fleet repo).
-    Project trackers keep only project-local observations.
-    The routing rule is carried in orchestrate's dev-loop protocol, read in place by every loop session.
-    From a machine whose identity cannot write the destination tracker, the lesson files on the project tracker with an `[upstream:<home>]` title marker - the retro's lane-1 audit sweeps those; the marker makes local pooling protocol, not a miss.
-  - Lane 2, safety net - the retro sweeps for what routing cannot catch: cross-repo patterns, evidence-synthesis verdicts, and an audit that lane 1 happened.
-    Every ranked retro action names a destination home.
+- **Route at the moment of observation**: a lesson about a shared asset files on that asset's home tracker when it is made (skill and approach lessons on this repo's tracker, machine lessons on the operator's fleet repo).
+  Project trackers keep only project-local observations.
+  The routing rule is carried in orchestrate's dev-loop protocol, read in place by every loop session.
+  From a machine whose identity cannot write the destination tracker, the lesson files on the project tracker with an `[upstream:<home>]` title marker - the operator's cross-project board sweep picks those up; the marker makes local pooling protocol, not a miss.
 - **Lessons land as changes, not memos**: destination repos turn filed lessons into skill updates, doctrine edits, or catalog entries, propagated by the ordinary sweep.
   Observe, file upstream, fix at source, sweep out.
 - **The change queue**: this repo's tracker is the change queue for the skills and this doctrine.
@@ -197,6 +191,6 @@ Bootstrap is not "repo created"; it is "conformant and live".
 ## Conformance
 
 Observation observes; this document prescribes.
-The consumer's observation surface asserts per project: framework version and agentic-baseline drift, toolchain canonical-set drift against the registry's pins, skill delta (missing / retired-but-present / unrecorded extras / hash drift), contract-exists with headings matching the skeleton, ports agreeing with the registry, driver pin at source HEAD, sessions-since-last-retro.
-Zero delta across the columns is conformant; any non-zero delta is the standing manual trigger for a sweep, refresh pass, or retro.
+The consumer's observation surface asserts per project: framework version and agentic-baseline drift, toolchain canonical-set drift against the registry's pins, skill delta (missing / retired-but-present / unrecorded extras / hash drift), contract-exists with headings matching the skeleton, ports agreeing with the registry, driver pin at source HEAD.
+Zero delta across the columns is conformant; any non-zero delta is the standing manual trigger for a sweep or refresh pass.
 No calendar cadence anywhere.
