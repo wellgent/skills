@@ -28,10 +28,10 @@ Cache Components defaults on for greenfield (the user can decline).
 1. **Scaffold** - run `/setup-web-stack` against the new checkout, on its greenfield route: scaffold from the defaults reference, then toolchain, gate scripts, AGENTS.md/CLAUDE.md convention.
 2. **Claim** - registration writes up front, so nothing downstream uses placeholders.
    This stage is pluggable: where the operator keeps a project registry (port map, capability declarations, skill membership), add the project there now - next free port block on the target machine, capability declarations, pack assignment.
-   With no registry, record the port choices in the project's own dev-loop contract and move on.
+   With no registry, the ports still land in `.agents/launch.json`; move on.
 3. **Skills** - install the membership verdict: the registry's declared set where one exists, otherwise the curated base plus the packs the repo's facts trigger (per the standard's Skills section), by explicit `npx skills add`.
 4. **Workflow** - run `/setup-matts-skills` against the checkout: the curated set, instructions-file convention, orchestrate driver, canonical labels.
-5. **Contract** - dev-loop declarations from orchestrate's `dev-loop-declarations.md` reference with the claimed ports; project `verify` skill from `verify-reference.md`.
+5. **Contract** - dev-loop declarations from orchestrate's `dev-loop-declarations.md` reference; the claimed ports land in `.agents/launch.json` (with the committed `.claude/launch.json` symlink); project `verify` skill from `verify-reference.md`.
 6. **Hosting** - per audience class: Vercel + Convex link for public; the self-hosted ops pattern plus cloudflared + Access (team) or `tailscale serve` (personal) for internal.
 7. **First ship** - the gate runs green, production serves the shipped commit per the class's prod-parity proof, then finalize the registration (public URL, live fields) where a registry exists.
 

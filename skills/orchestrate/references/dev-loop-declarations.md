@@ -20,10 +20,12 @@ Tracker mechanics live in [issue-tracker.md](issue-tracker.md); label strings in
 
 ## Ports
 
-- Off-loop: <port> - work outside orchestrator sessions, manual or agent-driven; the loop never binds or reaps it.
-- Gate (verification): <port>.
-- Takes (implementers): <port>.
-<any further port rules, e.g. a neighboring production port on the same machine that agents must never touch>
+Port numbers live in `.agents/launch.json` (configurations `off-loop`, `gate`, `takes`) - the single edit point for this repo's dev-loop ports; `.claude/launch.json` is a committed symlink to it.
+
+- Off-loop: work outside orchestrator sessions, manual or agent-driven; the loop never binds or reaps it.
+- Gate (verification): the gate's ephemeral verification server.
+- Takes (implementers): ephemeral take servers.
+<any further port rules stated in prose with their numbers, e.g. a production port on this machine that agents must never touch - production ports never move into launch.json>
 
 ## Runtime
 
@@ -53,7 +55,47 @@ Advisory review input per surface (never pass/fail):
 <deliberate protocol overrides, each stated with its reason - or "None.">
 ```
 
-## 2. Tracker mechanics: merge into `docs/agents/issue-tracker.md`
+## 2. Launch config: `.agents/launch.json`
+
+The repo-canonical launch declaration and the single edit point for the project's dev-loop port numbers.
+Create it if missing, with three configurations named `off-loop`, `gate`, `takes` - off-loop first, so a launch picker offers it as the default.
+Commit `.claude/launch.json` as a symlink to it - Claude Code reads launch config at that path and follows repo symlinks.
+The schema is Claude Code launch.json v0.0.1 (`runtimeExecutable`, `runtimeArgs`, `port`, optional `autoPort` per configuration); JSON comments are allowed.
+Production ports never appear here - they are deployment facts, declared in the contract's prose rule and the operator's registry.
+Allocate ports read-before-claim per the prerequisite below.
+
+```jsonc
+{
+  // Dev-loop port allocation - the single edit point for this repo's dev ports.
+  // Semantics and the production-port rule: docs/agents/dev-loop.md.
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "off-loop",
+      "runtimeExecutable": "<package manager>",
+      "runtimeArgs": ["run", "dev"],
+      "port": <off-loop port>,
+      "autoPort": false
+    },
+    {
+      "name": "gate",
+      "runtimeExecutable": "<package manager>",
+      "runtimeArgs": ["exec", "<framework>", "dev", "--port", "<gate port>"],
+      "port": <gate port>,
+      "autoPort": false
+    },
+    {
+      "name": "takes",
+      "runtimeExecutable": "<package manager>",
+      "runtimeArgs": ["exec", "<framework>", "dev", "--port", "<takes port>"],
+      "port": <takes port>,
+      "autoPort": false
+    }
+  ]
+}
+```
+
+## 3. Tracker mechanics: merge into `docs/agents/issue-tracker.md`
 
 `/setup-matt-pocock-skills` writes `docs/agents/issue-tracker.md`; this section extends it.
 If that file does not exist yet, defer this merge and flag it.
@@ -74,7 +116,7 @@ Semantics live in the installed skill's `references/dev-loop-protocol.md`; decla
 - **Escalation**: flip to `needs-human` (`--remove-label in-progress --add-label needs-human`), unassign, leave the record in comments.
 ```
 
-## 3. Labels
+## 4. Labels
 
 The loop consumes the triage labels from `/setup-matt-pocock-skills` (`ready-for-agent`, `needs-triage`, `needs-info`) plus three lifecycle labels.
 Create any that are missing:
@@ -88,7 +130,7 @@ gh label create needs-human --description "Blocked on human input - human unbloc
 
 Then record them in `docs/agents/triage-labels.md` (same deferral rule as the tracker merge if the file is missing): map the `ready-for-human` role to `needs-human`, and add a "Dev loop labels" section listing `spec`, `in-progress`, and `fix-main` with pointers to `dev-loop.md`.
 
-## 4. Prerequisites the loop assumes
+## 5. Prerequisites the loop assumes
 
 Verify each in the target and flag gaps - the loop runs degraded without them:
 
@@ -98,4 +140,4 @@ Verify each in the target and flag gaps - the loop runs degraded without them:
 - **GitHub sub-issues and issue dependencies** enabled on the repo - the hierarchy and blocking edges are native, not body conventions.
 - **The `codex` CLI installed and authenticated** on the machine only when takes will be routed through the codex runner by explicit invocation - and `jq` for reading its event streams.
 - **Provider credentials on the machine, verified at scaffold time** - whatever auth the stack's tickets will need: `npx convex whoami`, `vercel whoami`, `gh auth status` (with the scopes the tracker mechanics use), DNS/registrar access when the spec includes domains. A gap found here is a line in the setup report; a gap found mid-board stalls every remaining ticket behind a `needs-human`.
-- **A machine-unique port map** - the contract's off-loop/gate/takes (and production) ports must not collide with any other project or service on the same machine. Where a machine-level port registry exists, claim a free block there before writing the contract.
+- **A read-before-claim port allocation** - before writing `.agents/launch.json`, consult the operator's aggregated port view (where one exists, e.g. a fleet dashboard reading every project's launch config) and claim a free block that collides with no other project or service on the same machine; the aggregated view's collision check is the standing drift guard after the claim.
