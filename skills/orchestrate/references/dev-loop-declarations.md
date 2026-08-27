@@ -60,14 +60,12 @@ Advisory review input per surface (never pass/fail):
 The repo-canonical launch declaration and the single edit point for the project's dev-loop port numbers.
 Create it if missing, with three configurations named `off-loop`, `gate`, `takes` - off-loop first, so a launch picker offers it as the default.
 Commit `.claude/launch.json` as a symlink to it - Claude Code reads launch config at that path and follows repo symlinks.
-The schema is Claude Code launch.json v0.0.1 (`runtimeExecutable`, `runtimeArgs`, `port`, optional `autoPort` per configuration); JSON comments are allowed.
+The schema is Claude Code launch.json v0.0.1 (`runtimeExecutable`, `runtimeArgs`, `port`, optional `autoPort` per configuration); keep the file strict JSON - editors validate `.json` files without comments.
 Production ports never appear here - they are deployment facts, declared in the contract's prose rule and the operator's registry.
 Allocate ports read-before-claim per the prerequisite below.
 
-```jsonc
+```json
 {
-  // Dev-loop port allocation - the single edit point for this repo's dev ports.
-  // Semantics and the production-port rule: docs/agents/dev-loop.md.
   "version": "0.0.1",
   "configurations": [
     {
