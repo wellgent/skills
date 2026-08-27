@@ -114,6 +114,14 @@ At each boundary the driver checks its own context pressure and stops rather tha
 Anything the next session needs goes as a comment on the relevant ticket; the tracker is the only handoff surface.
 Resuming is just invoking the driver skill again.
 
+## Watching long-running processes
+
+A session watching a process that outlives a normal step - a backfill, an oversight loop - holds these rules:
+
+- Treat wake notifications as hints, never proof: on every wake and every poll, re-verify liveness independently - process check plus log mtime against the clock. A quiet channel or a stale log reads "presumed dead, investigate".
+- Make process checks self-match-proof: a watcher whose own command line contains the watched pattern matches itself - bracket the first character (`pgrep -f '[p]attern'`) or guard with `grep -v $$`.
+- Driver side: a take gone quiet with no active task is the dropped-notification tell - poll the condition yourself and message the take to proceed.
+
 ## Between sessions
 
 The human side of the seam - pull-based, no fixed cadence:
