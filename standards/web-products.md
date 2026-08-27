@@ -161,6 +161,8 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
   Project trackers keep only project-local observations.
   The routing rule is carried in orchestrate's dev-loop protocol, read in place by every loop session.
   From a machine whose identity cannot write the destination tracker, the lesson files on the project tracker with an `[upstream:<home>]` title marker - the operator's cross-project board sweep picks those up; the marker makes local pooling protocol, not a miss.
+- **Boards get periodic cross-project triage**: the operator sweeps every project's board as one set at their own cadence - closing what reality has already resolved, triaging the `needs-triage` pool per the label taxonomy, reframing issues whose right solution changed, deduplicating within and across projects (the best-framed issue survives and absorbs the rest), and refiling shared-asset issues, including `[upstream:<home>]`-marked ones, on their home trackers.
+  The sweep is what keeps every board accurate between sessions without per-project ceremony.
 - **Lessons land as changes, not memos**: destination repos turn filed lessons into skill updates, doctrine edits, or catalog entries, propagated by the ordinary sweep.
   Observe, file upstream, fix at source, sweep out.
 - **The change queue**: this repo's tracker is the change queue for the skills and this doctrine.
