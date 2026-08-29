@@ -29,7 +29,6 @@ This list is the stance: the one place the curated `mattpocock/skills` selection
 - `resolving-merge-conflicts`
 - `setup-matt-pocock-skills`
 - `tdd`
-- `teach`
 - `to-spec`
 - `to-tickets`
 - `triage`
