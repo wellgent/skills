@@ -90,7 +90,7 @@ Preference and familiarity do not qualify.
 - The volume-rehearsal ladder is a first-class gate proof for data-heavy specs.
 - Components are per-product and namespaced (aggregates, migrations, rate-limiter adopted per need).
 - Testing: vitest edge-runtime with inlined `convex-test`.
-- The `get-convex` skill pack is mandatory for every Convex app (see Skills).
+- The catalog's Convex skill set from `get-convex/agent-skills` is mandatory for every Convex app, installed as ordinary `npx skills` pins (see Skills). The Convex SDK's own file manager stays off (`convex.json`: `{"aiFiles": {"enabled": false}}`): `convex ai-files` installs the whole upstream pack with no subset option, and one of its skills sends session transcripts to Convex.
 - `convex deploy` runs on production builds only; "codegen touches the deployment" is a standing caution.
 - `defineApp` env declaration is required.
 - Auth is the hosting standard's territory - see above, not restated here.

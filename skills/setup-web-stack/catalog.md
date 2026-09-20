@@ -85,6 +85,7 @@ References: <https://cpojer.net/posts/fastest-frontend-tooling>, <https://github
 ## Convex backend
 
 For any project with a `convex/` directory. All from `get-convex/agent-skills`; upstream ships many more - most are thin task cards or prod-ops loops built for Convex's own agent harness, and `convex-improve-convex-plugin` sends session transcripts to Convex, so pick deliberately rather than installing `--all`.
+Keep the Convex SDK's file manager off: `convex.json` carries `{"aiFiles": {"enabled": false}}`, because `convex ai-files install` and `update` add the whole pack with no subset option, and `convex dev` would install it on first run without the switch.
 
 - `convex` - entry-point router: recognizes Convex work and routes to the specific convex-* skill
 - `convex-auth` - wire authentication (`@convex-dev/auth`, OAuth/passkeys) including the auth.config.ts plumbing
