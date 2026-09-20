@@ -86,7 +86,8 @@ Every orchestrator session runs this before any work:
    Then `git fetch` and rebase onto the default branch, health-check the browser-verification tooling, reap stale loop-owned dev servers on the contract's gate and takes ports via its dev-server script - never the off-loop port, which belongs to work outside the loop - and remove stale take worktrees with their branches (leftovers are died sessions).
    No dev server is started here: servers stay ephemeral, spun up when a gate needs one.
 2. **Recovery sweep** - find assigned items, apply the crash-safety table above.
-3. **Tracker preflight** - read the main-health signals the contract declares (deploy status, CI checks) on the default branch's head; a contract declaring no remote signal substitutes a local run of the check command on the rebased head.
+3. **Tracker preflight** - read the main-health signals the contract declares (deploy status, CI checks) on the default branch's head; a contract declaring no remote signal substitutes a local run of the check command on the rebased head, in a scratch worktree scaffolded per the contract's worktree scaffold line and removed afterwards - never in the main checkout, which on a self-hosted product is the served bundle.
+   A contract may declare a deploy-status signal that already answers the question (a health endpoint verifying the served build's commit against the head); the local run is then the fallback for when production lags the head.
    Any red → find-or-create the `fix-main` ticket (label `fix-main` + `ready-for-agent`, title names the failing check and sha, body carries the evidence); at most one open at a time.
    Green with a stale open `fix-main` → close it with a note.
 4. **Select**, in priority order:
