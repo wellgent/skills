@@ -36,3 +36,6 @@ codex -C <take worktree> exec resume "$SID" --dangerously-bypass-approvals-and-s
 - Auth is host-level and fails only at token-refresh time; `codex login status` can still report logged-in on a revoked refresh token.
   A take dying at token-zero with HTTP 401 `refresh_token_invalidated` needs a human `codex login` - escalate, do not retry.
 - A capacity error surfaces as a dead `turn.failed` launch with an empty take report - relaunch with the same prompt.
+- In the Codex desktop execution harness a contract dev-server script reports ready and exits, and its server child is gone before the next tool call.
+  Hold a PTY for the session after the start command (a shell read, session id recorded), stop the server through the contract script, then release the PTY.
+  Ownership stays ephemeral and per handle; never a broad process kill.
