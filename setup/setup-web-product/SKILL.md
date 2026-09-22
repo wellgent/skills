@@ -1,6 +1,6 @@
 ---
 name: setup-web-product
-description: Bootstrap a new web product end to end along the golden path - four inputs, then scaffold, claim, skills, workflow, contract, hosting, and first ship, each stage deferred to its existing installer.
+description: Bootstrap a new web product end to end along the golden path - four inputs, then scaffold, claim, skills, workflow, verify, contract, hosting, and first ship, each stage deferred to its existing installer.
 argument-hint: "<product name> (remaining inputs gathered interactively)"
 disable-model-invocation: true
 ---
@@ -31,11 +31,12 @@ Cache Components defaults on for greenfield (the user can decline).
    With no registry, the ports still land in `.agents/launch.json`; move on.
 3. **Skills** - install the membership verdict: the registry's declared set where one exists, otherwise the curated base plus the packs the repo's facts trigger (per the standard's Skills section), by explicit `npx skills add`.
 4. **Workflow** - run `/setup-matts-skills` against the checkout: the curated set, instructions-file convention, orchestrate driver, canonical labels.
-5. **Contract** - dev-loop declarations from orchestrate's `dev-loop-declarations.md` reference; the claimed ports land in `.agents/launch.json` (with the committed `.claude/launch.json` symlink); project `verify` skill from the installed `verify-protocol` skill's `verify-reference.md`.
-6. **Hosting** - per audience class: Vercel + Convex link for public; the self-hosted ops pattern plus cloudflared + Access (team) or `tailscale serve` (personal) for internal.
-7. **First ship** - the gate runs green, production serves the shipped commit per the class's prod-parity proof, then finalize the registration (public URL, live fields) where a registry exists.
+5. **Verify** - run `/setup-verify` against the checkout: the project `verify` skill and `scripts/dev-server.sh` scaffolded with the claimed ports, the shared protocol copied in as its managed file.
+6. **Contract** - dev-loop declarations from orchestrate's `dev-loop-declarations.md` reference; the claimed ports land in `.agents/launch.json` (with the committed `.claude/launch.json` symlink).
+7. **Hosting** - per audience class: Vercel + Convex link for public; the self-hosted ops pattern plus cloudflared + Access (team) or `tailscale serve` (personal) for internal.
+8. **First ship** - the gate runs green, production serves the shipped commit per the class's prod-parity proof, then finalize the registration (public URL, live fields) where a registry exists.
 
-Two-phase registration is deliberate: claim at stage 2, finalize at stage 7; observation tolerates claimed-but-not-yet-live in between.
+Two-phase registration is deliberate: claim at stage 2, finalize at stage 8; observation tolerates claimed-but-not-yet-live in between.
 
 ## Report
 

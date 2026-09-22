@@ -132,8 +132,8 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
 **Custom skill homing** - three homes:
 
 - **Project-local** (default): skills whose content is the project's specifics.
-  `verify` is the one mandated project-local skill - every project carries `.agents/skills/verify/SKILL.md` plus `scripts/dev-server.sh`.
-  It is two-layer: the shared mechanics (dev-server discipline, browser preflight, review loop, universal gotchas) are read in place from the installed `verify-protocol` skill (wellgent/skills, an ordinary pin beside `orchestrate`); the local skill holds only repo declarations (Ports, Launch, Sign-in, Driving gotchas, Environment gotchas, Checks that work well), scaffolded from that skill's `verify-reference.md`, and earned gotchas append to the local layer.
+  `verify` is the one mandated project-local skill - every project carries `.agents/skills/verify/` (its own `SKILL.md` plus the managed `protocol.md`) and `scripts/dev-server.sh`, set up by `setup-verify`.
+  It is two-layer: the shared mechanics (dev-server discipline, browser preflight, review loop, universal gotchas) are the managed `protocol.md` beside the skill, copied in and replaced on every `setup-verify` run; the local `SKILL.md` holds only repo declarations (Ports, Launch, Sign-in, Driving gotchas, Environment gotchas, Checks that work well), scaffolded once by `setup-verify`, and earned gotchas append to the local layer.
   Launch-the-app content lives in `verify` - launch is its first chapter, never a companion `run` skill.
   Observation asserts presence only (skill and script exist); section-level conformance is a convergence-time human check.
 - **This repo** (public): everything we use regularly and can express internals-free - it must work unmodified in a stranger's repo.
@@ -183,7 +183,7 @@ The golden path is this repo's [`setup-web-product`](../setup/setup-web-product/
 Defaults applied without asking: Next latest stable per the channel rule, Tailwind v4 on, the full toolchain standard, the gate composition, base skill set plus triggered packs, port block auto-allocated as the next free block on the target machine, canonical label taxonomy seeded.
 Cache Components defaults on for greenfield.
 
-**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), skills (install the membership verdict), workflow (setup-matts-skills), contract (dev-loop declarations + verify skill), hosting (per audience class), first ship (gate green, prod-parity proof, registration finalized).
+**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), skills (install the membership verdict), workflow (setup-matts-skills), verify (setup-verify), contract (dev-loop declarations), hosting (per audience class), first ship (gate green, prod-parity proof, registration finalized).
 
 **Two-phase registration**: claim at step 2 (ports, membership), finalize at first ship (public URL, live fields); observation tolerates claimed-but-not-yet-live in between.
 

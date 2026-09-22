@@ -2,6 +2,7 @@
 
 The shared runtime-verification mechanics behind every project's `verify` skill.
 Read this first; the project's `verify` skill declares the repo-specific facts (ports, launch, sign-in, gotchas, proven checks) and wins on conflict.
+In a project this file is `.agents/skills/verify/protocol.md`, a managed copy `setup-verify` replaces on every run; edits happen here, never in the project.
 Agents observe what they actually built through this loop: browser review during development, and the dev-loop gate calls `/verify` for any ticket with runtime surface.
 
 ## Dev-server discipline
