@@ -16,6 +16,7 @@ Each verification session launches its own ephemeral server on the port its role
 
 - `start` refuses a taken port - it never adopts a running server.
 - `stop` reaps by pidfile plus a port-scoped sweep, never a broad pkill that could kill someone else's server.
+- `stop` reports stopped only after the port is observed closed; while a listener remains it exits non-zero and names the holder, so teardown never trusts a stop that left a server behind.
 - Teardown is part of the loop, not optional.
 - One server per checkout at a time - concurrent dev processes share build state and corrupt it - unless the project's script isolates build dirs per port and its `verify` skill says so.
 

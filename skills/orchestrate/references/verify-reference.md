@@ -58,8 +58,19 @@ case "$CMD" in
     fi
     # Reap straggler listeners, scoped to this port only - never a broad pkill.
     # -sTCP:LISTEN keeps client keep-alive sockets out of the kill list.
-    lsof -ti "tcp:${PORT}" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
-    echo "stopped (port ${PORT})"
+    # Report stopped only once the port is observed closed: TERM, wait, then KILL, wait.
+    for sig in TERM KILL; do
+      lsof -ti "tcp:${PORT}" -sTCP:LISTEN 2>/dev/null | xargs kill "-${sig}" 2>/dev/null || true
+      for _ in $(seq 1 10); do
+        if ! lsof -ti "tcp:${PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
+          echo "stopped (port ${PORT})"
+          exit 0
+        fi
+        sleep 1
+      done
+    done
+    echo "port ${PORT} still held by pid $(lsof -ti "tcp:${PORT}" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ')- not stopped" >&2
+    exit 1
     ;;
   status)
     if alive && curl -s -o /dev/null "http://localhost:${PORT}/"; then
