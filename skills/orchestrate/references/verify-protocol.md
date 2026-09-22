@@ -46,6 +46,7 @@ Pass **absolute paths** to `agent-browser screenshot` - relative paths resolve a
 
 - A production build clobbers a running dev server's build dir - stop the server before building, and restart clean if it 500s.
 - Saved browser auth state goes stale; re-run sign-in at the start of each session rather than trusting yesterday's.
+- `agent-browser fill <selector> ''` clears a React controlled input's DOM value but not its state, so the app keeps acting on the old text; clear with `press` select-all then `Backspace`, or `fill` a non-empty value. A non-empty `fill` syncs correctly.
 
 ## The living-skill rule
 
