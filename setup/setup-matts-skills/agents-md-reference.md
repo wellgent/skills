@@ -17,6 +17,7 @@ Project-specific sections written by other skills stay out of scope here - in pa
 - **Review / merge / handoff** - `code-review`, `resolving-merge-conflicts`, `handoff`
 - **Verify at runtime** - `next-dev-loop` is the dev-time verification flow: confirm a change works in the running `next dev` (its `/_next/mcp` view plus `agent-browser`'s browser view), launched and driven per the repo's `verify` skill.
 - **Dev loop** - `orchestrate` (drive specs end to end per the skill's shipped protocol and the repo's dev-loop declarations: groom via a fresh subagent, deliver via fresh native-subagent take sessions in their own worktrees, gate yourself; push only on green).
+- **Where things live** - project rules an agent consults are docs: `docs/agents/dev-loop.md` (the dev-loop contract), `issue-tracker.md`, `triage-labels.md`, `domain.md`, and this file; procedures an agent runs are skills under `.agents/skills/`; pinned skills and files marked managed are vendor-owned and replaced on update, never edited here - the project-owned `verify` skill carries one such file, its `protocol.md`.
 - **Outside the loop** - a session that is not the orchestrator (manual or agent-driven) runs dev servers on the dev-loop contract's off-loop port; for work alongside a possibly-live loop session it takes its own worktree rather than the main checkout, and it never pushes commits it did not author.
 
 ## Skills management (`npx skills`)

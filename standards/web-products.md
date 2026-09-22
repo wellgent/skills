@@ -129,6 +129,12 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
   Cadence: manual, drift-triggered - no cron.
 - **Situational skills** (e.g. `react-view-transitions`) stay catalog-documented; a project adopting one records it in the registry as a per-project extra.
 
+**Where agent-facing content lives** - two axes decide it, ownership and form.
+Ownership: vendor-owned content arrives by pin or managed copy and is replaced wholesale on update, so nothing project-owned may live inside a pinned directory; project-owned content is scaffolded once and then belongs to the repo.
+Form: a skill is a procedure an agent invokes, and the harness fixes its home under `.agents/skills/`; a doc is what an agent consults, and `docs/agents/` is the project's home for agent-facing docs, with `AGENTS.md` as the entry.
+So the dev-loop protocol is vendor-owned inside the `orchestrate` pin and its project-owned contract is the doc `docs/agents/dev-loop.md` (only the driver reads it, nothing invokes it); the `verify` skill is project-owned and invoked, so its `SKILL.md` is its contract, and the vendor-owned protocol it needs sits beside it as a managed file marked as such.
+Project rules an agent consults are in `docs/agents/` and `AGENTS.md`; procedures an agent runs are skills; anything vendor-owned is a pin or a marked managed file wherever it sits.
+
 **Custom skill homing** - three homes:
 
 - **Project-local** (default): skills whose content is the project's specifics.
