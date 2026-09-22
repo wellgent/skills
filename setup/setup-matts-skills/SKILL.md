@@ -83,6 +83,13 @@ First the file layout - `AGENTS.md` is the real file, `CLAUDE.md` symlinks to it
 - Neither exists: create a minimal `AGENTS.md` describing the project (what it is, how to build/test) and add the symlink
 
 Then the content: merge the two sections from [agents-md-reference.md](./agents-md-reference.md) into the target's `AGENTS.md` - the "Development workflow (Matt's skills)" router and the "Skills management (`npx skills`)" notes. If a section already exists, update it in place rather than appending a duplicate. Leave the project's own sections untouched, and don't rewrite prose the user wrote without flagging it.
+A project section that contradicts the Landing bullet (a `--no-ff` rule, a pull-request-and-merge-button workflow, "never commit to `main`") is flagged with a proposed rewrite to the Landing rule.
+
+Then the GitHub repo settings the Landing rule relies on, per the standard's Version control section:
+
+```bash
+gh api -X PATCH repos/<owner>/<repo> -F allow_merge_commit=false -F allow_rebase_merge=true -F allow_squash_merge=true -F delete_branch_on_merge=true
+```
 
 ### 4. Install the driver skill
 
@@ -108,4 +115,4 @@ The engineering skills need per-repo config (issue tracker, triage labels, domai
 
 ## Report
 
-End with what changed in the target: skills installed (and skipped as already present), instructions-file state, the driver skill installed, dev-loop contract state (created, already present, or deferred merges) with any prerequisite gaps, and whether `/setup-matt-pocock-skills` still needs to run.
+End with what changed in the target: skills installed (and skipped as already present), instructions-file state with any flagged Landing contradictions, repo merge settings, the driver skill installed, dev-loop contract state (created, already present, or deferred merges) with any prerequisite gaps, and whether `/setup-matt-pocock-skills` still needs to run.

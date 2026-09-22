@@ -117,6 +117,19 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
   A preview deploy is not a gate proof - unproven work never reaches the remote.
 - **A ship is complete when the production surface is verified serving the shipped commit** - not when the push succeeds.
 
+## Version control
+
+- **Linear history on `main`**: every commit on the default branch is one development step by its author.
+  A merge commit carries no content, so the default branch never gets one.
+- **Branch freely, land linearly**: work is committed on `main` directly or on a branch or worktree.
+  A branch lands by rebasing onto the remote default branch, fast-forwarding (`git merge --ff-only`), and pushing.
+  Never `--no-ff`, never a merge-commit button, never a `git pull` that merges.
+  The dev loop's take landing is this rule applied.
+- **No pull requests by default**: nobody reviews on GitHub and the gate is local, so a PR adds nothing.
+  One is opened only when the operator asks, and it lands the same way - the fast-forward push marks it merged.
+- **Squash is not the default**: it collapses the commit chain; it is used only when the operator asks.
+- **Repo settings**: merge commits off, rebase merging on, squash left available, head branches deleted on merge.
+
 ## Skills
 
 Membership splits along the stance/operations fault line: the curated Matt's selection is declared by this repo's [`setup-matts-skills`](../setup/setup-matts-skills/SKILL.md) skill (the stance); capability packs, per-project assignment, and retired-skill lists live in the consumer's private registry (the operations).

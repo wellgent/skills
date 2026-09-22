@@ -19,6 +19,7 @@ Project-specific sections written by other skills stay out of scope here - in pa
 - **Dev loop** - `orchestrate` (drive specs end to end per the skill's shipped protocol and the repo's dev-loop declarations: groom via a fresh subagent, deliver via fresh native-subagent take sessions in their own worktrees, gate yourself; push only on green).
 - **Where things live** - project rules an agent consults are docs: `docs/agents/dev-loop.md` (the dev-loop contract), `issue-tracker.md`, `triage-labels.md`, `domain.md`, and this file; procedures an agent runs are skills under `.agents/skills/`; pinned skills and files marked managed are vendor-owned and replaced on update, never edited here - the project-owned `verify` skill carries one such file, its `protocol.md`.
 - **Outside the loop** - a session that is not the orchestrator (manual or agent-driven) runs dev servers on the dev-loop contract's off-loop port; for work alongside a possibly-live loop session it takes its own worktree rather than the main checkout, and it never pushes commits it did not author.
+- **Landing** - `main` history stays linear. Commit on `main` or on a branch or worktree; a branch lands by rebasing onto `origin/main`, fast-forwarding (`git merge --ff-only`), and pushing. No merge commits (`--no-ff`, the GitHub merge button, a `git pull` without `--rebase`), no pull requests unless the operator asks for one, no squash by default.
 
 ## Skills management (`npx skills`)
 

@@ -104,7 +104,7 @@ Situational, adopt per project when the need is real: `convex-migrate-rehearse` 
 
 ## Vercel deployment
 
-For projects delivered through Vercel Git integration (branch push → preview, merge to main → production).
+For projects delivered through Vercel Git integration (branch push → preview, push to main → production).
 
 - `deploy-to-vercel` from `vercel-labs/agent-skills` - preview deploys, project linking, git-push setup
 - `vercel-cli-with-tokens` from `vercel-labs/agent-skills` - drives the Vercel CLI via `VERCEL_TOKEN` (plus `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID` instead of `vercel link`) where interactive `vercel login` isn't possible; for headless environments (CI, cloud agents) - auth plumbing that complements `deploy-to-vercel`, not a second deploy path
