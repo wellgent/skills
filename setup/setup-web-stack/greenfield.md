@@ -7,8 +7,10 @@ Scaffolding a brand-new web app before equipping it. A greenfield stack is a con
 - Next.js App Router, TypeScript strict, `src/` directory, `@/*` alias, Tailwind on by default (drop `--tailwind` only when the project genuinely styles another way):
 
 ```bash
-pnpm create next-app@latest . --typescript --app --src-dir --tailwind --import-alias '@/*'
+pnpm create next-app@latest . --typescript --app --src-dir --tailwind --import-alias '@/*' --use-pnpm
 ```
+
+- `create-next-app` writes `AGENTS.md` and `CLAUDE.md` as files; keep `AGENTS.md`, replace `CLAUDE.md` with the symlink the instructions-file convention prescribes, and let `next dev` maintain its managed rules block in `AGENTS.md`
 
 - pnpm as package manager (commit `pnpm-lock.yaml`); package scripts stay the command interface
 - Tailwind CSS v4 for styling: tokens in the global stylesheet, component-level composition over one-off utility sprawl, design decisions recorded in the project's docs

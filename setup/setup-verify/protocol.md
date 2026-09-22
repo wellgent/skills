@@ -34,14 +34,20 @@ If the daemon fails with `Resource temporarily unavailable` (EAGAIN), the likely
 
 ## The review loop
 
+Drive a named session of your own, never the default shared one - two sessions on one browser corrupt each other's state:
+
+    export AGENT_BROWSER_SESSION=$(agent-browser session id --scope worktree --prefix verify)
+
+Mint it from the same stable directory as the preflight.
 The known-good sequence, against your session's own port:
 
-    agent-browser open http://localhost:<port> && agent-browser wait --load networkidle
+    agent-browser open http://localhost:<port> && agent-browser wait --selector <a selector the page is known to render>
     agent-browser set viewport 375 812 && agent-browser screenshot --full /abs/path/mobile.png
     agent-browser set viewport 1280 800 && agent-browser screenshot --full /abs/path/desktop.png
     agent-browser close
 
 Pass **absolute paths** to `agent-browser screenshot` - relative paths resolve against the daemon's working directory, not the caller's.
+Wait on a selector, text, or URL the page is known to reach; `wait --load networkidle` only for pages known to go quiet, since persistent sockets and polling never settle it.
 
 ## Universal gotchas
 

@@ -39,7 +39,7 @@ Deviations from any rule are allowed with a written justification, recorded wher
 ## Toolchain
 
 - **TypeScript**: the TS 7 line, one version fleet-wide, installed under the plain `typescript` package name - never the `@typescript/native` alias split (it breaks `convex typecheck`).
-  Next apps set `experimental.useTypeScriptCli: true` until Next makes TS 7 first-class; `next build` remains the enforcement gate.
+  Next 16.3+ runs the project's `tsc` inside `next build` by default (`experimental.useTypeScriptCli`); it is never set `false`, and `next build` remains the enforcement gate.
   No dev-build tsgo pins.
   Re-evaluation checkpoint: TS 7.1, when the programmatic compiler API returns.
 - **Lint**: oxlint with `@nkzw/oxlint-config`, plus `oxlint-tsgolint` with `typeAware: true`, and the `react`/`nextjs` plugins where applicable.
@@ -127,7 +127,7 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
 - **Retired skills** are named in the private registry; sweeps remove them wherever found.
 - **Distribution**: `npx skills` lock-pins on disk (`skills-lock.json`), converged by explicit `add -s` / `remove` per delta, never `skills update`.
   Cadence: manual, drift-triggered - no cron.
-- **Situational skills** (e.g. `react-view-transitions`) stay catalog-documented; a project adopting one records it in the registry as a per-project extra.
+- **Situational skills** (e.g. `vercel-react-view-transitions`) stay catalog-documented; a project adopting one records it in the registry as a per-project extra.
 
 **Where agent-facing content lives** - two axes decide it, ownership and form.
 Ownership: vendor-owned content arrives by pin or managed copy and is replaced wholesale on update, so nothing project-owned may live inside a pinned directory; project-owned content is scaffolded once and then belongs to the repo.

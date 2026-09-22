@@ -10,13 +10,14 @@ Rationale lives here; membership does not. The rules are in [`standards/web-prod
 - `web-design-guidelines` from `vercel-labs/agent-skills` - accessibility and UX audit during review
 - `vercel-composition-patterns` from `vercel-labs/agent-skills` - compound components, render props, context patterns
 - `vercel-react-best-practices` from `vercel-labs/agent-skills` - React/Next performance patterns
-- `react-view-transitions` from `vercel-labs/agent-skills` - React View Transition API for page transitions, shared-element and list animations; only for projects doing that kind of motion work
-- Next.js docs ship inside the `next` package (`node_modules/next/dist/docs/`), not as a skill. On 16.3+ nothing to install: `next dev` maintains a small marker-delimited rules block in `AGENTS.md` pointing agents at the bundled docs. On 16.1 and earlier run `npx @next/codemod@latest agents-md` to copy version-matched docs into a gitignored `.next-docs/` indexed from `AGENTS.md`, and re-run it after Next upgrades. Next.js workflow skills live in `vercel/next.js` `/skills`
+- `vercel-react-view-transitions` from `vercel-labs/agent-skills` - React View Transition API for page transitions, shared-element and list animations; only for projects doing that kind of motion work
+- Next.js docs ship inside the `next` package (`node_modules/next/dist/docs/`), not as a skill. On 16.3+ nothing to install: `next dev` maintains a small marker-delimited rules block in `AGENTS.md` pointing agents at the bundled docs (`agentRules: false` in `next.config` opts out). On 16.2 the docs are bundled but no block is written: point `AGENTS.md` at `node_modules/next/dist/docs/` by hand. On 16.1 and earlier run `npx @next/codemod@canary agents-md` to copy version-matched docs into a gitignored `.next-docs/` indexed from `AGENTS.md`, and re-run it after Next upgrades. Next.js workflow skills live in `vercel/next.js` `/skills`
 - `next-cache-components-adoption` and `next-cache-components-optimizer` from `vercel/next.js` - Next 16+ projects turning on or tuning `cacheComponents`: adoption flips the flag and works through the blocking routes it surfaces, the optimizer tunes the static shell and route navigation once it's on
+- `next-partial-prefetching-adoption` and `next-partial-prefetching-optimizer` from `vercel/next.js` - the same pair for `partialPrefetching` on Next 16.3+ with Cache Components on: adoption flips the flag and opts routes in (`export const prefetch = 'partial'`) through the insights it surfaces; the optimizer tunes what selected client navigations prefetch (default, viewport, intent) once both flags are live. Adopt after Cache Components, not alongside
 
 ## Knowledge and writing
 
-- `find-docs` from `upstash/context7` - library docs lookup instead of guessing APIs; requires the `ctx7` CLI authenticated on the machine
+- `find-docs` from `upstash/context7` - library docs lookup instead of guessing APIs; the `ctx7` CLI authenticated on the machine (`npx ctx7 setup`) lifts the anonymous rate limit; the skill runs `npx ctx7@latest` and needs no other setup
 - `writing-guidelines` from `vercel-labs/agent-skills` - reviews docs and prose against Vercel's writing guidelines; useful in nearly any project with user-facing text
 
 ## Browser verification
@@ -27,10 +28,10 @@ For any project with a UI a user opens in a browser - it is how an agent observe
 - `next-dev-loop` from `vercel/next.js` - Next.js projects only: verifies runtime behavior after edits by combining Next's `/_next/mcp` with `agent-browser`; needs a running `next dev`. agent-browser is the sole browser driver - Playwright stays a test engine where a project runs Playwright tests, never a second reviewer
 - A repo `verify` skill plus an ephemeral dev-server script - both set up by the `setup-verify` setup path (source: wellgent/skills, checkout-run): the project-specific manual for launching, signing in as an agent, and driving the app, and the port-scoped `scripts/dev-server.sh` it rides on. The dev-loop workflow's gate calls `/verify` for any ticket with runtime surface, and the skill is where hard-won driving gotchas accumulate
 
-Known-good review loop - never verify visually with naive fetching (JS-rendered content comes back blank):
+Known-good review loop - never verify visually with naive fetching (JS-rendered content comes back blank). Run it in a named session of your own (`export AGENT_BROWSER_SESSION=$(agent-browser session id --scope worktree --prefix verify)`, from a stable directory) so concurrent sessions never share a browser. Wait on a selector or text the page is known to render; `--load networkidle` only for pages known to go quiet:
 
 ```bash
-agent-browser open http://localhost:3000 && agent-browser wait --load networkidle
+agent-browser open http://localhost:3000 && agent-browser wait --selector main
 agent-browser set viewport 375 812 && agent-browser screenshot --full mobile.png
 agent-browser set viewport 1280 800 && agent-browser screenshot --full desktop.png
 agent-browser close
@@ -59,7 +60,7 @@ A fast deterministic gate pays off disproportionately with agents: they run it d
 pnpm add -D typescript oxlint @nkzw/oxlint-config oxlint-tsgolint oxfmt
 ```
 
-TypeScript 7 installs under the plain `typescript` package name (never the `@typescript/native` alias split - it breaks `convex typecheck`); Next apps set `experimental.useTypeScriptCli: true`.
+TypeScript 7 installs under the plain `typescript` package name (never the `@typescript/native` alias split - it breaks `convex typecheck`). Next 16.3+ runs the project's `tsc` in `next build` by default (`experimental.useTypeScriptCli`); never set it `false` on TS 7, the build exits.
 
 Scripts (pnpm shape; adapt the `check` chain for npm):
 
@@ -77,14 +78,14 @@ Scripts (pnpm shape; adapt the `check` chain for npm):
 `check` is the single command agents gate on - the gate runs what production runs, so the full test suite and the real production build are inside it. Notes:
 
 - Canonical `oxlint.config.ts` (nkzw preset, tsgolint `typeAware`, react/nextjs plugins) and `.oxfmtrc.json` baseline: copy the designated canonical project's files verbatim, per the standard
-- Existing eslint + prettier projects: offer the migration, don't force it; if accepted, get `check` green and remove the replaced tooling in the same change
+- Existing eslint + prettier projects: offer the migration, don't force it; if accepted, run oxc's own `migrate-oxlint` skill (`npx skills add https://github.com/oxc-project/oxc --skill migrate-oxlint`) or `npx @oxlint/migrate` on the flat config, get `check` green, and remove the replaced tooling in the same change. `@nkzw/oxlint-config` 2.x bundles its plugins: only `@nkzw/oxlint-config` and `@nkzw/eslint-plugin` stay in devDependencies, the individual `eslint-plugin-*` packages go
 - On-demand React scan that complements code review: `pnpm dlx react-doctor@latest . --diff main --verbose`
 
 References: <https://cpojer.net/posts/fastest-frontend-tooling>, <https://github.com/nkzw-tech/oxlint-config>
 
 ## Convex backend
 
-For any project with a `convex/` directory. All from `get-convex/agent-skills`; upstream ships many more - most are thin task cards or prod-ops loops built for Convex's own agent harness, and `convex-improve-convex-plugin` sends session transcripts to Convex, so pick deliberately rather than installing `--all`.
+For any project with a `convex/` directory. All from `get-convex/agent-skills`; upstream ships 33 - most are thin task cards or prod-ops loops built for Convex's own agent harness, and `convex-improve-convex-plugin` sends the coding-session transcript to Convex (opt-in with a consent prompt, still excluded), so pick deliberately rather than installing `--all`.
 Keep the Convex SDK's file manager off: `convex.json` carries `{"aiFiles": {"enabled": false}}`, because `convex ai-files install` and `update` add the whole pack with no subset option, and `convex dev` would install it on first run without the switch.
 
 - `convex` - entry-point router: recognizes Convex work and routes to the specific convex-* skill
@@ -99,7 +100,7 @@ Keep the Convex SDK's file manager off: `convex.json` carries `{"aiFiles": {"ena
 - `convex-reviewer` - Convex-specific review checklist (auth checks, `.filter()` table scans, `Date.now()` in queries, validator coverage, `internal.*` scheduling) for the review stage; catches what generic code review misses
 - `convex-verify` - prove a built feature: seed, drive as owner / other user / unauthenticated via convex-test `withIdentity`, assert positive and negative behavior; the negative authz assertions are the load-bearing half
 
-Situational, adopt per project when the need is real: `convex-migrate-rehearse` and `convex-backup` (snapshot-rehearsed schema changes and restore drills once production data matters), `convex-advisor` (read-limit/OCC insights on large tables), `convex-billing` (Stripe), `convex-agent` (`@convex-dev/agent` backends), `convex-launch-readiness` (pre-launch composite audit).
+Situational, adopt per project when the need is real: `convex-migrate-rehearse` and `convex-backup` (snapshot-rehearsed schema changes and restore drills once production data matters), `convex-advisor` (read-limit/OCC insights on large tables), `convex-billing` (Stripe), `convex-agent` (`@convex-dev/agent` backends), `convex-launch-readiness` (pre-launch composite audit), `convex-cost` (ranks functions by read volume and projects spend, pairs with the advisor), `convex-insights` (logs and health in natural language over the official MCP), `convex-explain-app` (read-only explainer from schema and functions, for onboarding), `convex-seed` (seed or import data), `convex-domains` (custom domains).
 
 ## Vercel deployment
 
@@ -141,7 +142,7 @@ else
 fi
 ```
 
-Protected previews (Deployment Protection): configure Protection Bypass for Automation before feature work, store the secret as `VERCEL_AUTOMATION_BYPASS_SECRET`, and keep it out of commits and messages. This is HTTP-layer access to the deployed URL - `VERCEL_TOKEN` auth (`vercel-cli-with-tokens`) authenticates the CLI to the API and does not get requests past protection.
+Protected previews (Deployment Protection): configure Protection Bypass for Automation before feature work, store the secret as `VERCEL_AUTOMATION_BYPASS_SECRET`, and keep it out of commits and messages. This is HTTP-layer access to the deployed URL - `VERCEL_TOKEN` auth (`vercel-cli-with-tokens`) authenticates the CLI to the API and does not get requests past protection. For browser review, agent-browser's own `protected-vercel-deployments` skill (`agent-browser skills get protected-vercel-deployments`) is the preferred path: a short-lived OIDC token from `vercel project token` (CLI 53.3+) sent as `x-vercel-trusted-oidc-idp-token`, no long-lived secret in the session. The bypass secret stays for `vercel curl` and CI.
 
 ```bash
 # needs a recent vercel CLI (the protection subcommand is not in older majors);
@@ -159,6 +160,6 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 
 # browser review through the protection
 agent-browser set headers "{\"x-vercel-protection-bypass\":\"$VERCEL_AUTOMATION_BYPASS_SECRET\",\"x-vercel-set-bypass-cookie\":\"true\"}"
-agent-browser open https://<preview-url> && agent-browser wait --load networkidle
+agent-browser open https://<preview-url> && agent-browser wait --selector main
 ```
 
