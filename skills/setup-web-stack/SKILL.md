@@ -1,6 +1,6 @@
 ---
 name: setup-web-stack
-description: Equip a target web project from a curated catalog of community skills, tooling, and known-good configs - two routes, decided by whether the target exists yet: scaffold greenfield from the defaults reference, or read an existing project and install just what fits it.
+description: "Equip a target web project from a curated catalog of community skills, tooling, and known-good configs - two routes, decided by whether the target exists yet: scaffold greenfield from the defaults reference, or read an existing project and install just what fits it."
 argument-hint: "<path to target project>"
 disable-model-invocation: true
 ---
