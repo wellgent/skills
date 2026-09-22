@@ -83,21 +83,21 @@ First the file layout - `AGENTS.md` is the real file, `CLAUDE.md` symlinks to it
 
 Then the content: merge the two sections from [agents-md-reference.md](./agents-md-reference.md) into the target's `AGENTS.md` - the "Development workflow (Matt's skills)" router and the "Skills management (`npx skills`)" notes. If a section already exists, update it in place rather than appending a duplicate. Leave the project's own sections untouched, and don't rewrite prose the user wrote without flagging it.
 
-### 4. Install the driver skill
+### 4. Install the driver and verify-protocol skills
 
-The dev-loop driver is `orchestrate` from this repo, installed and pinned exactly like the curated set:
+The dev-loop driver is `orchestrate` from this repo, and the shared runtime-verification mechanics are `verify-protocol`; both install and pin exactly like the curated set:
 
 ```bash
-npx skills add wellgent/skills -s orchestrate
+npx skills add wellgent/skills -s orchestrate -s verify-protocol
 ```
 
-It follows the standard layout - real directory in `.agents/skills/`, symlink in `.claude/skills/` (create the symlink if the installer did not).
-The skill is harness-generic: the take executor (native subagents vs an external runner such as `codex exec`) is declared in the project's dev-loop contract, not by choosing a different skill.
+Both follow the standard layout - real directory in `.agents/skills/`, symlink in `.claude/skills/` (create the symlink if the installer did not).
+The driver is harness-generic: the take executor (native subagents vs an external runner such as `codex exec`) is declared in the project's dev-loop contract, not by choosing a different skill.
 Updates propagate by explicit `add`/`remove` per delta, never `npx skills update` (open CLI bug #542).
 
 ### 5. Scaffold the dev-loop declarations
 
-The loop's protocol ships with the installed skill (`<project>/.agents/skills/orchestrate/references/dev-loop-protocol.md`) and is read in place - never copied into the project. What gets scaffolded is the slim declarations contract: apply the installed `references/dev-loop-declarations.md` - create `docs/agents/dev-loop.md` from its template (port semantics, runtime commands, gate proofs, deviations, resolving the placeholders from the repo), create `.agents/launch.json` (three configurations, off-loop first) with the committed `.claude/launch.json` symlink, merge its tracker-mechanics section into `docs/agents/issue-tracker.md`, create the lifecycle labels, and verify the prerequisites it lists (including the project `verify` skill, scaffolded from the installed `references/verify-reference.md`). Where the target already carries a contract, leave it - the skill defers to it.
+The loop's protocol ships with the installed skill (`<project>/.agents/skills/orchestrate/references/dev-loop-protocol.md`) and is read in place - never copied into the project. What gets scaffolded is the slim declarations contract: apply the installed `references/dev-loop-declarations.md` - create `docs/agents/dev-loop.md` from its template (port semantics, runtime commands, gate proofs, deviations, resolving the placeholders from the repo), create `.agents/launch.json` (three configurations, off-loop first) with the committed `.claude/launch.json` symlink, merge its tracker-mechanics section into `docs/agents/issue-tracker.md`, create the lifecycle labels, and verify the prerequisites it lists (including the project `verify` skill, scaffolded from the installed `verify-protocol` skill's `verify-reference.md`). Where the target already carries a contract, leave it - the skill defers to it.
 
 For the machine-unique port map prerequisite, claim a free block in whatever port registry the target's machines keep before writing the contract. Takes run on the driving harness's native subagents by default; only when takes will be routed through an external runner by explicit request does the machine need that runner's harness authenticated.
 

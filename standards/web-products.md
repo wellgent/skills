@@ -133,7 +133,7 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
 
 - **Project-local** (default): skills whose content is the project's specifics.
   `verify` is the one mandated project-local skill - every project carries `.agents/skills/verify/SKILL.md` plus `scripts/dev-server.sh`.
-  It is two-layer: the shared mechanics (dev-server discipline, browser preflight, review loop, universal gotchas) are read in place from orchestrate's `verify-protocol.md`; the local skill holds only repo declarations (Ports, Launch, Sign-in, Driving gotchas, Environment gotchas, Checks that work well), scaffolded from `verify-reference.md`, and earned gotchas append to the local layer.
+  It is two-layer: the shared mechanics (dev-server discipline, browser preflight, review loop, universal gotchas) are read in place from the installed `verify-protocol` skill (wellgent/skills, an ordinary pin beside `orchestrate`); the local skill holds only repo declarations (Ports, Launch, Sign-in, Driving gotchas, Environment gotchas, Checks that work well), scaffolded from that skill's `verify-reference.md`, and earned gotchas append to the local layer.
   Launch-the-app content lives in `verify` - launch is its first chapter, never a companion `run` skill.
   Observation asserts presence only (skill and script exist); section-level conformance is a convergence-time human check.
 - **This repo** (public): everything we use regularly and can express internals-free - it must work unmodified in a stranger's repo.

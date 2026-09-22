@@ -100,7 +100,7 @@ description: How to launch and drive this app at runtime - dev servers, agent si
 
 # Verifying <project> at runtime
 
-Protocol first: read `../orchestrate/references/verify-protocol.md` - dev-server discipline, the browser preflight, the review loop, the universal gotchas.
+Protocol first: read `../verify-protocol/verify-protocol.md` - dev-server discipline, the browser preflight, the review loop, the universal gotchas.
 This skill declares what is unique to this repo.
 
 ## Ports

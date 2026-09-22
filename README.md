@@ -20,6 +20,7 @@ Distributed skills: installed into consumer projects as ordinary `npx skills` pi
 
 - **orchestrate** - run one dev-loop session as the driver: preflight, select, drive one spec end to end, tear down, report.
   Harness-generic: grooming drafts run in fresh subagents of the driving harness; implementation takes run on the executor the project contract names - the harness's native subagents by default, or an external harness via a runner file (`runners/codex.md` ships takes as `codex exec` sessions). Review and every tracker write stay with the driver.
+- **verify-protocol** - the shared runtime-verification mechanics every project's local `verify` skill reads in place (dev-server discipline, browser preflight, review loop, universal gotchas), plus the scaffold for that project-local skill and its `scripts/dev-server.sh`.
 
 ## Setup paths
 
@@ -53,7 +54,7 @@ Takes always run on the driving harness's native subagent mechanism (Claude Code
 On top of that, the project carries only what is project-specific:
 
 - a slim declarations contract at `docs/agents/dev-loop.md` - ports, scripts, gate proofs, and any deliberate protocol deviations; on conflict the contract wins. Scaffold it from [`dev-loop-declarations.md`](skills/orchestrate/references/dev-loop-declarations.md)
-- tracker mechanics at `docs/agents/issue-tracker.md`, and a project-local `verify` skill for runtime verification (shared mechanics read in place from [`verify-protocol.md`](skills/orchestrate/references/verify-protocol.md); scaffold: [`verify-reference.md`](skills/orchestrate/references/verify-reference.md))
+- tracker mechanics at `docs/agents/issue-tracker.md`, and a project-local `verify` skill for runtime verification (shared mechanics read in place from the installed `verify-protocol` skill's [`verify-protocol.md`](skills/verify-protocol/verify-protocol.md); scaffold: [`verify-reference.md`](skills/verify-protocol/verify-reference.md))
 - a GitHub-style issue tracker with labels (`ready-for-agent`, `in-progress`, `needs-human`, `needs-triage`, `needs-info`), sub-issues, and blocking edges
 
 A project missing these can still read the skill as a reference workflow, but the loop's guarantees come from the protocol plus the contract.
