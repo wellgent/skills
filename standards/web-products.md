@@ -119,8 +119,8 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
 
 ## Skills
 
-Membership splits along the stance/operations fault line: the curated Matt's selection is declared by this repo's [`setup-matts-skills`](../skills/setup-matts-skills/SKILL.md) skill (the stance); capability packs, per-project assignment, and retired-skill lists live in the consumer's private registry (the operations).
-[`setup-web-stack/catalog.md`](../skills/setup-web-stack/catalog.md) keeps rationale (what each skill is for), never membership.
+Membership splits along the stance/operations fault line: the curated Matt's selection is declared by this repo's [`setup-matts-skills`](../setup/setup-matts-skills/SKILL.md) skill (the stance); capability packs, per-project assignment, and retired-skill lists live in the consumer's private registry (the operations).
+[`setup-web-stack/catalog.md`](../setup/setup-web-stack/catalog.md) keeps rationale (what each skill is for), never membership.
 
 - **Three tiers**: a base set every project carries, capability add-on packs keyed to repo facts, and per-project assignment (packs plus recorded extras).
 - **Pack triggers are repo facts, not preferences**: convex pack when the project has a `convex/` directory; vercel-hosted pack when it deploys through Vercel; cache-components pack when `cacheComponents` is enabled or actively being adopted.
@@ -171,7 +171,7 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
 
 ## New projects
 
-The golden path is this repo's [`setup-web-product`](../skills/setup-web-product/SKILL.md) skill: it takes the few real inputs, then drives the whole bootstrap end to end, deferring each stage to its existing installer.
+The golden path is this repo's [`setup-web-product`](../setup/setup-web-product/SKILL.md) skill: it takes the few real inputs, then drives the whole bootstrap end to end, deferring each stage to its existing installer.
 
 **Input surface - four decisions, everything else defaulted**:
 

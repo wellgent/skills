@@ -16,13 +16,18 @@ npx skills add wellgent/skills -s orchestrate
 
 ## Skills
 
+Distributed skills: installed into consumer projects as ordinary `npx skills` pins and read in place there.
+
 - **orchestrate** - run one dev-loop session as the driver: preflight, select, drive one spec end to end, tear down, report.
   Harness-generic: grooming drafts run in fresh subagents of the driving harness; implementation takes run on the executor the project contract names - the harness's native subagents by default, or an external harness via a runner file (`runners/codex.md` ships takes as `codex exec` sessions). Review and every tracker write stay with the driver.
-- **setup-matts-skills** - set up Matt Pocock's engineering workflow in a target project: the curated `mattpocock/skills` selection (declared in the skill - it is the stance), the AGENTS.md convention, and the orchestrate driver on top.
-- **setup-web-stack** - equip a web project from a curated [catalog](skills/setup-web-stack/catalog.md) of community skills, quality tooling, and known-good configs: two routes - scaffold greenfield from the defaults reference, or read an existing project and install just what fits it.
-- **setup-web-product** - the golden path for a new web product: four inputs, then scaffold, claim, skills, workflow, contract, hosting, and first ship, each stage deferred to its installer.
 
-`orchestrate` installs into projects as an ordinary pin. The `setup-*` skills are checkout-run: clone this repo and invoke them against a target project path.
+## Setup paths
+
+Operator skills under [`setup/`](setup/): run from a checkout of this repo against a target project path, in either harness (`.claude/skills/` and `.agents/skills/` link to them). They are never installed into a project and never listed by the skills CLI - they carry the catalog and the curated selection, so they run at this repo's HEAD by design.
+
+- **setup-matts-skills** - set up Matt Pocock's engineering workflow in a target project: the curated `mattpocock/skills` selection (declared in the skill - it is the stance), the AGENTS.md convention, and the orchestrate driver on top.
+- **setup-web-stack** - equip a web project from a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling, and known-good configs: two routes - scaffold greenfield from the defaults reference, or read an existing project and install just what fits it.
+- **setup-web-product** - the golden path for a new web product: four inputs, then scaffold, claim, skills, workflow, contract, hosting, and first ship, each stage deferred to its installer.
 
 ## The doctrine
 
@@ -35,7 +40,7 @@ Everything we use regularly lives here - shared with the world, friends, clients
 Truly internal things live at project or repo level: one project's specifics stay in that project; operational registries, version pins, and fleet machinery stay in private repos.
 
 A skill published here is internals-free - any coupling to a specific product, company, or environment is expressed generically - and works unmodified in a stranger's repo: install it, read it, run it, with no tribal knowledge required.
-Once here, a skill is distributed like any third-party skill: an ordinary `npx skills` pin in the consuming repo's `skills-lock.json`.
+A distributed skill under `skills/` is consumed like any third-party skill: an ordinary `npx skills` pin in the consuming repo's `skills-lock.json`. A setup path under `setup/` is consumed by cloning this repo and running it against the target.
 
 ## Conventions these skills assume
 
