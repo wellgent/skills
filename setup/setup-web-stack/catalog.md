@@ -79,7 +79,7 @@ Scripts (pnpm shape; adapt the `check` chain for npm):
 
 - Canonical `oxlint.config.ts` (nkzw preset, tsgolint `typeAware`, react/nextjs plugins) and `.oxfmtrc.json` baseline: copy the designated canonical project's files verbatim, per the standard
 - Existing eslint + prettier projects: offer the migration, don't force it; if accepted, run oxc's own `migrate-oxlint` skill (`npx skills add https://github.com/oxc-project/oxc --skill migrate-oxlint`) or `npx @oxlint/migrate` on the flat config, get `check` green, and remove the replaced tooling in the same change. `@nkzw/oxlint-config` 2.x bundles its plugins: only `@nkzw/oxlint-config` and `@nkzw/eslint-plugin` stay in devDependencies, the individual `eslint-plugin-*` packages go
-- On-demand React scan that complements code review: `pnpm dlx react-doctor@latest . --diff main --verbose`
+- On-demand React scan that complements code review, advisory input and never pass/fail: `pnpm dlx react-doctor@latest . --scope changed --base main --verbose --no-score`. `--no-score` keeps the score upload, share URL and usage telemetry off. No project install: the "not installed" footer printed after the findings is ignored
 
 References: <https://cpojer.net/posts/fastest-frontend-tooling>, <https://github.com/nkzw-tech/oxlint-config>
 
