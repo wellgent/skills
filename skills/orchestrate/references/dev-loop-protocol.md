@@ -163,6 +163,9 @@ The project's check command is the baseline fact re-run; the contract's **Gate p
 The same section names advisory review inputs per surface (never pass/fail).
 Both the gate and take prompts consume it.
 
+A review tool scoped to `origin/HEAD` (the bundled `/security-review` is one) reviews `git diff origin/HEAD...HEAD` computed inside the take's worktree, before landing, and the shipped comment records the reviewed commit range.
+Takes run in sessions rooted in the main checkout, so invoking such a tool there reviews the main checkout's empty diff; the proof is the tool's review steps applied to the worktree diff, never the bare invocation.
+
 ## Skill map
 
 - `/to-spec` - conversation → spec issue (from the engineering skill set).
