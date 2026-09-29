@@ -107,6 +107,7 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
   The dev loop's driver-owned gate (diff review, re-run proofs, push only on green) is the single enforcement point.
   CI would duplicate it in a divergent environment with a demonstrated rot pattern.
   The fact that reopens this decision: unattended or scheduled pushes that bypass the gated loop becoming real.
+- **No residue**: code and docs describe what is; a replacement deletes what it replaces in the same diff; no unused files, exports, types, or dependencies (every dead-code suppression carries a written reason); every `TODO` carries an issue number; tests follow their code; vendor-owned trees are re-pinned, never edited.
 - **Coverage: no metric, no minimum counts.**
   Tests must exist and run inside `check`; per-spec gate proofs name the evidence a change must produce; the volume-rehearsal ladder governs data-heavy specs.
   Test allocation stays per-product and risk-driven.
@@ -136,7 +137,7 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
 [`setup-web-stack/catalog.md`](../setup/setup-web-stack/catalog.md) keeps rationale (what each skill is for), never membership.
 
 - **Three tiers**: a base set every project carries, capability add-on packs keyed to repo facts, and per-project assignment (packs plus recorded extras).
-- **Pack triggers are repo facts, not preferences**: convex pack when the project has a `convex/` directory; vercel-hosted pack when it deploys through Vercel; cache-components pack when `cacheComponents` is enabled or actively being adopted.
+- **Pack triggers are repo facts, not preferences**: convex pack when the project has a `convex/` directory; vercel-hosted pack when it deploys through Vercel; cache-components pack when `cacheComponents` is enabled; cache-components-adoption pack only while `cacheComponents` is being adopted, removed once adoption is done.
 - **Retired skills** are named in the private registry; sweeps remove them wherever found.
 - **Distribution**: `npx skills` lock-pins on disk (`skills-lock.json`), converged by explicit `add -s` / `remove` per delta, never `skills update`.
   Cadence: manual, drift-triggered - no cron.
@@ -173,6 +174,8 @@ Project rules an agent consults are in `docs/agents/` and `AGENTS.md`; procedure
 - **One lane system**: wayfinder charts large scopes, grilling handles ad-hoc decisions, to-spec/to-tickets groom, **orchestrate is the standard execution lane for spec-scale delivery**, implement serves one-offs that don't warrant the loop, off-loop work runs on the declared port.
   Lane choice is judgment, not deviation - the Deviations section governs protocol overrides inside the loop only.
   Session shapes are protocol: single-flight, fixed driver/implementer roles, spec-at-a-time with continuation as the headroom exception.
+- **Where review runs**: the driver's gate per ticket; a cross-model review over each spec's combined diff before the spec closes; an iteration baseline before specs start; an iteration close-out as soon as the build board empties, before launch; and a periodic deep audit on a trigger.
+  Deterministic analyzers (react-doctor, knip, the design detector, the Convex authz scan, a residue grep) feed review everywhere as advisory input, never pass/fail; the verdict is always a person-grade read.
 
 ## Learning propagation
 
