@@ -23,7 +23,7 @@ case "$CMD" in
       exit 1
     fi
     cd "$REPO_ROOT"
-    <optional backend sync, e.g. `npx convex dev --once`>
+    <backend sync before the app starts - `pnpm exec convex dev --once` on a Convex app; drop the line when there is no backend>
     nohup <dev command, e.g. `node_modules/.bin/next dev --turbopack`> -p "$PORT" >"$LOGFILE" 2>&1 &
     echo $! >"$PIDFILE"
     for _ in $(seq 1 60); do

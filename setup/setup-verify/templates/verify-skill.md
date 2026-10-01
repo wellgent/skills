@@ -27,6 +27,10 @@ Use `scripts/dev-server.sh start <gate port>` for a fresh, session-owned server;
 <How an agent signs in without a human: the dev-only backdoor (test accounts, logged OTPs or magic links, seeded sessions) and its exact steps.
 Whatever the mechanism, it must be dev-deployment-only - production keeps the real flow, and the backdoor never ships or runs there.>
 
+## Seed data
+
+<How the dev deployment gets realistic data, as exact commands: seed functions in the repo, or the same source production syncs from. Say when to run them, whether a repeat is safe, and how to clean up what a check creates.>
+
 ## Driving gotchas
 
 <Project-specific driving gotchas, appended as sessions earn them: selectors that need `type` over fill, modals that trap Escape, forms that only enable on dirty+valid, waits that hang on persistent sockets.>

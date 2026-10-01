@@ -13,7 +13,7 @@ One of this repo's setup skills, independent of the others. Run from a checkout 
 
 ## What the project ends up with
 
-- `.agents/skills/verify/SKILL.md` - the project's own skill, scaffolded once from [templates/verify-skill.md](templates/verify-skill.md) and never overwritten after: ports, launch, agent sign-in, and the gotcha sections verification sessions grow. Symlinked from `.claude/skills/verify`.
+- `.agents/skills/verify/SKILL.md` - the project's own skill, scaffolded once from [templates/verify-skill.md](templates/verify-skill.md) and never overwritten after: ports, launch, agent sign-in, seed data, and the gotcha sections verification sessions grow. Symlinked from `.claude/skills/verify`.
 - `.agents/skills/verify/protocol.md` - the shared mechanics, a verbatim copy of [protocol.md](protocol.md): dev-server discipline, the browser health preflight, the review loop, universal gotchas, the living-skill rule. Managed: replaced wholesale on every run, never edited in the project.
 - `scripts/dev-server.sh` - ephemeral, session-owned servers on explicit ports, scaffolded once from [templates/dev-server.sh](templates/dev-server.sh) with the placeholders resolved.
 
@@ -24,11 +24,11 @@ A line belongs in the protocol only when it reads identically for every project;
 
 ### 1. Read the project
 
-Resolve every placeholder the templates carry before writing: the project name, the dev command (and any backend sync step that must run first, such as `npx convex dev --once`), and the port roles. Ports come from `.agents/launch.json` (off-loop, gate, takes); with no launch file yet, claim them per the operator's port registry or ask, and write the launch file as the dev-loop declarations describe. Note whether the host co-runs a production service whose port must never be touched, and how an agent signs in without a human (a dev-only backdoor; production keeps the real flow).
+Resolve every placeholder the templates carry before writing: the project name, the dev command, the backend sync step that must run first (`pnpm exec convex dev --once` for a Convex app, which the standard requires), how the dev deployment gets its data, and the port roles. Ports come from `.agents/launch.json` (off-loop, gate, takes); with no launch file yet, claim them per the operator's port registry or ask, and write the launch file as the dev-loop declarations describe. Note whether the host co-runs a production service whose port must never be touched, and how an agent signs in without a human (a dev-only backdoor; production keeps the real flow).
 
 ### 2. Scaffold once
 
-When `.agents/skills/verify/SKILL.md` is absent: write it from the template with the Ports and Launch sections filled and the rest left as headed sections, create the `.claude/skills/verify` relative symlink, and write `scripts/dev-server.sh` from its template with the placeholders resolved, executable. Leave the project's `AGENTS.md` alone unless it lacks a pointer to the skill; then add one line under its development-workflow section.
+When `.agents/skills/verify/SKILL.md` is absent: write it from the template with the Ports, Launch and Seed data sections filled and the rest left as headed sections, create the `.claude/skills/verify` relative symlink, and write `scripts/dev-server.sh` from its template with the placeholders resolved, executable. Leave the project's `AGENTS.md` alone unless it lacks a pointer to the skill; then add one line under its development-workflow section.
 
 When the skill already exists: do not touch `SKILL.md`. It is the project's living manual.
 
@@ -38,7 +38,8 @@ Copy [protocol.md](protocol.md) to `.agents/skills/verify/protocol.md` verbatim,
 
 ### 4. Report script drift
 
-Diff the project's `scripts/dev-server.sh` against the template's shape - the stop block that confirms the port closed, the listener-only sweep, the start refusal on a taken port. Report what diverges and why it matters; converge it with the user's agreement, keeping the project's resolved placeholders and any local additions.
+Diff the project's `scripts/dev-server.sh` against the template's shape - the stop block that confirms the port closed, the listener-only sweep, the start refusal on a taken port, and on a Convex app the `convex dev --once` sync in `start`. Report what diverges and why it matters; converge it with the user's agreement, keeping the project's resolved placeholders and any local additions.
+On a backend-backed app, also report a `SKILL.md` with no Seed data section: without one, a fresh dev deployment shows nothing to verify against.
 
 ## Report
 

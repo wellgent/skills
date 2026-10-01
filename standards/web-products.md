@@ -92,6 +92,7 @@ Preference and familiarity do not qualify.
 - Testing: vitest edge-runtime with inlined `convex-test`.
 - The catalog's Convex skill set from `get-convex/agent-skills` is mandatory for every Convex app, installed as ordinary `npx skills` pins (see Skills). The Convex SDK's own file manager stays off (`convex.json`: `{"aiFiles": {"enabled": false}}`): `convex ai-files` installs the whole upstream pack with no subset option, and one of its skills sends session transcripts to Convex.
 - `convex deploy` runs on production builds only; "codegen touches the deployment" is a standing caution.
+- The dev deployment carries data and is deployed by nothing but the dev server: `scripts/dev-server.sh start` runs `pnpm exec convex dev --once` before the app starts, so every runtime check runs against the current schema and functions. The project's `verify` skill names how dev gets its data - seed functions in the repo, or the same source production syncs from - and every runtime check seeds first.
 - `defineApp` env declaration is required.
 - Auth is the hosting standard's territory - see above, not restated here.
 
