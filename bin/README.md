@@ -9,6 +9,7 @@ This page holds what the commands read and write, which no `--help` shows.
 The template is [`templates/brain/flow.json`](../templates/brain/flow.json).
 
 - `projects["<owner>/<repo>"].checkout`: where the project is checked out on this host. A spawned session starts there unless `--cwd` names a worktree.
+- `projects["<owner>/<repo>"].card`: the project card's path in the driving brain. The lead reads it first.
 - `projects["<owner>/<repo>"].iteration`: the open iteration, as the iteration map's issue number. `flow ledger` writes to that iteration's file.
 - `harness.claude`, `harness.codex`: arguments every session of that harness starts with.
 - `steps.<step>`: `model` and `effort`. The model's prefix picks the harness: `claude-*` runs in Claude Code, `gpt-*` in Codex. Model ids are full ids, never aliases.
