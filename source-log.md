@@ -20,8 +20,8 @@ A source the flow starts to depend on gets a section here in the same change.
 ## pbakaus/impeccable
 
 - **Upstream:** `git:pbakaus/impeccable:skill`
-- **Seen:** `4bc74df2e34c170fb63f106a9d80dee42e9abcc0`, 2026-10-05
-- **Pin:** `4bc74df2e34c170fb63f106a9d80dee42e9abcc0`
+- **Seen:** `f3132ffe7e8a99abe88b8867a59de261c3ed7b4d`, 2026-10-05
+- **Pin:** `f3132ffe7e8a99abe88b8867a59de261c3ed7b4d`
 - **Used by:** UX design (`impeccable`), and the design scanner line of `docs/agents/dev-loop.md`.
 
 ## vercel-labs/agent-skills
@@ -68,7 +68,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## Codex
 
 - **Upstream:** `npm:@openai/codex`
-- **Seen:** `0.160.0`, 2026-10-05
+- **Seen:** `0.160.1`, 2026-10-05
 - **Used by:** the harness of every `gpt-*` step. Read its release notes the same way.
 
 ## herdr
@@ -182,7 +182,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## Vercel CLI
 
 - **Upstream:** `npm:vercel`
-- **Seen:** `62.2.0`, 2026-10-05
+- **Seen:** `62.4.0`, 2026-10-05
 - **Used by:** Release and the prototype deploy.
 
 ## Vercel changelog
