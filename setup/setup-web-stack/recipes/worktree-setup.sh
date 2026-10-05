@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SEED_FUNCTION="<seed function, e.g. seed:run>"
-EXPIRATION="in 7 days"
+EXPIRATION="in 5 days" # the longest Convex accepts
 
 cd "$(git rev-parse --show-toplevel)"
 name=$(basename "$PWD")

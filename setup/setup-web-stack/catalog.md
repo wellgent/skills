@@ -101,33 +101,36 @@ Scripts (pnpm shape; adapt the `check` chain for npm):
 module.exports = {
   forbidden: [
     {
-      name: "no-circular",
-      severity: "error",
       comment: "Break the cycle: move what both modules need into a third module that imports neither.",
       from: {},
+      name: "no-circular",
+      severity: "error",
       to: { circular: true },
     },
   ],
   options: {
+    doNotFollow: { path: "node_modules" },
     parser: "swc",
     tsConfig: { fileName: "tsconfig.json" },
     tsPreCompilationDeps: true,
-    doNotFollow: { path: "node_modules" },
   },
 };
 ```
+
+  The nkzw preset lints the config file too: its keys are sorted as above, and `oxlint.config.ts` carries an override `{ files: ["**/*.cjs"], env: { commonjs: true } }`. On pnpm 12, `@swc/core` needs `allowBuilds: { "@swc/core": false }` in `pnpm-workspace.yaml` (its binary arrives as an optional dependency, so the build script is not needed), and knip needs `ignoreDependencies: ["@swc/core"]` with the reason that dependency-cruiser loads it by name
 
 - A blocking check that is red on `main` when it is introduced stays out of `check` until a cleanup spec gets it green; until then its count is a scanner-pass number
 - Installing Matt's `code-review` project skill replaces the bundled `/code-review` (a project skill wins over a bundled one of the same name); the bundled review stays reachable as `/review`
 
 Scanner pass - measured at each Audit and recorded with `flow ledger scan`, never pass/fail. The commands go on the "Scanner pass" lines of `docs/agents/dev-loop.md`:
 
-- `unused_code`: `pnpm knip --reporter json`, counting issues; zero on a repo that carries knip in `check`
-- `duplication_source_pct`, `duplication_tests_pct`: `pnpm dlx jscpd --min-tokens 50 --min-lines 5 --reporters json` twice, once over source with tests, fixtures and generated code ignored, once over the test and fixture files alone. jscpd finds textual clones only; logic duplicated under different names is the Audit defect review's lens
-- `dependency_violations`: `pnpm lint:deps --output-type json`, counting violations
+- `unused_code`: `pnpm --reporter=silent run knip --reporter json`, counting issues; zero on a repo that carries knip in `check`. Without `--reporter=silent`, pnpm 12 prints the script line to stdout and the JSON does not parse
+- `duplication_source_pct`, `duplication_tests_pct`: `pnpm dlx jscpd@<pinned version> --min-tokens 50 --min-lines 5 --reporters json` twice, once over source with tests, fixtures and generated code ignored, once over the test and fixture files alone; the number is `.statistics.total.percentage` of the report. Pin the version so runs stay comparable. In this mode jscpd finds textual clones only; logic duplicated under different names is the Audit defect review's lens
+- `dependency_violations`: `pnpm --reporter=silent run lint:deps --output-type json`, counting violations
 - `suppressions`: a grep count of `oxlint-disable`, `eslint-disable`, `@ts-expect-error`, `@ts-ignore` and `as any` over source
 - `tests`, `test_seconds`: the test run's own summary
 - `source_lines`, `test_lines`: `git ls-files` piped to `wc -l`, split by the test file pattern
+- Commands too long for one doc line go into one project script, `scripts/scan.sh <measure>`, which prints the number
 - `react_doctor` (project measure): `pnpm dlx react-doctor@latest . --no-score --no-supply-chain`, the `N issues` line. `--no-score` keeps the score upload, share URL and usage telemetry off; `--no-supply-chain` keeps the dependency lookups off
 
 References: <https://cpojer.net/posts/fastest-frontend-tooling>, <https://github.com/nkzw-tech/oxlint-config>
@@ -158,28 +161,25 @@ export default defineConfig({
       excludeFiles: ["**/*.test.ts", "**/*.fixtures.ts"],
       rules: {
         ...Object.fromEntries(
-          Object.keys(convexPlugin.configs.recommended[0].rules).map((rule) => [rule, "error"]),
+          Object.keys(convexPlugin.rules).map((rule) => [`@convex-dev/${rule}`, "error"]),
         ),
-        "@convex-dev/import-wrong-runtime": "error",
-        "@convex-dev/no-collect-in-query": "error",
-        "@convex-dev/require-access-control": "error",
       },
     },
   ],
 });
 ```
 
-Adopting it on an existing codebase is one preparatory ticket: `npx @convex-dev/codemod explicit-ids` for the implicit table-id calls, one index deleted from each prefix-redundant pair, and the reasoned disables.
+On an existing codebase the rules start red, so until the cleanup they run from a second config file that spreads the main one, under a `lint:convex` script listed as a pending check. Adopting it is one preparatory ticket: `npx @convex-dev/codemod explicit-ids` for the implicit table-id calls, one index deleted from each prefix-redundant pair, and the reasoned disables.
 
 Migrations - `@convex-dev/migrations`, installed as a component. Every production migration runs with `dryRun: true` first; the lead puts the dry run's row counts into the production-write approval and runs the migration itself.
 
 Deploy keys - every worktree is scoped to its own deployment:
 
 - The run host's Convex login is used by the lead session and by the worktree setup script; it stays readable on the host
-- Every worktree works through a `CONVEX_DEPLOY_KEY` in its `.env.local`, scoped to that worktree's own dev deployment: `convex deployment token create <name> --save-env`. With the key in scope every `convex` command in that directory reaches that deployment only
+- Every worktree works through a `CONVEX_DEPLOY_KEY` in its `.env.local`, scoped to that worktree's own dev deployment: `convex deployment token create <name> --save-env`. With the key in scope every `convex` command in that directory reaches that deployment only: the CLI ignores `--prod` and says so
 - Vercel holds the production deploy key in its Production environment and the preview deploy key in its Preview environment, both as `CONVEX_DEPLOY_KEY`
 
-One dev deployment per worktree - [`recipes/worktree-setup.sh`](recipes/worktree-setup.sh), copied to `scripts/worktree-setup.sh` and named on the "Set up" line of `docs/agents/dev-loop.md`. It installs dependencies, creates an expiring cloud dev deployment named after the worktree, mints the scoped key, pushes the functions once and runs the seed. The seed is an idempotent internal function that creates the test identities `docs/agents/dev-loop.md` lists. New dev deployments take their environment variables from the Convex project's default environment variables, so the sign-in keys are set there once. A deployment is removed by its expiry.
+One dev deployment per worktree - [`recipes/worktree-setup.sh`](recipes/worktree-setup.sh), copied to `scripts/worktree-setup.sh` and named on the "Set up" line of `docs/agents/dev-loop.md`. It installs dependencies, creates a cloud dev deployment named after the worktree that expires after 5 days, the longest Convex accepts, mints the scoped key, pushes the functions once and runs the seed. The seed is an idempotent internal function that creates the test identities `docs/agents/dev-loop.md` lists. New dev deployments take their environment variables from the Convex project's default environment variables, so the sign-in keys are set there once. A deployment is removed by its expiry.
 
 Prototype previews - [`recipes/vercel-build.sh`](recipes/vercel-build.sh), copied to `scripts/vercel-build.sh` with `"buildCommand": "bash scripts/vercel-build.sh"` in `vercel.json`. A `prototype/*` branch build runs `convex deploy` with the preview deploy key, which creates a Convex preview deployment named after the branch and seeds it through `--preview-run`. Preview deployments expire (5 days on the free plans, 14 on paid); a round that outlives one redeploys and reseeds. Preview sign-in keys come from the project's default environment variables for previews.
 
