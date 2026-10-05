@@ -82,14 +82,14 @@ Scripts (pnpm shape; adapt the `check` chain for npm):
   "lint:format": "oxfmt --check .",
   "lint:deps": "depcruise src --config .dependency-cruiser.cjs",
   "knip": "knip",
-  "typecheck": "tsc --noEmit",
+  "typecheck": "next typegen && tsc --noEmit",
   "test": "vitest run",
   "test:journeys": "playwright test --config e2e/journeys/playwright.config.ts",
   "check": "pnpm typecheck && pnpm lint && pnpm lint:format && pnpm knip && pnpm lint:deps && pnpm test && pnpm build"
 }
 ```
 
-`check` is the single command agents gate on, and every step in it blocks - the gate runs what production runs, so the full test suite and the real production build are inside it. A project with a design system adds its design-system lint to the chain, and a Convex project adds `convex` to the `depcruise` paths. `test:journeys` stays outside `check`: `flow gate` runs it once per spec from the "Journey tests" line of `docs/agents/dev-loop.md`. Notes:
+`next typegen` (Next.js projects) rewrites the route types under `.next/types` before `tsc` reads them, so a build directory left by an earlier commit cannot fail the typecheck. `check` is the single command agents gate on, and every step in it blocks - the gate runs what production runs, so the full test suite and the real production build are inside it. A project with a design system adds its design-system lint to the chain, and a Convex project adds `convex` to the `depcruise` paths. `test:journeys` stays outside `check`: `flow gate` runs it once per spec from the "Journey tests" line of `docs/agents/dev-loop.md`. Notes:
 
 - Canonical `oxlint.config.ts` (nkzw preset, tsgolint `typeAware`, react/nextjs plugins) and `.oxfmtrc.json` baseline: copy the designated canonical project's files verbatim, per the standard
 - Existing eslint + prettier projects: offer the migration, don't force it; if accepted, run oxc's own `migrate-oxlint` skill (`npx skills add https://github.com/oxc-project/oxc --skill migrate-oxlint`) or `npx @oxlint/migrate` on the flat config, get `check` green, and remove the replaced tooling in the same change. `@nkzw/oxlint-config` 2.x bundles its plugins: only `@nkzw/oxlint-config` and `@nkzw/eslint-plugin` stay in devDependencies, the individual `eslint-plugin-*` packages go

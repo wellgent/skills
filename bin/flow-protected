@@ -83,7 +83,8 @@ trap 'rm -f "$flags" "$flags.lines"' EXIT
 # Suppressions and skip markers on added lines.
 while IFS=$'\t' read -r sign file line text; do
   [ "$sign" = + ] || continue
-  if echo "$text" | grep -Eq "$SUPPRESSION"; then
+  # A suppression sits in a comment; the same words in a string or a pattern are code.
+  if echo "$text" | grep -Eq "(//|/\*|#|<!--|^[[:space:]]*\*).*$SUPPRESSION"; then
     after=$(echo "$text" | sed -E "s/.*$SUPPRESSION//")
     if echo "$after" | grep -Eq -- '(--|:)[[:space:]]*[^[:space:]]' ||
        { echo "$text" | grep -Eq '@ts-(ignore|expect-error)[[:space:]]+[^[:space:]*]'; }; then
