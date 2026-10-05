@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# flow cost <session id> [--harness claude|codex] [--from <time>] [--to <time>]
+# Prints what one session used, as JSON: tokens per model read from its transcript and the
+# transcripts of its subagents, priced at API list prices from ledger/prices.json.
+# --from and --to (UTC, ISO 8601) cut a window out of a long-running session.
+# Exit 3 when the host holds no transcript for the session.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+need jq
+
+sid= harness= from= to=
+while [ $# -gt 0 ]; do
+  case $1 in
+    --harness) harness=${2:?--harness needs claude or codex}; shift 2 ;;
+    --from) from=${2:?--from needs a time}; shift 2 ;;
+    --to) to=${2:?--to needs a time}; shift 2 ;;
+    -*) die "unknown option: $1" ;;
+    *) sid=$1; shift ;;
+  esac
+done
+[ -n "$sid" ] || die "usage: flow cost <session id> [--harness claude|codex] [--from <time>] [--to <time>]"
+case $sid in *[!A-Za-z0-9-]*) die "not a session id: $sid" ;; esac
+prices="$FLOW_HOME/ledger/prices.json"
+[ -f "$prices" ] || die "price table missing: $prices"
+
+# Claude Code: <projects>/<project>/<session>.jsonl, subagents under <session>/.
+# A response is written once per content block with the same usage, so rows are counted per message id.
+claude_cost() {
+  local root="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects" main
+  main=$(find "$root" -mindepth 2 -maxdepth 2 -type f -name "$sid.jsonl" 2>/dev/null | head -1)
+  [ -n "$main" ] || return 3
+  {
+    awk 1 "$main"
+    [ ! -d "${main%.jsonl}" ] || find "${main%.jsonl}" -type f -name '*.jsonl' -exec awk 1 {} +
+  } | jq -R -n -L "$FLOW_BIN" --slurpfile prices "$prices" --arg sid "$sid" --arg from "$from" --arg to "$to" '
+    include "ledger";
+    reduce (inputs | fromjson? | select(type == "object" and (.timestamp | type) == "string")
+            | select(.timestamp >= $from and ($to == "" or .timestamp <= $to))) as $r
+      ({start: null, end: null, version: null, messages: {}};
+       .start = (if .start == null or $r.timestamp < .start then $r.timestamp else .start end)
+       | .end = (if .end == null or $r.timestamp > .end then $r.timestamp else .end end)
+       | .version = (.version // $r.version)
+       | if $r.type == "assistant" and ($r.message.usage | type) == "object" and $r.message.model != "<synthetic>"
+         then $r.message.usage as $u
+           | .messages[$r.message.id // $r.uuid] = {
+               model: ($r.message.model + (if $u.speed == "fast" then ":fast" else "" end)),
+               input: ($u.input_tokens // 0),
+               cache_write_5m: (if $u.cache_creation then $u.cache_creation.ephemeral_5m_input_tokens // 0
+                                else $u.cache_creation_input_tokens // 0 end),
+               cache_write_1h: ($u.cache_creation.ephemeral_1h_input_tokens? // 0),
+               cache_read: ($u.cache_read_input_tokens // 0),
+               output: ($u.output_tokens // 0)}
+         else . end)
+    | . as $s
+    | ([$s.messages[]] | group_by(.model)
+       | map({key: .[0].model, value: (reduce .[] as $m
+           ({input: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0};
+            .input += $m.input | .cache_write_5m += $m.cache_write_5m | .cache_write_1h += $m.cache_write_1h
+            | .cache_read += $m.cache_read | .output += $m.output))})
+       | from_entries | priced($prices[0]))
+    + {session: $sid, harness: "claude", harness_version: $s.version, start: $s.start, end: $s.end,
+       wall_s: (if $s.start == null then null else ($s.end | epoch) - ($s.start | epoch) end)}'
+}
+
+# Codex: sessions/YYYY/MM/DD/rollout-<time>-<session>.jsonl. Token counts are cumulative, so a
+# file's usage is its last count, less the last count before --from. A subagent thread is its
+# own file whose first line names the root session.
+codex_file() {
+  { grep -E '^.{0,80}"type":"(session_meta|turn_context)"|"type":"token_count"' "$1" || true; tail -n 1 "$1"; } |
+    jq -R -n --arg from "$from" --arg to "$to" '
+      def usage: .payload.info.total_token_usage;
+      reduce (inputs | fromjson? | select(type == "object")) as $r
+        ({model: null, version: null, start: null, end: null, base: null, total: null};
+         .end = ($r.timestamp // .end)
+         | if $r.type == "session_meta" then .version = $r.payload.cli_version | .start = $r.timestamp
+           elif $r.type == "turn_context" then .model = ($r.payload.model // .model)
+           elif $r.type == "event_msg" and $r.payload.type == "token_count" and ($r | usage) != null then
+             if $from != "" and $r.timestamp < $from then .base = ($r | usage)
+             elif $to == "" or $r.timestamp <= $to then .total = ($r | usage)
+             else . end
+           else . end)
+      | (.total // .base) as $t | (.base // {}) as $b
+      | .usage = (if $t == null or .model == null then null else
+          {input: (($t.input_tokens - $t.cached_input_tokens) - (($b.input_tokens // 0) - ($b.cached_input_tokens // 0))),
+           cache_write_5m: 0, cache_write_1h: 0,
+           cache_read: ($t.cached_input_tokens - ($b.cached_input_tokens // 0)),
+           output: ($t.output_tokens - ($b.output_tokens // 0))} end)
+      | del(.base, .total)'
+}
+
+codex_cost() {
+  local root="${CODEX_HOME:-$HOME/.codex}/sessions" main file day
+  main=$(find "$root" -type f -name "rollout-*-$sid.jsonl" 2>/dev/null | head -1)
+  [ -n "$main" ] || return 3
+  day=$(dirname "$main")
+  {
+    codex_file "$main"
+    find "$root" -type f -name 'rollout-*.jsonl' | sort | while IFS= read -r file; do
+      [ "$file" != "$main" ] || continue
+      [[ "$(dirname "$file")" < "$day" ]] && continue
+      head -c 1500 "$file" | grep -q "\"session_id\":\"$sid\"" || continue
+      codex_file "$file"
+    done
+  } | jq -s -L "$FLOW_BIN" --slurpfile prices "$prices" --arg sid "$sid" '
+    include "ledger";
+    .[0] as $main
+    | (map(select(.usage != null)) | group_by(.model)
+       | map({key: .[0].model, value: (reduce .[].usage as $u
+           ({input: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0};
+            .input += $u.input | .cache_read += $u.cache_read | .output += $u.output))})
+       | from_entries | priced($prices[0]))
+    + {session: $sid, harness: "codex", harness_version: $main.version, start: $main.start, end: $main.end,
+       wall_s: (if $main.start == null or $main.end == null then null
+                else ($main.end | epoch) - ($main.start | epoch) end)}'
+}
+
+code=0
+case $harness in
+  claude) claude_cost || code=$? ;;
+  codex) codex_cost || code=$? ;;
+  "") claude_cost || { code=$?; [ "$code" -ne 3 ] || { code=0; codex_cost || code=$?; }; } ;;
+  *) die "--harness must be claude or codex, got: $harness" ;;
+esac
+[ "$code" -ne 3 ] || FLOW_EXIT=3 die "no transcript for session $sid on this host"
+exit "$code"

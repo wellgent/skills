@@ -5,7 +5,8 @@
 # An empty entry starts the lead's harness with no model or effort flags, so the session runs
 # on the same host defaults as the lead; FLOW_LEAD_MODEL and FLOW_LEAD_EFFORT name them when
 # the lead runs on something else.
-# The invocation is the session's start prompt. Prints the run as JSON.
+# The invocation is the session's start prompt. Prints the run as JSON and keeps it as the
+# spawn record flow ledger reads.
 set -euo pipefail
 . "$FLOW_BIN/lib.sh"
 need herdr jq
@@ -104,8 +105,12 @@ for attempt in 1 2 3 4; do
 done
 [ -n "$started" ] || die "pane $pane never became ready for $run"
 
-jq -n --arg run "$run" --arg step "$step" --arg target "$target" --arg harness "$harness" --arg model "$model" \
+record=$(jq -n --arg run "$run" --arg step "$step" --arg target "$target" --arg harness "$harness" --arg model "$model" \
   --arg effort "$effort" --arg lead "$lead" --arg pane "$pane" --arg cwd "$cwd" --arg skill "$skill" \
   --arg time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg flow "$(git -C "$FLOW_HOME" rev-parse --short HEAD 2>/dev/null || echo unknown)" \
   '{run: $run, step: $step, target: $target, harness: $harness, model: $model, effort: $effort,
-    lead: $lead, pane: $pane, cwd: $cwd, skill: $skill, started: $time}'
+    lead: $lead, pane: $pane, cwd: $cwd, skill: $skill, started: $time, flow_version: $flow}')
+mkdir -p "$(state_dir)/runs"
+echo "$record" >"$(state_dir)/runs/$run.json"
+echo "$record"

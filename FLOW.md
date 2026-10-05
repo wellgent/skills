@@ -142,14 +142,14 @@ Stages the lead runs itself have no entry.
 - **Input:** the ledger, the tracker, transcripts sampled by ledger outliers.
 - **Output:** Retro report; checks and standards applied; skill and flow text changes put to the client.
 - **Quality bar:** every candidate is routed (check, standard, re-test trigger, trial ticket, or dropped with a reason); skill and flow text changes only with the client's approval.
-- **Tools:** `retro` read as a file, `writing-for-agents`, the ledger rollup script.
+- **Tools:** `retro` read as a file, `writing-for-agents`, `flow ledger rollup`.
 
 ## Hand-off artifacts
 
 Each entry says where the artifact lives, who writes it and who reads it.
 Formats with a template are in [`templates/artifacts/`](templates/artifacts/).
 
-- **Run-end report** (every spawned session): one line into the lead's herdr session, sent with `flow report <outcome> <link to the stage's artifact>`: `run-end: <step> <spec> <outcome> <link> <session id> (<session name>)`. The lead's ledger row comes from it. A question or a conflict exit goes the same way with `flow ask`.
+- **Run-end report** (every spawned session): one line into the lead's herdr session, sent with `flow report <outcome> <link to the stage's artifact>`: `run-end: <step> <spec> <outcome> <link> <session id> (<session name>)`. The lead appends the run's ledger row from it with `flow ledger run`. A question or a conflict exit goes the same way with `flow ask`.
 - **Readiness report** ([template](templates/artifacts/readiness-report.md)): comment on the iteration map. Writer: lead. Readers: client, Retro.
 - **Spec brief** ([template](templates/artifacts/spec-brief.md)): the first body of the spec's issue on the project tracker, opened at the end of Shape. Writer: lead. Readers: designer, architect.
 - **UX notes** ([template](templates/artifacts/ux-notes.md)): comment on the spec issue, plus the chosen prototype branch. Writer: designer. Readers: architect, lead, Review.
@@ -168,6 +168,6 @@ Every bug ticket carries its **origin spec**.
 
 ## The trail per iteration
 
-- In the driving brain: the ledger file under `ledger/<project>/`, the two Audit report files beside it, and the iteration map with the readiness report and the Retro report as comments.
+- In the driving brain: the ledger file under `ledger/<project>/` ([schema](ledger/README.md)), the two Audit report files beside it, and the iteration map with the readiness report and the Retro report as comments.
 - On the project tracker: the spec brief and spec, UX notes, design record, Review and QA findings, Release report. Ledger rows link to them.
 - On the run host: transcripts, kept 365 days, pointed at by session id.

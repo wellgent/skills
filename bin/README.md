@@ -9,6 +9,7 @@ This page holds what the commands read and write, which no `--help` shows.
 The template is [`templates/brain/flow.json`](../templates/brain/flow.json).
 
 - `projects["<owner>/<repo>"].checkout`: where the project is checked out on this host. A spawned session starts there unless `--cwd` names a worktree.
+- `projects["<owner>/<repo>"].iteration`: the open iteration, as the iteration map's issue number. `flow ledger` writes to that iteration's file.
 - `harness.claude`, `harness.codex`: arguments every session of that harness starts with.
 - `steps.<step>`: `model` and `effort`. The model's prefix picks the harness: `claude-*` runs in Claude Code, `gpt-*` in Codex. Model ids are full ids, never aliases.
 - An empty step entry starts the lead's harness with no model or effort arguments, so the session runs on the host defaults the lead started from. When the lead runs on something else, `FLOW_LEAD_MODEL` and `FLOW_LEAD_EFFORT` in the lead's environment name it.
@@ -67,3 +68,13 @@ Then it pushes `HEAD` to the remote main branch as a fast-forward and brings the
 `flow tick arm` adds one hourly crontab entry for the lead session and `flow tick disarm` removes it.
 Each tick asks sessions stopped at a usage limit to continue, then types `lead tick: check runs` into the lead's session.
 It does nothing when the lead session does not exist.
+
+## The ledger
+
+`flow ledger` appends to `ledger/<repo>/<iteration>.jsonl` beside the flow config and never commits; the lead commits and pushes the file.
+The rows, the cost rules and the two Retro triggers are in [`ledger/README.md`](../ledger/README.md).
+
+- `flow spawn` keeps each run's spawn record, and `flow ask` each question and conflict exit, under `$FLOW_STATE` (default `~/.local/state/flow`). `flow ledger run` reads them, so it runs on the host the step was spawned on.
+- `flow ledger run` takes the run-end line as the lead received it, in quotes.
+- `flow ledger gate` reads the gate result from the project checkout named in the flow config.
+- `flow cost` and `flow ledger fill` read transcripts from `~/.claude/projects` and `~/.codex/sessions` (`CLAUDE_CONFIG_DIR` and `CODEX_HOME` move them).

@@ -1,0 +1,401 @@
+#!/usr/bin/env bash
+# flow ledger <command> ...
+# Appends rows to the iteration's ledger file in the driving brain, ledger/<repo>/<iteration>.jsonl,
+# and reads them back for the Retro. The row schema is in ledger/README.md.
+# The iteration is --iteration <id>, or projects["<owner>/<repo>"].iteration in the flow config.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+need jq
+
+usage() {
+  cat <<'USAGE'
+Usage: flow ledger <command> [args] [--iteration <id>]
+
+  run '<run-end line>' [--session <id>] [<measure>=<number> ...]
+        One spawned session's row, from its run-end report and spawn record, with cost.
+  stage <stage> <target> <outcome> [<link>] [--reason <text>] [<measure>=<number> ...]
+        A stage the lead ran itself, or a skipped stage (outcome skipped, --reason required).
+  gate <target> [--commit <sha>]
+        The newest gate result for the target, read from the project checkout.
+  rec <target> --round <n> <recommendation>
+        The lead's sealed recommendation, before the client picks.
+  decision <target> --basis text|prototype|live-data --link <url> [--reverses <decision id or link>]
+        [--options <n> --pick as-offered|mixed|redo --round <n>] <gist>
+        A client decision. The three design options go together and need a sealed recommendation.
+  scan <owner>/<repo> [--commit <sha>] <measure>=<number> ...
+        The Audit scanner pass.
+  bug <owner>/<repo>#<bug> --origin <spec issue>|unknown [--found <date>]
+        [--area authorization|money|data-integrity]
+        An escaped defect. Exit 2 when it triggers a Retro.
+  lead <owner>/<repo> <session id>
+        The lead session's cost from the iteration's first row until now.
+  fill <owner>/<repo>
+        Fill the cost of rows whose transcript or price was missing when they were appended.
+  rollup <owner>/<repo>
+        The Retro report's ledger sections as Markdown, against the previous iteration.
+  check <owner>/<repo>#<spec>
+        Compare a released spec's measures with the previous ten. Exit 2 when one is outside
+        their spread.
+USAGE
+}
+
+now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+cmd=${1:-help}
+[ $# -gt 0 ] && shift
+case $cmd in help|-h|--help) usage; exit 0 ;; esac
+
+opt_iteration= opt_session= opt_reason= opt_commit= opt_round= opt_basis= opt_link= opt_reverses=
+opt_options= opt_pick= opt_origin= opt_found= opt_area=
+pos=() measures=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --iteration|--session|--reason|--commit|--round|--basis|--link|--reverses|--options|--pick|--origin|--found|--area)
+      [ $# -ge 2 ] || die "$1 needs a value"
+      eval "opt_${1#--}=\$2"; shift 2 ;;
+    -*) die "unknown option: $1" ;;
+    *)
+      case $cmd:$1 in
+        run:[a-z]*=*|stage:[a-z]*=*|scan:[a-z]*=*) measures+=("$1") ;;
+        *) pos+=("$1") ;;
+      esac
+      shift ;;
+  esac
+done
+arg() { echo "${pos[$1]:-}"; }
+
+measures_json() {
+  jq -n '[$ARGS.positional[] | capture("^(?<k>[a-z][a-z0-9_]*)=(?<v>.+)$") // error("not <measure>=<number>")
+          | {(.k): (.v | tonumber)}] | add // {}' --args ${measures[@]+"${measures[@]}"} 2>/dev/null ||
+    die "measures are <name>=<number> with a lower-case name, got: ${measures[*]}"
+}
+
+# Sets TARGET_*, config, checkout, iteration, dir, file and base (the fields every row carries).
+open_ledger() {
+  [ -n "$1" ] || { usage >&2; exit 64; }
+  parse_target "$1"
+  config=$(find_config)
+  iteration=${opt_iteration:-$(jq -r --arg r "$TARGET_REPO" '.projects[$r].iteration // empty' "$config")}
+  case $iteration in
+    ""|*"<"*) die "no iteration: pass --iteration <id> or set projects[\"$TARGET_REPO\"].iteration in $config" ;;
+    *[!A-Za-z0-9._-]*) die "iteration must be a plain id such as the iteration map's issue number, got: $iteration" ;;
+  esac
+  checkout=$(jq -r --arg r "$TARGET_REPO" '.projects[$r].checkout // ""' "$config")
+  case $checkout in "~"*) checkout=$HOME${checkout#"~"} ;; esac
+  dir="$(cd "$(dirname "$config")" && pwd)/ledger/$TARGET_NAME"
+  file="$dir/$iteration.jsonl"
+  base=$(jq -n --arg time "$(now)" --arg iteration "$iteration" --arg project "$TARGET_REPO" --arg spec "$TARGET_ISSUE" \
+    '{kind: null, time: $time, iteration: ($iteration | tonumber? // .), project: $project,
+      spec: (if $spec == "" then null else $spec | tonumber end)}')
+}
+
+# Every row of the project, across iterations, as one JSON array.
+all_rows() {
+  if compgen -G "$dir/*.jsonl" >/dev/null; then cat "$dir"/*.jsonl | jq -s .; else echo '[]'; fi
+}
+file_rows() { if [ -f "$file" ]; then jq -s . "$file"; else echo '[]'; fi; }
+
+append() {
+  local row
+  row=$(jq -c . <<<"$1")
+  mkdir -p "$dir"
+  printf '%s\n' "$row" >>"$file"
+  echo "$row"
+  echo "flow ledger: appended a $(jq -r .kind <<<"$row") row to $file" >&2
+}
+
+# cost_of <session> [flow cost options]: the cost object, or null with a note when it cannot be read.
+cost_of() {
+  local out code=0
+  out=$("$FLOW_BIN/flow-cost" "$@" 2>&1) || code=$?
+  if [ "$code" -ne 0 ]; then
+    echo "flow ledger: no cost yet ($out); run flow ledger fill on the host that holds the transcript" >&2
+    echo null; return 0
+  fi
+  if [ "$(jq '.unpriced | length' <<<"$out")" -gt 0 ]; then
+    echo "flow ledger: no price for $(jq -r '.unpriced | join(", ")' <<<"$out"); add it to $FLOW_HOME/ledger/prices.json, then run flow ledger fill" >&2
+  fi
+  echo "$out"
+}
+
+STAGES="readiness shape ux-design system-design plan build review qa release audit retro"
+
+case $cmd in
+  run)
+    line=$(arg 0)
+    re='^run-end: ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) \(([^)]+)\)$'
+    [[ $line =~ $re ]] || die "not a run-end line: run-end: <step> <target> <outcome> <link> <session id> (<session name>)"
+    step=${BASH_REMATCH[1]} outcome=${BASH_REMATCH[3]} link=${BASH_REMATCH[4]}
+    session=${opt_session:-${BASH_REMATCH[5]}} run=${BASH_REMATCH[6]}
+    open_ledger "${BASH_REMATCH[2]}"
+    case $step in
+      ux-design) stage=ux-design role=designer ;;
+      system-design|system-design-second) stage=system-design role=architect ;;
+      grooming) stage=plan role=groomer ;;
+      build) stage=build role=implementer ;;
+      review) stage=review role=reviewer ;;
+      qa) stage=qa role=qa ;;
+      audit|audit-second|audit-architecture|audit-architecture-second) stage=audit role=auditor ;;
+      *) die "unknown step: $step" ;;
+    esac
+    record="$(state_dir)/runs/$run.json"
+    [ -f "$record" ] || die "no spawn record for $run at $record; append on the host the step was spawned on"
+    [ "$(file_rows | jq --arg run "$run" 'map(select(.run == $run)) | length')" -eq 0 ] || die "$run is already in $file"
+    events="$(state_dir)/runs/$run.events"
+    asks=0 conflicts=0
+    if [ -f "$events" ]; then
+      asks=$(grep -c ' question$' "$events" || true)
+      conflicts=$(grep -c ' conflict exit$' "$events" || true)
+    fi
+    [ "$session" != unknown ] || session=
+    cost=null
+    if [ -n "$session" ]; then
+      cost=$(cost_of "$session" --harness "$(jq -r .harness "$record")")
+    else
+      echo "flow ledger: the run-end line has no session id; pass --session <id> or the row stays without cost" >&2
+    fi
+    append "$(jq -n --argjson base "$base" --slurpfile record "$record" --argjson cost "$cost" \
+      --argjson measures "$(measures_json)" --arg stage "$stage" --arg step "$step" --arg role "$role" \
+      --arg outcome "$outcome" --arg link "$link" --arg session "$session" \
+      --argjson asks "$asks" --argjson conflicts "$conflicts" -L "$FLOW_BIN" '
+      include "ledger";
+      $record[0] as $r
+      | ($cost.end // $base.time) as $end
+      | $base + {kind: "run", stage: $stage, step: $step, role: $role, run: $r.run,
+          harness: $r.harness,
+          model: (if $r.model != "" then $r.model
+                  else ($cost.models // {} | to_entries | max_by(.value.output) | .key // null) end),
+          effort: (if $r.effort == "" then null else $r.effort end),
+          flow_version: ($r.flow_version // null), harness_version: ($cost.harness_version // null),
+          start: $r.started, end: $end, wall_s: (($end | epoch) - ($r.started | epoch)),
+          outcome: $outcome, link: (if $link == "none" then null else $link end),
+          session: (if $session == "" then null else $session end),
+          asks: $asks, conflict_exits: $conflicts, measures: $measures,
+          cost: (if $cost == null then null else $cost | {usd, tokens, models, unpriced, prices_as_of} end)}')"
+    ;;
+
+  stage)
+    stage=$(arg 0) outcome=$(arg 2) link=$(arg 3)
+    [ -n "$stage" ] && [ -n "$outcome" ] || die "usage: flow ledger stage <stage> <target> <outcome> [<link>] [--reason <text>]"
+    case " $STAGES " in *" $stage "*) ;; *) die "unknown stage: $stage (one of: $STAGES)" ;; esac
+    [ "$outcome" != skipped ] || [ -n "$opt_reason" ] || die "a skipped stage needs --reason <text>"
+    open_ledger "$(arg 1)"
+    append "$(jq -n --argjson base "$base" --argjson measures "$(measures_json)" --arg stage "$stage" \
+      --arg outcome "$outcome" --arg link "$link" --arg reason "$opt_reason" '
+      $base + {kind: "run", stage: $stage, step: null, role: "lead", outcome: $outcome,
+        link: (if $link == "" then null else $link end),
+        skip_reason: (if $reason == "" then null else $reason end),
+        session: null, measures: $measures, cost: null}')"
+    ;;
+
+  gate)
+    open_ledger "$(arg 0)"
+    [ -d "$checkout" ] || die "$config has no usable projects[\"$TARGET_REPO\"].checkout"
+    gates="$(cd "$checkout" && cd "$(git rev-parse --git-common-dir)" && pwd)/flow/gate"
+    result=
+    if [ -n "$opt_commit" ]; then
+      result=$(ls "$gates/$opt_commit"*.json 2>/dev/null | head -1 || true)
+    else
+      for candidate in $(ls -t "$gates"/*.json 2>/dev/null || true); do
+        if [ "$(jq -r .target "$candidate")" = "$(arg 0)" ]; then result=$candidate; break; fi
+      done
+    fi
+    [ -n "$result" ] || die "no gate result for $(arg 0) in $gates"
+    row=$(jq -n --argjson base "$base" --slurpfile gate "$result" '
+      $gate[0] as $g
+      | $base + {kind: "gate", time: $g.time, commit: $g.commit, branch: $g.branch, verdict: $g.verdict,
+          check_exit: $g.check.exit, check_s: $g.check.seconds,
+          journeys_exit: ($g.journeys.exit? // null), journeys_s: ($g.journeys.seconds? // null),
+          protected_hits: ($g.flags | length),
+          protected_kinds: ($g.flags | group_by(.kind) | map({(.[0].kind): length}) | add // {}),
+          protected_accepted: $g.flags_accepted}')
+    [ "$(file_rows | jq --argjson row "$row" 'map(select(.kind == "gate" and .commit == $row.commit and .time == $row.time)) | length')" -eq 0 ] ||
+      die "the gate result of $(jq -r .time <<<"$row") on $(jq -r '.commit[0:12]' <<<"$row") is already in $file"
+    append "$row"
+    ;;
+
+  rec)
+    rec=$(arg 1)
+    [ -n "$rec" ] && [ -n "$opt_round" ] || die "usage: flow ledger rec <target> --round <n> <recommendation>"
+    open_ledger "$(arg 0)"
+    [ -n "$TARGET_ISSUE" ] || die "a recommendation belongs to a spec: <owner>/<repo>#<issue>"
+    [ "$(file_rows | jq --argjson spec "$TARGET_ISSUE" --argjson round "$opt_round" \
+      'map(select((.kind == "rec" or .kind == "decision") and .spec == $spec and .round == $round)) | length')" -eq 0 ] ||
+      die "round $opt_round of #$TARGET_ISSUE already has a recommendation or a pick; a recommendation is sealed before the client picks"
+    append "$(jq -n --argjson base "$base" --argjson round "$opt_round" --arg rec "$rec" \
+      '$base + {kind: "rec", round: $round, lead_rec: $rec}')"
+    echo "flow ledger: commit and push the ledger before the client sees the options" >&2
+    ;;
+
+  decision)
+    gist=$(arg 1)
+    [ -n "$gist" ] && [ -n "$opt_basis" ] && [ -n "$opt_link" ] ||
+      die "usage: flow ledger decision <target> --basis text|prototype|live-data --link <url> <gist>"
+    case $opt_basis in text|prototype|live-data) ;; *) die "--basis is text, prototype or live-data, got: $opt_basis" ;; esac
+    open_ledger "$(arg 0)"
+    rows=$(all_rows)
+    design=null
+    if [ -n "$opt_options$opt_pick$opt_round" ]; then
+      [ -n "$opt_options" ] && [ -n "$opt_pick" ] && [ -n "$opt_round" ] || die "a design decision needs --options, --pick and --round together"
+      case $opt_pick in as-offered|mixed|redo) ;; *) die "--pick is as-offered, mixed or redo, got: $opt_pick" ;; esac
+      [ "$opt_basis" = prototype ] || die "a design decision is made on a prototype: --basis prototype"
+      [ -n "$TARGET_ISSUE" ] || die "a design decision belongs to a spec: <owner>/<repo>#<issue>"
+      design=$(jq --argjson spec "$TARGET_ISSUE" --argjson round "$opt_round" --argjson options "$opt_options" --arg pick "$opt_pick" '
+        (map(select(.kind == "rec" and .spec == $spec and .round == $round)) | last) as $rec
+        | if $rec == null then null
+          else {options_offered: $options, pick: $pick, round: $round, lead_rec: $rec.lead_rec} end' <<<"$rows")
+      [ "$design" != null ] || die "round $opt_round of #$TARGET_ISSUE has no sealed recommendation; run flow ledger rec before the client picks"
+    fi
+    reversed=null
+    if [ -n "$opt_reverses" ]; then
+      reversed=$(jq --arg ref "$opt_reverses" 'map(select(.kind == "decision" and (.id == $ref or .link == $ref))) | last
+        | if . == null then {id: null, basis: "unknown"} else {id, basis} end' <<<"$rows")
+      [ "$(jq -r .id <<<"$reversed")" != null ] ||
+        echo "flow ledger: $opt_reverses matches no decision in the ledger; its basis is recorded as unknown" >&2
+    fi
+    id="$iteration-d$(($(file_rows | jq 'map(select(.kind == "decision")) | length') + 1))"
+    append "$(jq -n --argjson base "$base" --arg id "$id" --arg gist "$gist" --arg basis "$opt_basis" \
+      --arg link "$opt_link" --arg reverses "$opt_reverses" --argjson reversed "$reversed" --argjson design "$design" '
+      $base + {kind: "decision", id: $id, decision: $gist, basis: $basis, link: $link,
+        reverses: (if $reverses == "" then null else $reverses end),
+        reverses_basis: ($reversed.basis? // null)}
+      + ($design // {})')"
+    ;;
+
+  scan)
+    open_ledger "$(arg 0)"
+    [ -z "$TARGET_ISSUE" ] || die "the scanner pass takes <owner>/<repo>, without an issue"
+    values=$(measures_json)
+    missing=$(jq -r '["unused_code", "duplication_source_pct", "duplication_tests_pct", "dependency_violations",
+      "suppressions", "tests", "test_seconds", "source_lines", "test_lines"] - keys | join(" ")' <<<"$values")
+    [ -z "$missing" ] || die "the scanner row is missing: $missing"
+    commit=$opt_commit
+    [ -n "$commit" ] || { [ -d "$checkout" ] && commit=$(git -C "$checkout" rev-parse HEAD); } || die "pass --commit <sha>"
+    append "$(jq -n --argjson base "$base" --arg commit "$commit" --argjson measures "$values" \
+      '$base + {kind: "scan", commit: $commit, measures: $measures}')"
+    ;;
+
+  bug)
+    [ -n "$opt_origin" ] || die "usage: flow ledger bug <owner>/<repo>#<bug> --origin <spec issue>|unknown [--found <date>] [--area <area>]"
+    case $opt_origin in unknown) ;; *[!0-9]*|"") die "--origin is a spec issue number or unknown, got: $opt_origin" ;; esac
+    case $opt_area in ""|authorization|money|data-integrity) ;; *) die "--area is authorization, money or data-integrity, got: $opt_area" ;; esac
+    open_ledger "$(arg 0)"
+    [ -n "$TARGET_ISSUE" ] || die "a bug row takes the bug ticket: <owner>/<repo>#<issue>"
+    found=${opt_found:-$(now)}
+    case $found in ????-??-??) found="${found}T12:00:00Z" ;; esac
+    released=null
+    if [ "$opt_origin" != unknown ]; then
+      released=$(all_rows | jq --argjson spec "$opt_origin" \
+        'map(select(.kind == "run" and .stage == "release" and .spec == $spec and .outcome != "skipped")) | sort_by(.time) | .[0]
+         | if . == null then null else {time, iteration} end')
+      [ "$released" != null ] ||
+        die "spec #$opt_origin has no Release row; a bug found before its spec is released is a Review or QA finding, and one whose cause predates the flow has --origin unknown"
+    fi
+    row=$(jq -n --argjson base "$base" --arg origin "$opt_origin" --arg found "$found" --arg area "$opt_area" \
+      --argjson released "$released" -L "$FLOW_BIN" '
+      include "ledger";
+      $base + {kind: "bug", spec: null, bug: $base.spec, origin: ($origin | tonumber? // .),
+        origin_iteration: ($released.iteration? // null), origin_released: ($released.time? // null),
+        found: $found,
+        days: (if $released == null then null
+               else ((($found | epoch) - ($released.time | epoch)) / 86400 | floor | if . < 0 then 0 else . end) end),
+        area: (if $area == "" then null else $area end)}')
+    append "$row"
+    if [ -n "$opt_area" ] && [ "$(jq -r '.origin_iteration == .iteration' <<<"$row")" = true ]; then
+      echo "flow ledger: Retro trigger: an escaped defect touching $opt_area from spec #$opt_origin of the open iteration; run a Retro now" >&2
+      exit 2
+    fi
+    ;;
+
+  lead)
+    session=$(arg 1)
+    [ -n "$session" ] || die "usage: flow ledger lead <owner>/<repo> <session id>"
+    open_ledger "$(arg 0)"
+    rows=$(file_rows)
+    from=$(jq -r 'map(.time) | min // empty' <<<"$rows")
+    [ -n "$from" ] || die "$file has no rows yet"
+    [ "$(jq --arg s "$session" 'map(select(.stage == "lead" and .session == $s)) | length' <<<"$rows")" -eq 0 ] ||
+      die "the lead session $session is already in $file"
+    to=$(now)
+    cost=$(cost_of "$session" --from "$from" --to "$to")
+    append "$(jq -n --argjson base "$base" --argjson cost "$cost" --arg session "$session" --arg from "$from" --arg to "$to" '
+      $base + {kind: "run", stage: "lead", step: null, role: "lead", harness: ($cost.harness? // null),
+        model: ($cost.models // {} | to_entries | max_by(.value.output) | .key // null),
+        harness_version: ($cost.harness_version? // null), outcome: "done", link: null,
+        session: $session, window: {from: $from, to: $to}, measures: {},
+        cost: (if $cost == null then null else $cost | {usd, tokens, models, unpriced, prices_as_of} end)}')"
+    ;;
+
+  fill)
+    open_ledger "$(arg 0)"
+    [ -f "$file" ] || die "no ledger file: $file"
+    tmp=$(mktemp "$file.XXXXXX")
+    filled=0
+    while IFS= read -r row; do
+      if [ "$(jq -r '.kind == "run" and .session != null and (.cost == null or (.cost.unpriced | length) > 0)' <<<"$row")" = true ]; then
+        args=("$(jq -r .session <<<"$row")")
+        harness=$(jq -r '.harness // empty' <<<"$row")
+        [ -z "$harness" ] || args+=(--harness "$harness")
+        if [ "$(jq -r '.window != null' <<<"$row")" = true ]; then
+          args+=(--from "$(jq -r .window.from <<<"$row")" --to "$(jq -r .window.to <<<"$row")")
+        fi
+        cost=$(cost_of "${args[@]}")
+        if [ "$cost" != null ]; then
+          row=$(jq -c --argjson cost "$cost" '.cost = ($cost | {usd, tokens, models, unpriced, prices_as_of})
+            | .harness_version = (.harness_version // $cost.harness_version)
+            | .model = (.model // ($cost.models | to_entries | max_by(.value.output) | .key // null))' <<<"$row")
+          filled=$((filled + 1))
+        fi
+      fi
+      printf '%s\n' "$row"
+    done <"$file" >"$tmp"
+    mv "$tmp" "$file"
+    echo "flow ledger: filled the cost of $filled rows in $file" >&2
+    ;;
+
+  rollup)
+    open_ledger "$(arg 0)"
+    [ -f "$file" ] || die "no ledger file: $file"
+    all_rows | jq -r -L "$FLOW_BIN" --arg iteration "$iteration" -f "$FLOW_BIN/ledger-rollup.jq"
+    ;;
+
+  check)
+    open_ledger "$(arg 0)"
+    [ -n "$TARGET_ISSUE" ] || die "check takes a spec: <owner>/<repo>#<issue>"
+    out=$(all_rows | jq -r --argjson spec "$TARGET_ISSUE" '
+      def measures($rows):
+        {build_runs: ($rows | map(select(.stage == "build" and .kind == "run")) | length),
+         review_runs: ($rows | map(select(.stage == "review" and .outcome != "skipped")) | length),
+         blocking_findings: ($rows | map(.measures.blocking? // 0) | add // 0),
+         red_gates: ($rows | map(select(.kind == "gate" and .verdict == "red")) | length),
+         conflict_exits: ($rows | map(.conflict_exits? // 0) | add // 0),
+         cost_usd: ($rows | map(.cost.usd? // 0) | add // 0),
+         wall_hours: (($rows | map(.wall_s? // 0) | add // 0) / 360 | round / 10)};
+      . as $all
+      | [$all[] | select(.kind == "run" and .stage == "release" and .outcome != "skipped" and .spec != null)]
+        | group_by(.spec) | map(sort_by(.time) | .[0]) | sort_by(.time) as $released
+      | ($released | map(.spec) | index($spec)) as $at
+      | if $at == null then "error: spec #\($spec) has no Release row yet" else
+          ($released[([$at - 10, 0] | max):$at] | map(.spec)) as $before
+          | measures($all | map(select(.spec == $spec))) as $now
+          | if ($before | length) < 5
+            then "ok: \($before | length) earlier specs in the ledger, the comparison starts at five"
+            else [$before[] as $s | measures($all | map(select(.spec == $s)))] as $earlier
+              | [$now | to_entries[] | .key as $k | ($earlier | map(.[$k])) as $v
+                 | select(.value > ($v | max))
+                 | "flag: \($k) is \(.value), the previous \($v | length) specs ran from \($v | min) to \($v | max)"]
+              | if length == 0 then "ok: every measure of #\($spec) is inside the spread of the previous \($before | length) specs"
+                else join("\n") end
+            end
+        end')
+    echo "$out"
+    case $out in
+      error:*) exit 1 ;;
+      flag:*)
+        echo "flow ledger: Retro trigger: run a Retro, or record in the iteration map why not" >&2
+        exit 2 ;;
+    esac
+    ;;
+
+  *) usage >&2; exit 64 ;;
+esac

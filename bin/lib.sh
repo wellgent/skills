@@ -60,3 +60,6 @@ dev_loop_values() {
   [ -f "$file" ] || return 0
   { grep -m1 -F -- "- **$1:**" "$file" || true; } | { grep -o '`[^`]*`' || true; } | sed 's/^`//; s/`$//'
 }
+
+# Where flow spawn keeps what it observed about each run, for flow ledger on the same host.
+state_dir() { echo "${FLOW_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/flow}"; }

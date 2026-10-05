@@ -1,7 +1,7 @@
 {
   "tracker": "<owner>/<brain repo>",
   "projects": {
-    "<owner>/<project repo>": { "checkout": "~/repos/<project repo>" }
+    "<owner>/<project repo>": { "checkout": "~/repos/<project repo>", "iteration": "<iteration map issue number>" }
   },
   "harness": {
     "claude": ["--permission-mode", "bypassPermissions"],

@@ -31,6 +31,11 @@ Lead commands:
         Manage or run the hourly crontab entry that nudges the lead session.
   protected <base> <head>
         Print the protected-change flags for a diff as JSON.
+  ledger <command> ...
+        Append rows to the iteration's ledger, fill costs, roll it up for the Retro,
+        check the Retro triggers. flow ledger help lists the commands.
+  cost <session id> [--harness claude|codex] [--from <time>] [--to <time>]
+        Print a session's tokens and list-price cost from its transcript as JSON.
 
 Session commands (inside a spawned step):
   report <outcome> [<artifact link>]
@@ -47,7 +52,7 @@ USAGE
 cmd=${1:-help}
 [ $# -gt 0 ] && shift
 case $cmd in
-  spawn|gate|land|tick|protected|report) exec "$FLOW_BIN/flow-$cmd" "$@" ;;
+  spawn|gate|land|tick|protected|report|cost|ledger) exec "$FLOW_BIN/flow-$cmd" "$@" ;;
   ask) exec "$FLOW_BIN/flow-report" --ask "$@" ;;
   help|-h|--help) usage ;;
   *) usage >&2; exit 64 ;;
