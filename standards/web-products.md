@@ -96,8 +96,9 @@ Preference and familiarity do not qualify.
   With the file manager off nothing refreshes `convex/_generated/ai/guidelines.md`, so every toolchain sweep replaces it with the current upstream `convex_rules.txt`.
 - Migrations run through `@convex-dev/migrations`.
   A production migration is dry-run first (`dryRun: true`), and its row counts are part of the production-write approval.
-- **Production reach is a permission.** Only the lead session uses the run host's Convex login.
+- **Scoped keys guard production.** The run host's Convex login is used by the lead session and by the worktree setup script.
   Every worktree's `.env.local` carries a `CONVEX_DEPLOY_KEY` scoped to that worktree's own dev deployment (`convex deployment token create`), so every `convex` command a spawned session runs there reaches that deployment and no other.
+  The login stays readable on the host: the key stops a stray production command, and the `AGENTS.md` rule that a production read or write is a request to the lead covers the rest.
   Build pipelines hold keys scoped the same way: the production deploy key in the production build environment, the preview deploy key in the preview one.
 - **One dev deployment per worktree.** The worktree setup script creates an expiring cloud dev deployment (`convex deployment create dev/<worktree> --type dev --select --expiration`), mints its scoped key, pushes once (`convex dev --once`) and runs the seed, so parallel sessions share no schema or data and every runtime check runs against the worktree's own code.
   The seed lives in the repo as an idempotent function and creates the test identities `docs/agents/dev-loop.md` names.

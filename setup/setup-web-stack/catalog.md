@@ -173,9 +173,9 @@ Adopting it on an existing codebase is one preparatory ticket: `npx @convex-dev/
 
 Migrations - `@convex-dev/migrations`, installed as a component. Every production migration runs with `dryRun: true` first; the lead puts the dry run's row counts into the production-write approval and runs the migration itself.
 
-Deploy keys - production reach is a permission, not a prompt:
+Deploy keys - every worktree is scoped to its own deployment:
 
-- The run host's Convex login belongs to the lead session
+- The run host's Convex login is used by the lead session and by the worktree setup script; it stays readable on the host
 - Every worktree works through a `CONVEX_DEPLOY_KEY` in its `.env.local`, scoped to that worktree's own dev deployment: `convex deployment token create <name> --save-env`. With the key in scope every `convex` command in that directory reaches that deployment only
 - Vercel holds the production deploy key in its Production environment and the preview deploy key in its Preview environment, both as `CONVEX_DEPLOY_KEY`
 
