@@ -45,6 +45,7 @@ For each source under `.brain.skills`, in the brain's root:
 npx skills add "<source>#$(flow sources pin <source>)" --agent codex --copy -y --skill <name> [--skill <name> ...]
 ```
 
+- Pass every `--skill <name>` as its own pair of arguments: with `-y`, a list the CLI cannot parse installs the whole source without an error.
 - A skill already locked at that commit (`ref` in `skills-lock.json`) is skipped.
 - A skill locked at another commit, or with no `ref`, is removed (`npx skills remove <name> -y`) and added again at the pin. Updates go through `add` and `remove` only; `npx skills update` rewrites lock entries wrongly.
 - Every other skill the brain already pins from a logged source moves to the same pin, and one the source no longer ships at that commit is removed.

@@ -35,3 +35,4 @@ Read each file when its trigger matches your work, before you write code.
 - [docs/agents/dev-loop.md](docs/agents/dev-loop.md): the gate, worktrees, running the app, critical journeys, and the lenses and tools of Review, QA and Audit.
 - `docs/adr/`: architecture decisions. An ADR is settled; a ticket that contradicts one is a conflict exit.
 - [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md), [docs/agents/triage-labels.md](docs/agents/triage-labels.md): tracker mechanics and label strings.
+- [docs/agents/domain.md](docs/agents/domain.md): how to read the glossary and the ADRs before exploring the code.
