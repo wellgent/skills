@@ -16,7 +16,8 @@ Only when the brief says the spec has a user-visible surface. Otherwise append `
 ## 2. System design
 
 1. `flow spawn system-design <target>`, with `--note` naming the path of the latest merged architecture audit report.
-2. When the design record names a hard-to-reverse call, `flow spawn system-design-second <target>` and merge the second opinion into the record's comment yourself.
+2. The architect posts the record and asks for approval with `flow ask`, naming its hard-to-reverse calls.
+   When it names one, `flow spawn system-design-second <target>` and merge the second opinion into the record's comment yourself.
 3. Approve the record when all three hold: every hard-to-reverse call has its second opinion and an ADR, behavioural contracts with literal examples exist wherever the spec touches authorization, money or data integrity, and the data model serves every state in the UX notes.
    Otherwise answer the architect's session with what is missing.
 
@@ -25,12 +26,13 @@ Only when the brief says the spec has a user-visible surface. Otherwise append `
 1. Write the spec with `to-spec`, its template unchanged, replacing the brief as the issue body and linking the UX notes and the design record.
    Append `flow ledger stage plan <target> done <issue link>`.
 2. `flow spawn grooming <target>`.
+   The groomer sends its proposed breakdown with `flow ask` before it publishes; judge it against step 3 and reply.
 3. Approve the ticket graph when every contract example and every UX state is covered by a ticket, each ticket names the contract examples it implements, and blocking edges serialize every pair of tickets that cannot run in parallel.
 
 ## 4. Build and the gate
 
 1. `flow spawn build <target>`.
-2. At its run-end report, in the worktree holding the integration branch: `flow gate <target>`, then `flow ledger gate <target>`.
+2. At its run-end report, in the worktree its Build run comment names: `flow gate <target>`, then `flow ledger gate <target>`.
    - `pass`: go to Review.
    - `red`: `flow spawn build <target>` again, `--note` naming the failing check.
    - `flagged`: judge each flag.
