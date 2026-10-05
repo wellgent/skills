@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# flow sources                       compare every source in the source log with its upstream
+# flow sources seen <name> [<version>]
+#                                    record a version as seen today (default: the upstream's
+#                                    current one); a skill source's pin moves with it
+# flow sources seen --unchanged      stamp today's date on every source whose upstream is unchanged
+# flow sources pin <name>            print the commit a skill source is pinned at
+# The source log is source-log.md in the flow repo. Each source is a "## <name>" section with
+# "- **Upstream:** `<kind>:<arg>`", "- **Seen:** `<version>`, <date>" and, for a source of
+# pinned skills, "- **Pin:** `<commit sha>`".
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+
+LOG=${FLOW_SOURCE_LOG:-$FLOW_HOME/source-log.md}
+[ -f "$LOG" ] || die "no source log at $LOG"
+
+# One line per source: name, upstream, seen, pin (tab-separated, "-" when absent).
+rows() {
+  awk '
+    function span(line,   m) { if (match(line, /`[^`]*`/)) return substr(line, RSTART + 1, RLENGTH - 2); return "-" }
+    function flush() { if (name != "") printf "%s\t%s\t%s\t%s\n", name, up, seen, pin }
+    /^## / { flush(); name = substr($0, 4); up = seen = pin = "-"; next }
+    /^- \*\*Upstream:\*\*/ { up = span($0) }
+    /^- \*\*Seen:\*\*/ { seen = span($0) }
+    /^- \*\*Pin:\*\*/ { pin = span($0) }
+    END { flush() }
+  ' "$LOG"
+}
+
+# The upstream's current version, or "unknown" when it cannot be read from this host.
+current() {
+  local kind=${1%%:*} arg=${1#*:} out=
+  case $kind in
+    release) out=$(gh api "repos/$arg/releases/latest" --jq .tag_name 2>/dev/null) ;;
+    git)
+      case $arg in
+        *:*) out=$(gh api "repos/${arg%%:*}/commits?path=${arg#*:}&per_page=1" --jq '.[0].sha' 2>/dev/null) ;;
+        *) out=$(git ls-remote "https://github.com/$arg" HEAD 2>/dev/null | cut -f1) ;;
+      esac ;;
+    npm) out=$(npm view "$arg" version 2>/dev/null) ;;
+    brew) out=$(brew info --json=v2 "$arg" 2>/dev/null | jq -r '.formulae[0].versions.stable // .casks[0].version // empty') ;;
+    url) out=read ;;
+    *) die "unknown upstream kind in the source log: $1" ;;
+  esac
+  echo "${out:-unknown}"
+}
+
+# The commit a version of a skill source resolves to.
+pin_for() {
+  local kind=${1%%:*} arg=${1#*:} version=$2 repo sha
+  case $kind in
+    git) echo "$version" ;;
+    release)
+      repo=${arg%%:*}
+      sha=$(git ls-remote "https://github.com/$repo" "refs/tags/$version^{}" "refs/tags/$version" | sort -k2 | tail -1 | cut -f1)
+      [ -n "$sha" ] || die "no tag $version in $repo"
+      echo "$sha" ;;
+    *) die "a pin needs a git or release upstream, got: $1" ;;
+  esac
+}
+
+set_field() { # name field value-with-backticks-and-suffix
+  local tmp
+  tmp=$(mktemp)
+  awk -v name="$1" -v field="$2" -v value="$3" '
+    /^## / { inside = (substr($0, 4) == name) }
+    inside && index($0, "- **" field ":**") == 1 { print "- **" field ":** " value; next }
+    { print }
+  ' "$LOG" >"$tmp"
+  cat "$tmp" >"$LOG"
+  rm -f "$tmp"
+}
+
+row_of() { rows | awk -F'\t' -v name="$1" '$1 == name' ; }
+
+compare() {
+  local name up seen pin now state
+  while IFS=$'\t' read -r name up seen pin; do
+    now=$(current "$up")
+    case $now in
+      read|unknown) state=$now ;;
+      "$seen") state=same ;;
+      *) state=changed ;;
+    esac
+    printf '%s\t%s\t%s\t%s\n' "$state" "$name" "$seen" "$now"
+  done < <(rows)
+}
+
+need git jq gh npm
+today=$(date +%F)
+
+case ${1:-list} in
+  list) compare ;;
+  pin)
+    [ $# -eq 2 ] || die "usage: flow sources pin <name>"
+    row=$(row_of "$2"); [ -n "$row" ] || die "no source named $2 in the source log"
+    pin=$(echo "$row" | cut -f4)
+    [ "$pin" != - ] || die "$2 has no Pin line in the source log"
+    echo "$pin" ;;
+  seen)
+    [ $# -ge 2 ] || die "usage: flow sources seen <name> [<version>] | --unchanged"
+    if [ "$2" = --unchanged ]; then
+      compare | while IFS=$'\t' read -r state name seen now; do
+        [ "$state" = same ] || continue
+        set_field "$name" Seen "\`$seen\`, $today"
+        echo "stamped $name"
+      done
+      exit 0
+    fi
+    row=$(row_of "$2"); [ -n "$row" ] || die "no source named $2 in the source log"
+    up=$(echo "$row" | cut -f2); pin=$(echo "$row" | cut -f4)
+    version=${3:-$(current "$up")}
+    case $version in read|unknown) die "pass the version: the upstream of $2 cannot be read by script" ;; esac
+    if [ "$pin" != - ]; then
+      newpin=$(pin_for "$up" "$version")
+      set_field "$2" Pin "\`$newpin\`"
+    fi
+    set_field "$2" Seen "\`$version\`, $today"
+    echo "seen $2 $version" ;;
+  *) die "usage: flow sources [list] | seen <name> [<version>] | seen --unchanged | pin <name>" ;;
+esac

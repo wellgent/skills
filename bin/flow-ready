@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# flow ready [<owner>/<repo>]
+# The propagation check: is each target current with the flow repo? Prints one line per check,
+# "ok <target>: ..." or "behind <target>: ...", for the flow repo, the driving brain, the run
+# host and, when a project is named, the project. Exit 0 when nothing is behind, 1 otherwise.
+# Read-only apart from a git fetch in each checkout. What every target must hold is in
+# setup/requires.json; the commit each skill source is pinned at is in source-log.md.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+
+need git jq gh
+REQ=$FLOW_HOME/setup/requires.json
+behind=0
+ok() { echo "ok $1: $2"; }
+bad() { echo "behind $1: $2"; behind=1; }
+
+# A checkout is current when it is clean and holds the remote main branch's tip.
+checkout_current() { # target dir
+  local dir=$2 main
+  if [ -n "$(git -C "$dir" status --porcelain)" ]; then bad "$1" "$dir has uncommitted changes"; return; fi
+  if ! git -C "$dir" remote get-url origin >/dev/null 2>&1; then ok "$1" "$dir is clean (no remote)"; return; fi
+  git -C "$dir" fetch -q origin 2>/dev/null || { bad "$1" "cannot fetch origin in $dir"; return; }
+  main=$(cd "$dir" && main_branch)
+  if git -C "$dir" merge-base --is-ancestor "origin/$main" HEAD 2>/dev/null; then ok "$1" "$dir holds origin/$main"
+  else bad "$1" "$dir is behind origin/$main: git pull --rebase"; fi
+}
+
+# Every required skill is in the lock; every locked skill from a logged source sits at its pin;
+# every skill directory is linked into .claude/skills.
+skills_current() { # target dir scope
+  local target=$1 dir=$2 scope=$3 lock=$2/skills-lock.json source name ref pin
+  if [ ! -f "$lock" ]; then bad "$target" "no skills-lock.json in $dir"; return; fi
+  while IFS=$'\t' read -r source name; do
+    jq -e --arg n "$name" --arg s "$source" '.skills[$n].source == $s' "$lock" >/dev/null \
+      || bad "$target" "skill $name from $source is not pinned"
+  done < <(jq -r --arg scope "$scope" '.[$scope].skills | to_entries[] | .key as $s | .value[] | [$s, .] | @tsv' "$REQ")
+  while IFS=$'\t' read -r name source ref; do
+    pin=$("$FLOW_BIN/flow-sources" pin "$source" 2>/dev/null) || { bad "$target" "skill $name comes from $source, which the source log does not pin"; continue; }
+    [ "$ref" = "$pin" ] || bad "$target" "skill $name is at ${ref:-no ref}, the source log pins $source at $pin"
+    [ -d "$dir/.agents/skills/$name" ] || bad "$target" "skill $name is locked but .agents/skills/$name is missing"
+  done < <(jq -r '.skills | to_entries[] | select(.value.sourceType == "github") | [.key, .value.source, (.value.ref // "")] | @tsv' "$lock")
+  for path in "$dir"/.agents/skills/*/; do
+    [ -d "$path" ] || continue
+    name=$(basename "$path")
+    [ -e "$dir/.claude/skills/$name" ] || bad "$target" ".claude/skills/$name does not link to .agents/skills/$name"
+  done
+  [ $behind -eq 1 ] || ok "$target" "skills are pinned at the source log's commits"
+}
+
+labels_current() { # target tracker scope
+  local have label missing=
+  have=$(gh label list --repo "$2" --limit 300 --json name --jq '.[].name' 2>/dev/null) || { bad "$1" "cannot read the labels of $2"; return; }
+  while read -r label; do
+    echo "$have" | grep -qxF -- "$label" || missing="$missing $label"
+  done < <(jq -r --arg scope "$3" '.[$scope].labels[]' "$REQ")
+  if [ -n "$missing" ]; then bad "$1" "$2 lacks the labels:$missing"; else ok "$1" "$2 has the flow's labels"; fi
+}
+
+# --- flow repo
+checkout_current flow "$FLOW_HOME"
+
+# --- brain
+config=$(find_config 2>/dev/null) || config=
+if [ -z "$config" ]; then
+  brain=$PWD
+  bad brain "no flow.json in $PWD or its parents"
+elif brain=$(cd "$(dirname "$config")" && pwd) && jq -e . "$config" >/dev/null 2>&1; then
+  tracker=$(jq -r '.tracker // ""' "$config")
+  case $tracker in
+    ""|*"<"*) bad brain "flow.json names no tracker" ;;
+    *) ok brain "flow.json names the tracker $tracker"; labels_current brain "$tracker" brain ;;
+  esac
+  missing=$(jq -r --slurpfile t "$FLOW_HOME/templates/brain/flow.json" '($t[0].steps | keys) - (.steps // {} | keys) | join(" ")' "$config")
+  [ -z "$missing" ] && ok brain "flow.json has every step" || bad brain "flow.json lacks the steps: $missing"
+  jq -e '.harness.claude and .harness.codex' "$config" >/dev/null || bad brain "flow.json lacks the harness arguments"
+else
+  bad brain "$config is not valid JSON"
+fi
+before=$behind; behind=0
+skills_current brain "$brain" brain
+[ $before -eq 0 ] || behind=1
+checkout_current brain "$brain"
+
+# --- project
+if [ $# -ge 1 ]; then
+  parse_target "$1"
+  entry=
+  [ -z "$config" ] || entry=$(jq -c --arg r "$TARGET_REPO" '.projects[$r] // empty' "$config" 2>/dev/null || true)
+  if [ -z "$entry" ]; then
+    bad brain "flow.json has no project entry for $TARGET_REPO"
+  else
+    card=$(echo "$entry" | jq -r '.card // ""')
+    if [ -n "$card" ] && [ -f "$brain/$card" ]; then
+      if grep -q '^- \*\*[^*]*:\*\* *<' "$brain/$card"; then bad brain "the card $card has unfilled lines"; else ok brain "the card $card is filled"; fi
+    else bad brain "the card of $TARGET_REPO is missing: ${card:-no card path}"; fi
+    [ -d "$brain/ledger/$TARGET_NAME" ] && ok brain "ledger/$TARGET_NAME exists" || bad brain "ledger/$TARGET_NAME is missing"
+    checkout=$(echo "$entry" | jq -r '.checkout // ""'); checkout=${checkout/#\~/$HOME}
+    if [ ! -d "$checkout/.git" ] && [ ! -f "$checkout/.git" ]; then
+      bad project "no checkout at ${checkout:-<unset>}"
+    else
+      checkout_current project "$checkout"
+      missing=
+      while read -r file; do [ -e "$checkout/$file" ] || missing="$missing $file"; done < <(jq -r '.project.files[]' "$REQ")
+      [ -z "$missing" ] && ok project "the project docs are present" || bad project "missing files:$missing"
+      [ "$(readlink "$checkout/CLAUDE.md" 2>/dev/null)" = AGENTS.md ] || bad project "CLAUDE.md is not a symlink to AGENTS.md"
+      [ ! -e "$checkout/CONTEXT.md" ] || bad project "CONTEXT.md exists: the domain language lives in GLOSSARY.md"
+      check=$(cd "$checkout" && dev_loop_values "Check command" | head -1)
+      case $check in
+        ""|*"<"*) bad project "docs/agents/dev-loop.md names no check command" ;;
+        *) ok project "the check command is $check" ;;
+      esac
+      for dir in .agents/skills/verify .claude/skills/verify; do
+        [ ! -e "$checkout/$dir" ] || bad project "$dir exists: a project carries no skill named verify"
+      done
+      before=$behind; behind=0
+      skills_current project "$checkout" project
+      [ $before -eq 0 ] || behind=1
+      labels_current project "$TARGET_REPO" project
+      "$FLOW_BIN/flow-trust" --check "$checkout" >/dev/null 2>&1 && ok host "both harnesses trust $checkout" \
+        || bad host "$(echo $("$FLOW_BIN/flow-trust" --check "$checkout" 2>&1 | tr '\n' ';')) run flow trust $checkout"
+    fi
+  fi
+fi
+
+# --- host
+for tool in herdr claude codex npx; do
+  command -v "$tool" >/dev/null 2>&1 && ok host "$tool is $(command -v "$tool")" || bad host "$tool is not on PATH"
+done
+on_path=$(command -v flow 2>/dev/null || true)
+if [ -n "$on_path" ] && [ "$(cd -P "$(dirname "$(readlink -f "$on_path" 2>/dev/null || echo "$on_path")")" && pwd)" = "$FLOW_BIN" ]; then ok host "flow on PATH is this checkout's"
+else bad host "flow on PATH is ${on_path:-absent}, expected a link to $FLOW_BIN/flow"; fi
+lead=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/lead
+if [ -f "$lead/SKILL.md" ] && [ "$(cd -P "$lead" && pwd)" = "$(cd -P "$FLOW_HOME/lead" && pwd)" ]; then ok host "the lead skill links to this checkout"
+else bad host "$lead does not link to $FLOW_HOME/lead"; fi
+gh auth status >/dev/null 2>&1 && ok host "gh is signed in" || bad host "gh is not signed in"
+"$FLOW_BIN/flow-trust" --check "$brain" >/dev/null 2>&1 && ok host "both harnesses trust $brain" || bad host "a harness does not trust $brain: run flow trust $brain"
+
+exit $behind

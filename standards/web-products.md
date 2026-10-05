@@ -174,7 +174,7 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
 
 ## Skills
 
-Membership splits along the stance/operations fault line: the curated Matt's selection is declared by this repo's [`setup-matts-skills`](../setup/setup-matts-skills/SKILL.md) skill (the stance); capability packs, per-project assignment, and retired-skill lists live in the consumer's private registry (the operations).
+Membership splits along the stance/operations fault line: the sets every brain and every project carry are declared in this repo's [`setup/requires.json`](../setup/requires.json), and the commit each source is pinned at in [`source-log.md`](../source-log.md) (the stance); capability packs, per-project assignment, and retired-skill lists live in the consumer's private registry (the operations).
 [`setup-web-stack/catalog.md`](../setup/setup-web-stack/catalog.md) keeps rationale (what each skill is for and which step names it), never membership.
 
 - **A skill runs only when it is named**: by a step's stage skill, or by path and trigger in the project's `AGENTS.md` must-read list or `docs/agents/dev-loop.md`.
@@ -187,7 +187,8 @@ Membership splits along the stance/operations fault line: the curated Matt's sel
 - **Situational skills** are catalog-documented, each with the condition that pins it and the step that then names it.
   The lead pins one when its condition is met and records it in the registry as a per-project extra.
 - **Retired skills** are named in the private registry; sweeps remove them wherever found.
-- **Distribution**: `npx skills` pins by commit sha (`npx skills add <source>@<sha>`), recorded in `skills-lock.json`, converged by explicit `add` / `remove` per delta, never `skills update`.
+- **Distribution**: `npx skills` pins by commit sha (`npx skills add <source>#<sha>`, the sha from the source log), recorded as `ref` in `skills-lock.json`, converged by explicit `add` / `remove` per delta, never `skills update`.
+  `<source>@<name>` selects a skill by name and pins nothing.
   Cadence: manual, drift-triggered - no cron.
 
 **Where agent-facing content lives** - two axes decide it, ownership and form.
@@ -258,7 +259,7 @@ The golden path is this repo's [`setup-web-product`](../setup/setup-web-product/
 Defaults applied without asking: Next latest stable per the channel rule, Tailwind v4 on, the full toolchain standard, the gate composition, base skill set plus triggered packs, port block auto-allocated as the next free block on the target machine, canonical label taxonomy seeded.
 Cache Components defaults on for greenfield.
 
-**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), skills (install the membership verdict), workflow (setup-matts-skills), project docs (`AGENTS.md`, `docs/agents/dev-loop.md` and `CODING_STANDARDS.md` from the templates, the journey tests, the worktree setup script and the seed), hosting (per audience class), first ship (gate green, prod-parity proof, registration finalized).
+**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), brain (setup-brain: the card, the flow config entry, the ledger directory), project (setup-project: folder trust, pinned skills, `AGENTS.md`, `docs/agents/dev-loop.md` and `CODING_STANDARDS.md` from the templates, the journey tests, the worktree setup script and the seed), hosting (per audience class), first ship (check command green, prod-parity proof, registration finalized).
 
 **Two-phase registration**: claim at step 2 (ports, membership), finalize at first ship (public URL, live fields); observation tolerates claimed-but-not-yet-live in between.
 

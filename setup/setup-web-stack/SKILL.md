@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Equip a target project with the web-stack skills and tooling that actually fit it. [catalog.md](./catalog.md) is the directory - community skills, quality tooling, deployment configs, and earned recipes, grouped by concern. Your job is judgment, not coverage: read the project, pick the relevant entries, propose, install.
 
-One of this repo's setup skills, independent of the others. Run from a checkout of this repo; the argument is the path to the target project (ask if missing). Idempotent - re-running revisits the selection against the project's current state.
+The stack setup for a web product: [`setup-project`](../setup-project/SKILL.md) brings a project onto the flow and calls this skill for everything stack-specific. Run from a checkout of this repo; the argument is the path to the target project (ask if missing). Idempotent - re-running revisits the selection against the project's current state.
 
 ## Two routes
 
@@ -33,23 +33,35 @@ Read [catalog.md](./catalog.md) and select what serves this project. A Next.js a
 Community skills, from the target project root:
 
 ```bash
-npx skills add <repo> --agent codex --copy -y --skill <name> [--skill <name> ...]
+npx skills add "<source>#$(flow sources pin <source>)" --agent codex --copy -y --skill <name> [--skill <name> ...]
 ```
 
+- The pin is the commit the source log names for that source; the CLI records it as `ref` in `skills-lock.json`. A source the log lacks gets a section there first
 - `--agent codex` writes real directories into `.agents/skills/`; `--copy` keeps the files in the project instead of symlinking a package cache
-- Skip skills already pinned in `skills-lock.json` at the same source
+- Skip skills already locked at that `ref`; re-pin with `npx skills remove <name> -y` and a fresh `add`, never `npx skills update`
 - Normalize afterwards: real dirs under `.agents/skills/`, relative symlinks `.claude/skills/<name>` → `../../.agents/skills/<name>` (create missing ones; move any stray real dirs the CLI wrote into `.claude/` or `agent/`)
 - Commit `skills-lock.json` together with the skill folders
 
 Tooling and configs (quality gate devDeps, scripts, `vercel.json`, etc.) go in as the catalog describes, adapted to the project's package manager.
 
-### 4. Record in AGENTS.md
+A project with a `convex/` directory also takes the [Convex branch](./convex.md).
 
-Add or update a `## Web stack` section in the target's `AGENTS.md`: what was adopted and the conventions that follow from it (e.g. "`npm run check` must be green before any commit", "UI changes are verified with `agent-browser`, never naive fetching"). Keep it to what an agent must know before touching a file - a few lines, updated in place on re-run, the project's other sections untouched.
+### 4. Journey tests
 
-Convention for the instructions file itself: `AGENTS.md` is the real file, `CLAUDE.md` a symlink to it. If only `CLAUDE.md` exists, rename it and add the symlink; if both exist as real files, show the user the difference and ask; if neither exists, create a minimal `AGENTS.md` and the symlink.
+For each critical journey the client approved (the "Critical journeys" section of `docs/agents/dev-loop.md`): one plain Playwright test under `e2e/journeys/`, with its own `playwright.config.ts` there that starts the app per "Running the app" and signs in as a seeded test identity.
+The `test:journeys` script runs them, and the "Journey tests" gate line names it.
+With no approved journeys, scaffold nothing.
 
-### 5. Verify
+### 5. Record in the project docs
+
+The stack's facts go where the flow reads them, per the Methodology section of [`standards/web-products.md`](../../standards/web-products.md) ("What this stack puts in those files"):
+
+- `AGENTS.md`: the check command in "Rules for every session", and one must-read entry per pinned skill or file an implementer reads, each with its trigger.
+- `docs/agents/dev-loop.md`: the gate lines, worktrees, running the app, Review lenses, QA tools with their named checks, Audit lenses, the scanner pass commands, the design-system commands, and each deviation from the doctrine with its reason.
+
+Every skill pinned in step 3 is named on one of those lines; one that no line names is removed.
+
+### 6. Verify
 
 Verify what you installed, nothing more:
 
@@ -61,4 +73,4 @@ Report anything only the user can fix by hand: auth, tokens, deployment-protecti
 
 ## Report
 
-End with: what was installed and why, what was skipped and why, tooling and script changes, the AGENTS.md update, verification results, and any manual follow-ups.
+End with: what was installed and why, what was skipped and why, tooling and script changes, the lines written to the project docs, verification results, and any manual follow-ups.

@@ -36,6 +36,13 @@ Lead commands:
         check the Retro triggers. flow ledger help lists the commands.
   cost <session id> [--harness claude|codex] [--from <time>] [--to <time>]
         Print a session's tokens and list-price cost from its transcript as JSON.
+  sources [seen <name> [<version>] | seen --unchanged | pin <name>]
+        Compare every source in the source log with its upstream, or record a review.
+  ready [<owner>/<repo>]
+        The propagation check: is the flow repo, the brain, the host and the project
+        current? Exit 0 when nothing is behind, 1 otherwise.
+  trust [--check] <dir>
+        Mark a checkout as trusted in both harnesses on this host.
 
 Session commands (inside a spawned step):
   report <outcome> [<artifact link>]
@@ -52,7 +59,7 @@ USAGE
 cmd=${1:-help}
 [ $# -gt 0 ] && shift
 case $cmd in
-  spawn|gate|land|tick|protected|report|cost|ledger) exec "$FLOW_BIN/flow-$cmd" "$@" ;;
+  spawn|gate|land|tick|protected|report|cost|ledger|sources|ready|trust) exec "$FLOW_BIN/flow-$cmd" "$@" ;;
   ask) exec "$FLOW_BIN/flow-report" --ask "$@" ;;
   help|-h|--help) usage ;;
   *) usage >&2; exit 64 ;;

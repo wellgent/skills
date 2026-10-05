@@ -1,0 +1,15 @@
+{
+  "brain": {
+    "skills": {
+      "mattpocock/skills": ["domain-modeling", "grilling", "prototype", "research", "setup-matt-pocock-skills", "triage", "wayfinder", "writing-for-agents"]
+    },
+    "labels": ["lead:input", "lead:iteration", "wayfinder:map", "wayfinder:research", "wayfinder:prototype", "wayfinder:grilling", "wayfinder:task"]
+  },
+  "project": {
+    "skills": {
+      "mattpocock/skills": ["code-review", "codebase-design", "diagnosing-bugs", "domain-modeling", "implement", "implement-spec", "improve-codebase-architecture", "prototype", "retro", "tdd", "to-spec", "to-tickets"]
+    },
+    "labels": ["bug", "needs-triage", "needs-info", "ready-for-agent", "needs-human", "wontfix"],
+    "files": ["AGENTS.md", "CODING_STANDARDS.md", "GLOSSARY.md", "docs/agents/dev-loop.md", "docs/agents/issue-tracker.md", "docs/agents/triage-labels.md", "docs/agents/domain.md", ".github/ISSUE_TEMPLATE/bug.md"]
+  }
+}

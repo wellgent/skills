@@ -16,12 +16,12 @@ A project pins only the third-party skills a step names, by commit sha.
 - [`FLOW.md`](FLOW.md), [`GLOSSARY.md`](GLOSSARY.md) - the flow doc and its language.
 - `lead/` - the lead skill: the stages the lead runs itself (Readiness, Shape, Plan, Release, Retro) and how it starts and sequences every step. Linked into the user's skills directory on each run host.
 - `stages/<stage>/` - one skill per spawned stage: `ux-design`, `system-design`, `grooming`, `build`, `review`, `qa`, `audit`. Each opens with its header from `FLOW.md`. `flow spawn` puts the skill's absolute path in the session's start prompt; a `-second` step and the `audit-architecture` steps read their stage's skill.
-- [`bin/`](bin/) - the `flow` command (`spawn`, `gate`, `land`, `tick`, `report`, `ask`, `ledger`) and its scripts, Bash with `jq`; `flow help` lists them and [`bin/README.md`](bin/README.md) holds what they read. `bin/flow` is linked into the user's `PATH` on each run host.
+- [`bin/`](bin/) - the `flow` command (`spawn`, `gate`, `land`, `tick`, `report`, `ask`, `ledger`, `sources`, `ready`, `trust`) and its scripts, Bash with `jq`; `flow help` lists them and [`bin/README.md`](bin/README.md) holds what they read. `bin/flow` is linked into the user's `PATH` on each run host.
 - `ledger/` - the ledger schema and the price table the cost script reads. The ledger files themselves live in the driving brain.
 - [`templates/artifacts/`](templates/artifacts/) - the hand-off artifact formats `FLOW.md` names.
 - [`templates/project/`](templates/project/) - what the setup skills scaffold into a project: `AGENTS.md`, `docs/agents/dev-loop.md`, `CODING_STANDARDS.md` and the bug issue template with its origin-spec field.
-- `templates/brain/` - what the setup skills scaffold into a driving brain: the flow config and the project card.
-- `source-log.md` - every upstream source the flow depends on, with the last version seen and its date. Readiness reviews it in full.
+- [`templates/brain/`](templates/brain/) - what the setup skills scaffold into a driving brain: the flow config and the project card.
+- [`source-log.md`](source-log.md) - every upstream source the flow depends on, with the last version seen, its date and, for a source of pinned skills, the commit every brain and project pins. Readiness reviews it in full.
 - [`setup/`](setup/) - the setup skills.
 - [`standards/`](standards/) - the doctrine.
 
@@ -29,9 +29,12 @@ A project pins only the third-party skills a step names, by commit sha.
 
 Operator skills under [`setup/`](setup/): run from a checkout of this repo against a target path, in either harness (`.claude/skills/` and `.agents/skills/` link to them).
 
-- **setup-matts-skills** - set up Matt Pocock's engineering workflow in a target project: the curated `mattpocock/skills` selection and the `AGENTS.md` convention.
-- **setup-web-stack** - equip a web project from a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling and known-good configs.
+- **setup-brain** - scaffold the flow into a driving brain: flow config, labels, the lead's pinned skills, and a card, config entry and ledger directory per project.
+- **setup-project** - bring a project onto the flow: folder trust, pinned skills, the three project docs from the templates, critical journeys, tracker labels. It names no stack.
+- **setup-web-stack** - the stack setup for a web product: a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling and known-good configs, the journey tests and the Convex branch.
 - **setup-web-product** - the golden path for a new web product, each stage deferred to its installer.
+
+The first two are idempotent and Readiness re-runs them; [`setup/requires.json`](setup/requires.json) holds what a brain and a project must carry, and `flow ready` checks it.
 
 ## The doctrine
 

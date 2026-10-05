@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# flow trust <dir>          mark a checkout as trusted in Claude Code and Codex on this host
+# flow trust --check <dir>  exit 0 when both harnesses trust it, 1 otherwise
+# Each harness asks for folder trust once per repository per host, and an unanswered prompt
+# stalls flow spawn. Worktrees of a trusted checkout start without the prompt.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+
+check=0
+if [ "${1:-}" = --check ]; then check=1; shift; fi
+[ $# -eq 1 ] || die "usage: flow trust [--check] <dir>"
+[ -d "$1" ] || die "not a directory: $1"
+dir=$(cd "$1" && pwd -P)
+need jq
+
+claude_file=${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}
+claude_file=${claude_file:-$HOME/.claude.json}
+codex_file=${CODEX_HOME:-$HOME/.codex}/config.toml
+
+claude_trusted() {
+  [ -f "$claude_file" ] && jq -e --arg p "$dir" '.projects[$p].hasTrustDialogAccepted == true' "$claude_file" >/dev/null 2>&1
+}
+
+# The trust_level of the [projects."<dir>"] table, empty when the table is absent.
+codex_level() {
+  [ -f "$codex_file" ] || return 0
+  awk -v header="[projects.\"$dir\"]" '
+    $0 == header { inside = 1; found = 1; next }
+    /^\[/ { inside = 0 }
+    inside && /^trust_level[ ]*=/ { gsub(/^[^=]*=[ ]*"|"[ ]*$/, ""); print; exit }
+    END { if (found && !inside) exit }
+  ' "$codex_file"
+}
+
+if [ $check -eq 1 ]; then
+  ok=0
+  claude_trusted || { echo "claude: $dir is not trusted"; ok=1; }
+  [ "$(codex_level)" = trusted ] || { echo "codex: $dir is not trusted"; ok=1; }
+  exit $ok
+fi
+
+if claude_trusted; then
+  echo "claude: already trusted"
+else
+  [ -f "$claude_file" ] || die "no $claude_file: start Claude Code once on this host and sign in, then run this again"
+  tmp=$(mktemp "$claude_file.XXXXXX")
+  jq --arg p "$dir" '.projects[$p] = ((.projects[$p] // {}) + {hasTrustDialogAccepted: true})' "$claude_file" >"$tmp"
+  mv "$tmp" "$claude_file"
+  echo "claude: trusted $dir"
+fi
+
+level=$(codex_level)
+case $level in
+  trusted) echo "codex: already trusted" ;;
+  "")
+    grep -qF "[projects.\"$dir\"]" "$codex_file" 2>/dev/null && die "$codex_file has a [projects.\"$dir\"] table without a trust_level; set it to \"trusted\" by hand"
+    mkdir -p "$(dirname "$codex_file")"
+    printf '\n[projects."%s"]\ntrust_level = "trusted"\n' "$dir" >>"$codex_file"
+    echo "codex: trusted $dir" ;;
+  *) die "$codex_file sets trust_level = \"$level\" for $dir; change it to \"trusted\" by hand" ;;
+esac

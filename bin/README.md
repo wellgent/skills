@@ -79,3 +79,10 @@ The rows, the cost rules and the two Retro triggers are in [`ledger/README.md`](
 - `flow ledger run` takes the run-end line as the lead received it, in quotes.
 - `flow ledger gate` reads the gate result from the project checkout named in the flow config.
 - `flow cost` and `flow ledger fill` read transcripts from `~/.claude/projects` and `~/.codex/sessions` (`CLAUDE_CONFIG_DIR` and `CODEX_HOME` move them).
+
+## The source log and the propagation check
+
+- `flow sources` reads [`source-log.md`](../source-log.md), whose head describes the entry format, and prints one line per source: `same`, `changed`, `read` or `unknown`, the name, the version seen and the upstream's current one. It needs `gh` and `npm`; `FLOW_SOURCE_LOG` names another log.
+- `flow sources seen <name> [<version>]` writes the Seen line with today's date and, on a skill source, the Pin line with the commit that version resolves to. It never commits.
+- `flow ready` reads [`setup/requires.json`](../setup/requires.json) (the skills, labels and files a brain and a project must carry), the pins from the source log, and each `skills-lock.json`, where a pinned skill carries its commit as `ref`. Every `behind` line names its fix or the setup skill step that owns it.
+- `flow trust` writes `hasTrustDialogAccepted` for the directory into Claude Code's `~/.claude.json` (`CLAUDE_CONFIG_DIR` moves it) and a `[projects."<dir>"]` table with `trust_level = "trusted"` into `~/.codex/config.toml` (`CODEX_HOME` moves it). The Claude Code key is undocumented state: when a release stops honouring it, `flow spawn` exits 4 and the prompt is answered once in the tab.

@@ -4,7 +4,7 @@ Directory of community skills, tools, and known-good configs for web projects. T
 
 Rationale lives here; membership does not. The rules are in [`standards/web-products.md`](../../standards/web-products.md); a team's skill membership is declared in its own private registry - this catalog explains what each entry is for.
 
-A project pins a skill only when a flow step names it. Each entry says which step that is: a stage skill, the project's `AGENTS.md` must-read list, or a lens or tool line in its `docs/agents/dev-loop.md`. Pin by commit sha: `npx skills add <source>@<sha> --skill <name>`.
+A project pins a skill only when a flow step names it. Each entry says which step that is: a stage skill, the project's `AGENTS.md` must-read list, or a lens or tool line in its `docs/agents/dev-loop.md`. Pin by the commit the source log names: `npx skills add "<source>#$(flow sources pin <source>)" --skill <name>`.
 
 ## Design and UI quality
 
