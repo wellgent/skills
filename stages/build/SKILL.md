@@ -41,7 +41,7 @@ This skill adds only what the flow needs around them.
 Work in the worktree that holds the integration branch.
 
 - **Finding tickets**: one implementer fixes every ticket the note names, with `tdd`.
-  A finding that carries a failing repro test is fixed when that test passes unchanged.
+  A finding that carries a failing repro test names the test's commit: cherry-pick it onto the branch, and the finding is fixed when that test passes unchanged.
 - **A failing check**: fix the cause in the code.
 - **Gate flags**: each flag names a file and line.
   Restore the test, check setting or line the flag points at, or give it what the lead's note says it lacks.

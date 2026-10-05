@@ -46,9 +46,7 @@ When the destination is reached, say so in a round and keep the iteration open f
 
 1. Record the client's acceptance as one line in a comment on the map.
 2. **Audit.**
-   Run the project's scanner pass as its `docs/agents/dev-loop.md` declares it and append its numbers with `flow ledger scan`.
-   Spawn `audit`, `audit-second`, `audit-architecture` and `audit-architecture-second` on `<owner>/<repo>` together, each with the scanner numbers in `--note`.
-   Merge the two defect reports into `ledger/<repo>/<iteration>-audit-defects.md` and the two architecture reports into `ledger/<repo>/<iteration>-audit-architecture.md`, from the templates in `~/repos/wellgent-skills/templates/artifacts/`.
+   Run "The lead's part" of `~/repos/wellgent-skills/stages/audit/SKILL.md`: the scanner pass, the four audit steps and the two merged reports beside the ledger file.
    Triage every finding: a bug becomes a bug ticket with its origin spec, a structural candidate becomes a Shape candidate for the next iteration, a small cleanup becomes a single-invariant ticket in one cleanup spec for the next iteration's start, and anything else is closed with a reason in the merged report.
 3. **Retro.** Append this session's row with `flow ledger lead <owner>/<repo> <this session's id>`, then start the Retro in a fresh session per [retro](retro.md). Wait for its report on the map and take the tickets it hands you through the single-bug path.
 4. `flow tick disarm`.

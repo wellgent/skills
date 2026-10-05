@@ -2,7 +2,9 @@
 
 **Run:** <n>, on <commit range>
 
-**Verdict:** clean | <count> blocking
+**Verdict:** clean | blocking
+
+**Counts:** blocking=<n> filed=<n>
 
 ### Findings
 
