@@ -14,7 +14,10 @@ Every step converges on a state, so a re-run changes only what is behind.
    This writes to the Convex project: the lead does it, or the client where the lead has no access.
 4. **Vercel builds** (projects deployed through Vercel). Copy [`recipes/vercel-build.sh`](recipes/vercel-build.sh) to `scripts/vercel-build.sh` and point `buildCommand` in `vercel.json` at it.
    The production deploy key goes in Vercel's Production environment and the preview deploy key in its Preview environment, both as `CONVEX_DEPLOY_KEY`.
+   A preview deploy key is generated only in the Convex dashboard (Project Settings, Preview Deploy Keys), so this is the client's step where the lead has no dashboard access.
 5. **Prototype copy.** Once the client has approved the seed allowlist on the project card: copy [`recipes/prototype-copy.sh`](recipes/prototype-copy.sh) to `scripts/prototype-copy.sh` and scaffold its read and write functions.
+   The write takes every table in one call, so ids that rows share across tables are remapped together.
+   A function cannot tell a preview deployment from the others, so the write checks a marker variable set only in the project's preview defaults.
    Before that approval, skip this step and say so in the report.
 6. **Lint, migrations, file manager.** Wire `@convex-dev/eslint-plugin` through oxlint, install `@convex-dev/migrations` as a component, and set `{"aiFiles": {"enabled": false}}` in `convex.json`.
 7. **Prove it.** Run the worktree setup in a scratch worktree, then run `pnpm exec convex run --prod <the seed function>` there.

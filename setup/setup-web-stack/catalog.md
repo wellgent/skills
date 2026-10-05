@@ -23,7 +23,7 @@ Design-system lint, blocking inside `check`:
 Prototype scaffolding, on `main`:
 
 - A variant switcher component for `?variant=` options on the real routes, rendered only when `VERCEL_ENV` is not `production`
-- An idempotent seed and unseed for the reviewer's records, as internal functions
+- The prototype copy's read and write functions (Convex section), for the reviewer's own records
 - Only the variant code lives on the `prototype/<spec>-<slug>` branch; losing options are deleted at the pick
 
 ## Knowledge
@@ -183,7 +183,7 @@ One dev deployment per worktree - [`recipes/worktree-setup.sh`](recipes/worktree
 
 Prototype previews - [`recipes/vercel-build.sh`](recipes/vercel-build.sh), copied to `scripts/vercel-build.sh` with `"buildCommand": "bash scripts/vercel-build.sh"` in `vercel.json`. A `prototype/*` branch build runs `convex deploy` with the preview deploy key, which creates a Convex preview deployment named after the branch and seeds it through `--preview-run`. Preview deployments expire (5 days on the free plans, 14 on paid); a round that outlives one redeploys and reseeds. Preview sign-in keys come from the project's default environment variables for previews.
 
-Production records in a prototype - [`recipes/prototype-copy.sh`](recipes/prototype-copy.sh), copied to `scripts/prototype-copy.sh`. The lead runs it with the preview deployment's name, the reviewer and the tables of the client-approved allowlist on the project card. The project supplies the two internal functions it calls: a read that returns one owner's rows of one allowlisted table and refuses any other table, and a write that inserts them with ids remapped and refuses outside a preview deployment.
+Production records in a prototype - [`recipes/prototype-copy.sh`](recipes/prototype-copy.sh), copied to `scripts/prototype-copy.sh`. The lead runs it with the preview deployment's name, the reviewer and the tables of the client-approved allowlist on the project card. The project supplies the two internal functions it calls: a read that returns one owner's rows of one allowlisted table and refuses any other table, and a write that takes every table in one call, inserts the rows with ids remapped and refuses outside a preview deployment, which it recognises by a marker variable in the project's preview defaults. The script refuses with a deploy key in scope, since `--prod` would then read the key's deployment. Rows that point at stored files are copied without the files.
 
 Situational, pinned when the condition is met, each named by the step shown:
 

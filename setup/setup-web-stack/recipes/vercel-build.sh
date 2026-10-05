@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Vercel build command. Production deploys Convex with the production deploy key.
 # A prototype/* branch gets its own seeded Convex preview deployment through the preview
-# deploy key. Every other preview builds against the project's default dev deployment.
+# deploy key. Every other preview builds against the deployment its Preview-scoped
+# Convex URL names.
 set -euo pipefail
 
 PROTOTYPE_SEED_FUNCTION="<seed function, e.g. prototype/seed:run>"
