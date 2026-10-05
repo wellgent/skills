@@ -17,7 +17,7 @@ Everything stack-specific is written by the project's **stack setup**: for a web
 
 ## 1. Read the project
 
-- `git pull --rebase` in `~/repos/wellgent-skills` and in the checkout (a repo without a remote skips it), then read the checkout's `AGENTS.md`, `docs/agents/`, `skills-lock.json` and package scripts.
+- `git pull --rebase` in `~/repos/wellgent-skills` and in the checkout, then `git remote set-head origin -a` there, since `flow` reads the main branch's name from the checkout's `origin/HEAD` (a repo without a remote skips both). Then read the checkout's `AGENTS.md`, `docs/agents/`, `skills-lock.json` and package scripts.
 - `flow ready <owner>/<repo>`, run in the brain: its `behind project` lines are this run's work list.
 - Note what an earlier workflow left: a project skill named `verify`, a skill that drove specs end to end, sections of `AGENTS.md` or `docs/agents/` that describe steps the flow replaced.
 

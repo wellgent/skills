@@ -8,6 +8,8 @@ tsconfig*.json
 eslint.config.*
 .eslintrc*
 .oxlintrc*
+oxlint.config.*
+.oxfmtrc*
 biome.json*
 .prettierrc*
 prettier.config.*
