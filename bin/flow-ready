@@ -117,7 +117,7 @@ if [ $# -ge 1 ]; then
       [ $before -eq 0 ] || behind=1
       labels_current project "$TARGET_REPO" project
       "$FLOW_BIN/flow-trust" --check "$checkout" >/dev/null 2>&1 && ok host "both harnesses trust $checkout" \
-        || bad host "$(echo $("$FLOW_BIN/flow-trust" --check "$checkout" 2>&1 | tr '\n' ';')) run flow trust $checkout"
+        || bad host "a harness does not trust $checkout: run flow trust $checkout"
     fi
   fi
 fi

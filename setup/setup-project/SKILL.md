@@ -17,7 +17,7 @@ Everything stack-specific is written by the project's **stack setup**: for a web
 
 ## 1. Read the project
 
-- `git pull --rebase` in the checkout, then its `AGENTS.md`, `docs/agents/`, `skills-lock.json` and package scripts.
+- `git pull --rebase` in `~/repos/wellgent-skills` and in the checkout (one without a remote skips it), then its `AGENTS.md`, `docs/agents/`, `skills-lock.json` and package scripts.
 - `flow ready <owner>/<repo>`, run in the brain: its `behind project` lines are this run's work list.
 - Note what an earlier workflow left: a project skill named `verify`, a driver skill, sections of `AGENTS.md` or `docs/agents/` that describe steps the flow replaced.
 
@@ -39,7 +39,7 @@ npx skills add "<source>#$(flow sources pin <source>)" --agent codex --copy -y -
 - A skill locked at another commit, or with no `ref`, is removed (`npx skills remove <name> -y`) and added again at the pin. Updates go through `add` and `remove` only; `npx skills update` rewrites lock entries wrongly.
 - A pinned skill no step names is removed. One a person still invokes by hand moves to the brain or to user scope: list it in the report.
 - A project skill named `verify` is deleted once its launch, sign-in and drive instructions are in the "Running the app" section of `docs/agents/dev-loop.md`. A driver skill from an earlier workflow is deleted with it.
-- Layout afterwards: real directories under `.agents/skills/<name>`, a relative link `.claude/skills/<name>` → `../../.agents/skills/<name>` for each, `skills-lock.json` committed with them.
+- Layout afterwards: real directories under `.agents/skills/<name>`, a relative link `.claude/skills/<name>` → `../../.agents/skills/<name>` for each. The CLI writes no link and `remove` deletes one, so after every add: `mkdir -p .claude/skills && ln -sfn ../../.agents/skills/<name> .claude/skills/<name>`. `skills-lock.json` is committed with them.
 
 ## 4. Project docs
 

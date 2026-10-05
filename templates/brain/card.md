@@ -1,7 +1,6 @@
 # <Project name>: project card
 
 What the lead reads first about this project.
-The driving brain's own page conventions (frontmatter, links, citations) wrap these lines.
 
 - **Repo:** `<owner>/<repo>`
 - **Client:** <who starts iterations on this project and decides at the checkpoints>
