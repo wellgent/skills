@@ -61,7 +61,19 @@ case $model in
   *) die "steps.$step.model must start with claude- or gpt-, got: $model" ;;
 esac
 
-run="flow-$TARGET_NAME-$step-${TARGET_ISSUE:-main}-$(date +%H%M%S)"
+# herdr caps an agent name at 32 characters, so the step is a short tag and the repo name gives way.
+case $step in
+  ux-design) tag=ux ;;
+  system-design) tag=sd ;;
+  system-design-second) tag=sd2 ;;
+  grooming) tag=groom ;;
+  audit-second) tag=audit2 ;;
+  audit-architecture) tag=arch ;;
+  audit-architecture-second) tag=arch2 ;;
+  *) tag=$step ;;
+esac
+suffix="-$tag-${TARGET_ISSUE:-main}-$(date +%H%M%S)"
+run="flow-${TARGET_NAME:0:$((27 - ${#suffix}))}$suffix"
 prompt="You are running flow step $step on $target as session $run. Read $skill and follow it."
 prompt="$prompt The lead is herdr agent $lead: send it a question or a conflict exit with flow ask and wait for its reply in this session, never ask in your own pane."
 prompt="$prompt End the session with flow report <outcome> <artifact link>."
@@ -100,6 +112,13 @@ for attempt in 1 2 3 4; do
       # The start prompt is kept and runs once that is answered in the tab.
       FLOW_EXIT=4 die "$run is blocked at startup; answer its prompt in pane $pane (herdr agent read $run --source visible)" ;;
     *agent_pane_busy*) sleep 3 ;;
+    *'"timeout"'*)
+      # herdr waits for an agent ready for input; one that went straight to work on its start
+      # prompt runs past that wait unnamed. The session is up: name it and carry on.
+      [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent // empty')" = "$harness" ] \
+        || die "could not start $harness in pane $pane: $(echo "$out" | head -3)"
+      herdr agent rename "$pane" "$run" >/dev/null || die "could not name the session in pane $pane $run"
+      started=1; break ;;
     *) die "could not start $harness in pane $pane: $(echo "$out" | head -3)" ;;
   esac
 done

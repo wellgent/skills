@@ -11,6 +11,13 @@ mode=report kind=question
 if [ "${1:-}" = --ask ]; then mode=ask; shift; fi
 if [ "$mode" = ask ] && [ "${1:-}" = --conflict ]; then kind="conflict exit"; shift; fi
 
+# An option here is a mistake or a help probe; it must never go out as a report or a question.
+case ${1:-} in
+  -*)
+    if [ "$mode" = ask ]; then echo "usage: flow ask [--conflict] <question>"; else echo "usage: flow report <outcome> [<artifact link>]"; fi
+    case $1 in -h|--help) exit 0 ;; *) exit 1 ;; esac ;;
+esac
+
 : "${FLOW_LEAD:?not inside a spawned flow step (FLOW_LEAD is unset)}"
 : "${FLOW_STEP:?FLOW_STEP is unset}" "${FLOW_TARGET:?FLOW_TARGET is unset}" "${FLOW_RUN:?FLOW_RUN is unset}"
 

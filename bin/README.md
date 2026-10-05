@@ -21,7 +21,7 @@ One stopped at a usage limit is asked to continue by each hourly tick and resume
 ## What a spawned session gets
 
 - Its start prompt: the step, the target, the absolute path of its stage skill, the lead's herdr agent, and the two commands below.
-- Its herdr name: `flow-<repo>-<step>-<issue>-<HHMMSS>`, a tab in the workspace `<repo>-flow`.
+- Its herdr name: `flow-<repo>-<step tag>-<issue>-<HHMMSS>`, at most 32 characters (the step tags are in `flow-spawn`; a long repo name is cut), a tab in the workspace `<repo>-flow`.
 - `FLOW_LEAD`, `FLOW_STEP`, `FLOW_TARGET`, `FLOW_RUN` and `FLOW_HOME` in its environment.
 
 A session talks to the lead with two commands:
