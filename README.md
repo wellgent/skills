@@ -16,7 +16,7 @@ A project pins only the third-party skills a step names, by commit sha.
 - [`FLOW.md`](FLOW.md), [`GLOSSARY.md`](GLOSSARY.md) - the flow doc and its language.
 - `lead/` - the lead skill: the stages the lead runs itself (Readiness, Shape, Plan, Release, Retro) and how it starts and sequences every step. Linked into the user's skills directory on each run host.
 - `stages/<stage>/` - one skill per spawned stage: `ux-design`, `system-design`, `grooming`, `build`, `review`, `qa`, `audit`. Each opens with its header from `FLOW.md`. `flow spawn` puts the skill's absolute path in the session's start prompt; a `-second` step and the `audit-architecture` steps read their stage's skill.
-- `bin/` - the `flow` command (`spawn`, `gate`, `land`, `ledger`) and its scripts, Bash with `jq`. `bin/flow` is linked into the user's `PATH` on each run host.
+- [`bin/`](bin/) - the `flow` command (`spawn`, `gate`, `land`, `tick`, `report`, `ask`, `ledger`) and its scripts, Bash with `jq`; `flow help` lists them and [`bin/README.md`](bin/README.md) holds what they read. `bin/flow` is linked into the user's `PATH` on each run host.
 - `ledger/` - the ledger schema and the price table the cost script reads. The ledger files themselves live in the driving brain.
 - [`templates/artifacts/`](templates/artifacts/) - the hand-off artifact formats `FLOW.md` names.
 - `templates/project/` - what the setup skills scaffold into a project: `AGENTS.md`, `docs/agents/dev-loop.md`, `CODING_STANDARDS.md`.

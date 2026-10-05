@@ -1,0 +1,23 @@
+{
+  "tracker": "<owner>/<brain repo>",
+  "projects": {
+    "<owner>/<project repo>": { "checkout": "~/repos/<project repo>" }
+  },
+  "harness": {
+    "claude": ["--permission-mode", "bypassPermissions"],
+    "codex": ["--dangerously-bypass-approvals-and-sandbox"]
+  },
+  "steps": {
+    "ux-design": {},
+    "system-design": { "model": "claude-fable-5-1[1m]", "effort": "xhigh" },
+    "system-design-second": { "model": "gpt-6-astra", "effort": "xhigh" },
+    "grooming": {},
+    "build": { "model": "claude-opus-5-5[1m]", "effort": "high" },
+    "review": { "model": "gpt-6-astra", "effort": "xhigh" },
+    "qa": {},
+    "audit": { "model": "claude-fable-5-1[1m]", "effort": "xhigh" },
+    "audit-second": { "model": "gpt-6-astra", "effort": "xhigh" },
+    "audit-architecture": { "model": "claude-fable-5-1[1m]", "effort": "xhigh" },
+    "audit-architecture-second": { "model": "gpt-6-astra", "effort": "xhigh" }
+  }
+}

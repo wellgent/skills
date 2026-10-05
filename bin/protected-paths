@@ -1,0 +1,21 @@
+# Files that define a project's checks, one glob per line.
+# A glob is matched against the full path and the file name.
+# A change to any of them is a protected-change flag in the gate.
+# package.json is flagged only when its scripts change.
+# A project adds its own paths on the "Protected paths" line of docs/agents/dev-loop.md.
+package.json
+tsconfig*.json
+eslint.config.*
+.eslintrc*
+.oxlintrc*
+biome.json*
+.prettierrc*
+prettier.config.*
+knip.json*
+knip.config.*
+.knip.json*
+.dependency-cruiser.*
+vitest.config.*
+vitest.workspace.*
+jest.config.*
+playwright.config.*

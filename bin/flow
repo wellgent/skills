@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# flow: the mechanical parts of the development flow (see FLOW.md).
+set -euo pipefail
+
+src=${BASH_SOURCE[0]}
+while [ -L "$src" ]; do
+  dir=$(cd -P "$(dirname "$src")" && pwd)
+  src=$(readlink "$src")
+  case $src in /*) ;; *) src=$dir/$src ;; esac
+done
+FLOW_BIN=$(cd -P "$(dirname "$src")" && pwd)
+export FLOW_BIN
+export FLOW_HOME=${FLOW_HOME:-$(dirname "$FLOW_BIN")}
+
+usage() {
+  cat <<'USAGE'
+Usage: flow <command> [args]
+
+Lead commands:
+  spawn <step> <target> [--cwd <dir>] [--lead <agent>] [--note <text>]
+        Start a step as its own herdr session. <target> is <owner>/<repo>#<issue>
+        for a spec or bug ticket, or <owner>/<repo> for an audit step.
+  gate <target> [--accept <reason>]
+        Run the check command, the journey tests and the protected-change script
+        on the branch checked out in the current directory.
+        Exit 0 pass, 1 red, 2 flagged.
+  land <target>
+        Fast-forward the main branch to the gated commit and push.
+        Exit 3 when the main branch moved and the gate must run again.
+  tick arm|disarm|run [<lead>]
+        Manage or run the hourly crontab entry that nudges the lead session.
+  protected <base> <head>
+        Print the protected-change flags for a diff as JSON.
+
+Session commands (inside a spawned step):
+  report <outcome> [<artifact link>]
+        Send the run-end report to the lead.
+  ask [--conflict] <question>
+        Send a question or a conflict exit to the lead, then wait for its reply
+        in this session.
+
+Steps: ux-design system-design system-design-second grooming build review qa
+       audit audit-second audit-architecture audit-architecture-second
+USAGE
+}
+
+cmd=${1:-help}
+[ $# -gt 0 ] && shift
+case $cmd in
+  spawn|gate|land|tick|protected|report) exec "$FLOW_BIN/flow-$cmd" "$@" ;;
+  ask) exec "$FLOW_BIN/flow-report" --ask "$@" ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; exit 64 ;;
+esac

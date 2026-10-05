@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# flow tick arm [<lead>]     add the hourly crontab entry for the lead session
+# flow tick disarm [<lead>]  remove it
+# flow tick run <lead>       what the entry runs: resume sessions stopped at a usage limit,
+#                            then nudge the lead. Silent when the lead session does not exist.
+# The tick catches sessions that cannot report: a permission prompt, a crash, a usage limit,
+# a session that never started. The lead arms it with its first spawn and disarms it at close.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+
+action=${1:-}
+lead=${2:-${FLOW_LEAD:-${HERDR_PANE_ID:-}}}
+tag="# flow-tick $lead"
+LIMIT='(usage limit|rate limit reached|limit reached|hit your limit)'
+
+case $action in
+  arm)
+    need herdr jq crontab
+    [ -n "$lead" ] || die "no lead: run inside the lead's herdr session, or pass the agent"
+    path=$(dirname "$(command -v herdr)")
+    case ":$path:" in *":$(dirname "$(command -v jq)"):"*) ;; *) path="$path:$(dirname "$(command -v jq)")" ;; esac
+    path="$path:/usr/local/bin:/usr/bin:/bin"
+    entry="0 * * * * PATH=$path"
+    [ -z "${HERDR_SOCKET_PATH:-}" ] || entry="$entry HERDR_SOCKET_PATH=$HERDR_SOCKET_PATH"
+    entry="$entry $FLOW_BIN/flow tick run '$lead' >/dev/null 2>&1 $tag"
+    { crontab -l 2>/dev/null | grep -vF -- "$tag" || true; echo "$entry"; } | crontab -
+    echo "armed: $entry"
+    ;;
+  disarm)
+    need crontab
+    [ -n "$lead" ] || die "no lead: run inside the lead's herdr session, or pass the agent"
+    rest=$(crontab -l 2>/dev/null | grep -vF -- "$tag" || true)
+    if [ -n "$rest" ]; then echo "$rest" | crontab -; else crontab -r 2>/dev/null || true; fi
+    echo "disarmed: $lead"
+    ;;
+  run)
+    need herdr jq
+    [ -n "$lead" ] || die "usage: flow tick run <lead>"
+    herdr agent get "$lead" >/dev/null 2>&1 || exit 0
+    # A session stopped at a usage limit waits for the reset on its own setting:
+    # each tick asks it to continue, which succeeds once the window has reset.
+    herdr agent list | jq -r '.result.agents[] | select((.name // "") | startswith("flow-")) | select(.agent_status != "working") | .name' |
+      while IFS= read -r run; do
+        if herdr agent read "$run" --source visible --lines 40 2>/dev/null | grep -Eiq "$LIMIT"; then
+          herdr agent prompt "$run" "continue" >/dev/null 2>&1 || true
+        fi
+      done
+    herdr agent prompt "$lead" "lead tick: check runs" >/dev/null 2>&1 || true
+    ;;
+  *) die "usage: flow tick arm|disarm|run [<lead>]" ;;
+esac

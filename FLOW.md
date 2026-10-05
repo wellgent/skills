@@ -149,7 +149,7 @@ Stages the lead runs itself have no entry.
 Each entry says where the artifact lives, who writes it and who reads it.
 Formats with a template are in [`templates/artifacts/`](templates/artifacts/).
 
-- **Run-end report** (every spawned session): one line into the lead's herdr session, `<step> <spec> <outcome> <link to the stage's artifact> <session id>`. The lead's ledger row comes from it.
+- **Run-end report** (every spawned session): one line into the lead's herdr session, sent with `flow report <outcome> <link to the stage's artifact>`: `run-end: <step> <spec> <outcome> <link> <session id> (<session name>)`. The lead's ledger row comes from it. A question or a conflict exit goes the same way with `flow ask`.
 - **Readiness report** ([template](templates/artifacts/readiness-report.md)): comment on the iteration map. Writer: lead. Readers: client, Retro.
 - **Spec brief** ([template](templates/artifacts/spec-brief.md)): the first body of the spec's issue on the project tracker, opened at the end of Shape. Writer: lead. Readers: designer, architect.
 - **UX notes** ([template](templates/artifacts/ux-notes.md)): comment on the spec issue, plus the chosen prototype branch. Writer: designer. Readers: architect, lead, Review.

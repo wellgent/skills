@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# flow report <outcome> [<artifact link>]   the run-end report, one line into the lead's session
+# flow ask [--conflict] <question>          a question or a conflict exit to the lead
+# Both run inside a spawned step and read FLOW_LEAD, FLOW_STEP, FLOW_TARGET and FLOW_RUN,
+# which flow spawn sets.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+need herdr jq
+
+mode=report kind=question
+if [ "${1:-}" = --ask ]; then mode=ask; shift; fi
+if [ "$mode" = ask ] && [ "${1:-}" = --conflict ]; then kind="conflict exit"; shift; fi
+
+: "${FLOW_LEAD:?not inside a spawned flow step (FLOW_LEAD is unset)}"
+: "${FLOW_STEP:?FLOW_STEP is unset}" "${FLOW_TARGET:?FLOW_TARGET is unset}" "${FLOW_RUN:?FLOW_RUN is unset}"
+
+if [ "$mode" = ask ]; then
+  [ $# -ge 1 ] || die "usage: flow ask [--conflict] <question>"
+  line="$kind from $FLOW_RUN ($FLOW_STEP $FLOW_TARGET): $* Reply with: herdr agent prompt $FLOW_RUN \"<answer>\""
+else
+  [ $# -ge 1 ] && [ $# -le 2 ] || die "usage: flow report <outcome> [<artifact link>]"
+  session=$(herdr agent get "${HERDR_PANE_ID:-$FLOW_RUN}" 2>/dev/null | jq -r '.result.agent.agent_session.value // empty' || true)
+  line="run-end: $FLOW_STEP $FLOW_TARGET $1 ${2:-none} ${session:-unknown} ($FLOW_RUN)"
+fi
+
+# The lead rejects input while it is blocked on a prompt of its own, so retry for a while.
+for attempt in 1 2 3 4 5 6; do
+  if out=$(herdr agent prompt "$FLOW_LEAD" "$line" 2>&1); then
+    echo "sent to $FLOW_LEAD: $line"
+    [ "$mode" = report ] || echo "Wait for the lead's reply in this session before continuing."
+    exit 0
+  fi
+  sleep 10
+done
+die "could not reach the lead $FLOW_LEAD: $(echo "$out" | head -3)"

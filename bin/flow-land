@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# flow land <target>
+# Runs on the branch checked out in the current directory.
+# Needs a passed gate on HEAD. Rebases onto the main branch when it moved or the branch
+# holds merge commits; the gate still holds when the rebased tree is the gated tree.
+# Then fast-forwards the remote main branch to HEAD.
+# Exit 3 when the rebase changed the tree and flow gate must run again.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+need git jq
+
+[ $# -eq 1 ] || die "usage: flow land <target>"
+target=$1
+parse_target "$target"
+
+git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git repository"
+cd "$(git rev-parse --show-toplevel)"
+require_clean_tree
+
+main=$(main_branch)
+branch=$(git rev-parse --abbrev-ref HEAD)
+[ "$branch" != "$main" ] || die "check out the branch to land, not $main"
+git fetch --quiet origin "$main"
+
+dir=$(gate_dir)
+gated=$(git rev-parse HEAD)
+marker="$dir/$gated.json"
+[ -f "$marker" ] || die "no gate result for ${gated:0:12}; run flow gate first"
+[ "$(jq -r .verdict "$marker")" = pass ] || die "the gate on ${gated:0:12} is $(jq -r .verdict "$marker"), not pass"
+gated_tree=$(jq -r .tree "$marker")
+
+if ! git merge-base --is-ancestor "origin/$main" HEAD ||
+   [ -n "$(git rev-list --merges "origin/$main..HEAD")" ]; then
+  echo "flow land: rebasing $branch onto origin/$main" >&2
+  if ! git rebase --quiet "origin/$main" >&2; then
+    git rebase --abort
+    FLOW_EXIT=3 die "rebase onto origin/$main conflicts; resolve it in Build, then run flow gate again"
+  fi
+  if [ "$(git rev-parse 'HEAD^{tree}')" != "$gated_tree" ]; then
+    FLOW_EXIT=3 die "$main moved, so the rebased tree differs from the gated one; run flow gate again"
+  fi
+  # Same tree, new commit: the gate result carries over.
+  jq --arg commit "$(git rev-parse HEAD)" --arg from "$gated" '.commit = $commit | .rebased_from = $from' \
+    "$marker" >"$dir/$(git rev-parse HEAD).json"
+fi
+
+commit=$(git rev-parse HEAD)
+git push --quiet origin "$commit:refs/heads/$main"
+git fetch --quiet origin "$main"
+
+# Bring the local main branch along where that is safe.
+main_worktree=$(git worktree list --porcelain | awk -v ref="refs/heads/$main" '/^worktree /{w=substr($0,10)} $0=="branch " ref{print w}')
+if [ -n "$main_worktree" ]; then
+  if [ -z "$(git -C "$main_worktree" status --porcelain)" ]; then
+    git -C "$main_worktree" merge --quiet --ff-only "origin/$main"
+  else
+    echo "flow land: $main_worktree is dirty, local $main left behind origin/$main" >&2
+  fi
+elif git show-ref --verify --quiet "refs/heads/$main" && git merge-base --is-ancestor "refs/heads/$main" "$commit"; then
+  git update-ref "refs/heads/$main" "$commit"
+fi
+
+jq -n --arg target "$target" --arg commit "$commit" --arg gated "$gated" --arg branch "$branch" \
+  --arg main "$main" --arg time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{target: $target, landed: $commit, gated: $gated, branch: $branch, main: $main, time: $time}'
+echo "flow land: $main is at ${commit:0:12}" >&2

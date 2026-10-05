@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# flow protected <base> <head>: the protected-change flags for a diff, as a JSON array.
+# A flag is {kind, file, line, text}. Kinds:
+#   check-config   a file that defines the project's checks changed
+#   test-deleted   a test file was deleted
+#   test-removed   a test file lost more test cases than it gained
+#   assertion-loss a test file lost more assertions than it gained
+#   test-skip      a skip, only, todo or fails marker was added
+#   suppression    an inline suppression was added (text notes a missing reason)
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+need git jq awk
+
+[ $# -eq 2 ] || die "usage: flow protected <base> <head>"
+base=$1 head=$2
+
+TEST_FILE='(\.test\.|\.spec\.|_test\.|/__tests__/|(^|/)e2e/|(^|/)tests?/)'
+SKIP_MARK='(\.(skip|only|todo|fails)\b|\b(xit|xdescribe|xtest|fit|fdescribe)\()'
+TEST_CASE='\b(it|test)(\.each)?\('
+ASSERTION='\b(expect|assert[A-Za-z.]*)\('
+SUPPRESSION='(eslint-disable|oxlint-disable|biome-ignore|@ts-ignore|@ts-expect-error|@ts-nocheck|knip-ignore|(istanbul|v8|c8) ignore|# *noqa|type: *ignore|#\[allow\(|nolint)'
+
+flags=$(mktemp)
+trap 'rm -f "$flags"' EXIT
+flag() { printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >>"$flags"; }
+
+# Protected paths: the defaults plus the project's own.
+globs=$(grep -v '^#' "$FLOW_BIN/protected-paths" | grep -v '^$' || true)
+extra=$(dev_loop_values "Protected paths")
+[ -n "$extra" ] && globs=$globs$'\n'$extra
+
+is_protected() {
+  local file=$1 name=${1##*/} glob
+  while IFS= read -r glob; do
+    [ -n "$glob" ] || continue
+    # shellcheck disable=SC2254
+    case $file in $glob) return 0 ;; esac
+    # shellcheck disable=SC2254
+    case $name in $glob) return 0 ;; esac
+  done <<<"$globs"
+  return 1
+}
+
+first_changed_line() {
+  git diff --no-color -U0 "$base" "$head" -- "$1" |
+    awk '/^@@/ { split($3, a, ","); sub(/^\+/, "", a[1]); print (a[1] == 0 ? 1 : a[1]); exit }'
+}
+
+scripts_of() { git show "$1:$2" 2>/dev/null | jq -S '.scripts // {}' 2>/dev/null || echo '{}'; }
+
+while IFS=$'\t' read -r status file; do
+  [ -n "$file" ] || continue
+  if is_protected "$file"; then
+    if [ "${file##*/}" = package.json ]; then
+      if [ "$(scripts_of "$base" "$file")" != "$(scripts_of "$head" "$file")" ]; then
+        flag check-config "$file" "$(first_changed_line "$file")" "scripts changed"
+      fi
+    else
+      case $status in
+        D) flag check-config "$file" 1 "deleted" ;;
+        A) flag check-config "$file" 1 "added" ;;
+        *) flag check-config "$file" "$(first_changed_line "$file")" "changed" ;;
+      esac
+    fi
+  fi
+  if [ "$status" = D ] && echo "$file" | grep -Eq "$TEST_FILE"; then
+    flag test-deleted "$file" 1 "test file deleted"
+  fi
+done < <(git diff --no-color --no-renames --name-status "$base" "$head" | awk -F'\t' '{ print substr($1, 1, 1) "\t" $2 }')
+
+# Added and removed lines with their line numbers: sign, file, line, text.
+git diff --no-color --no-renames -U0 "$base" "$head" | awk '
+  /^diff --git / { file = ""; next }
+  /^--- /        { old = substr($0, 7); next }
+  /^\+\+\+ /     { file = ($0 == "+++ /dev/null") ? old : substr($0, 7); next }
+  /^@@ /         { split($2, o, ","); split($3, n, ","); oldline = -o[1]; newline = n[1] + 0; next }
+  file == ""     { next }
+  /^\+/          { printf "+\t%s\t%d\t%s\n", file, newline++, substr($0, 2); next }
+  /^-/           { printf "-\t%s\t%d\t%s\n", file, oldline++, substr($0, 2); next }
+' >"$flags.lines"
+trap 'rm -f "$flags" "$flags.lines"' EXIT
+
+# Suppressions and skip markers on added lines.
+while IFS=$'\t' read -r sign file line text; do
+  [ "$sign" = + ] || continue
+  if echo "$text" | grep -Eq "$SUPPRESSION"; then
+    after=$(echo "$text" | sed -E "s/.*$SUPPRESSION//")
+    if echo "$after" | grep -Eq -- '(--|:)[[:space:]]*[^[:space:]]' ||
+       { echo "$text" | grep -Eq '@ts-(ignore|expect-error)[[:space:]]+[^[:space:]*]'; }; then
+      flag suppression "$file" "$line" "$(echo "$text" | sed -E 's/^[[:space:]]+//' | cut -c1-160)"
+    else
+      flag suppression "$file" "$line" "no reason: $(echo "$text" | sed -E 's/^[[:space:]]+//' | cut -c1-160)"
+    fi
+  fi
+  if echo "$file" | grep -Eq "$TEST_FILE" && echo "$text" | grep -Eq "$SKIP_MARK"; then
+    flag test-skip "$file" "$line" "$(echo "$text" | sed -E 's/^[[:space:]]+//' | cut -c1-160)"
+  fi
+done <"$flags.lines"
+
+# Net loss of test cases or assertions per surviving test file.
+count() { awk -F'\t' -v s="$1" -v f="$2" '$1 == s && $2 == f' "$flags.lines" | cut -f4- | { grep -Eo "$3" || true; } | wc -l | tr -d ' '; }
+for file in $(cut -f2 "$flags.lines" | sort -u | { grep -E "$TEST_FILE" || true; }); do
+  git cat-file -e "$head:$file" 2>/dev/null || continue
+  line=$(first_changed_line "$file")
+  removed=$(count - "$file" "$TEST_CASE"); added=$(count + "$file" "$TEST_CASE")
+  [ "$removed" -gt "$added" ] && flag test-removed "$file" "$line" "test cases: -$removed +$added"
+  removed=$(count - "$file" "$ASSERTION"); added=$(count + "$file" "$ASSERTION")
+  [ "$removed" -gt "$added" ] && flag assertion-loss "$file" "$line" "assertions: -$removed +$added"
+done
+
+jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {kind: .[0], file: .[1], line: (.[2] | tonumber), text: (.[3:] | join("\t"))})' "$flags"

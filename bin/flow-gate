@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# flow gate <target> [--accept <reason>]
+# Runs on the branch checked out in the current directory: the project's check command,
+# its journey tests and the protected-change script on the whole diff against the main branch.
+# Prints the gate result as JSON and stores it for flow land.
+# Exit 0 pass, 1 red, 2 flagged.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+need git jq
+
+target= accept=
+while [ $# -gt 0 ]; do
+  case $1 in
+    --accept) accept=${2:?--accept needs a reason}; shift 2 ;;
+    -*) die "unknown option: $1" ;;
+    *) target=$1; shift ;;
+  esac
+done
+[ -n "$target" ] || die "usage: flow gate <target> [--accept <reason>]"
+parse_target "$target"
+
+git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git repository"
+cd "$(git rev-parse --show-toplevel)"
+require_clean_tree
+
+main=$(main_branch)
+git fetch --quiet origin "$main"
+commit=$(git rev-parse HEAD)
+tree=$(git rev-parse 'HEAD^{tree}')
+branch=$(git rev-parse --abbrev-ref HEAD)
+base=$(git merge-base HEAD "origin/$main")
+[ "$commit" != "$base" ] || die "HEAD has no commits ahead of origin/$main"
+
+check=$(dev_loop_values "Check command" | head -1)
+journeys=$(dev_loop_values "Journey tests" | head -1)
+[ -n "$check" ] || die 'docs/agents/dev-loop.md has no "- **Check command:** `<command>`" line'
+
+dir=$(gate_dir)
+mkdir -p "$dir"
+
+# run_step <name> <command>: sets STEP_JSON; the log stays beside the gate result.
+run_step() {
+  local name=$1 command=$2 log="$dir/$commit.$1.log" start code=0
+  echo "flow gate: $name: $command" >&2
+  start=$(date +%s)
+  bash -c "$command" >"$log" 2>&1 || code=$?
+  STEP_JSON=$(jq -n --arg command "$command" --arg log "$log" --argjson exit "$code" \
+    --argjson seconds "$(($(date +%s) - start))" '{command: $command, exit: $exit, seconds: $seconds, log: $log}')
+  if [ "$code" -ne 0 ]; then
+    echo "flow gate: $name failed (exit $code), last lines of $log:" >&2
+    tail -n 30 "$log" >&2
+  fi
+  return 0
+}
+
+run_step check "$check"; check_json=$STEP_JSON
+journeys_json=null
+if [ -n "$journeys" ]; then run_step journeys "$journeys"; journeys_json=$STEP_JSON; fi
+
+[ "$(git rev-parse HEAD)" = "$commit" ] || die "HEAD moved while the checks ran"
+[ -z "$(git status --porcelain)" ] || die "the checks changed tracked or unignored files: $(git status --porcelain | head -5)"
+
+flags=$("$FLOW_BIN/flow-protected" "$base" "$commit")
+
+result=$(jq -n --arg target "$target" --arg commit "$commit" --arg tree "$tree" --arg base "$base" \
+  --arg branch "$branch" --arg time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg accept "$accept" \
+  --argjson check "$check_json" --argjson journeys "$journeys_json" --argjson flags "$flags" '
+  {target: $target, commit: $commit, tree: $tree, base: $base, branch: $branch, time: $time,
+   check: $check, journeys: $journeys, flags: $flags,
+   flags_accepted: (if $accept == "" then null else $accept end)}
+  | .verdict = (
+      if .check.exit != 0 or (.journeys != null and .journeys.exit != 0) then "red"
+      elif (.flags | length) > 0 and .flags_accepted == null then "flagged"
+      else "pass" end)')
+
+echo "$result" >"$dir/$commit.json"
+echo "$result"
+
+verdict=$(echo "$result" | jq -r .verdict)
+count=$(echo "$flags" | jq length)
+if [ "$count" -gt 0 ]; then
+  echo "flow gate: $count protected-change flags:" >&2
+  echo "$flags" | jq -r '.[] | "  \(.kind) \(.file):\(.line) \(.text)"' >&2
+fi
+echo "flow gate: $verdict on ${commit:0:12} ($branch)" >&2
+case $verdict in
+  pass) exit 0 ;;
+  red) exit 1 ;;
+  flagged)
+    echo 'flow gate: judge each flag, then re-run with --accept "<reason>" or send the spec back to Build' >&2
+    exit 2 ;;
+esac
