@@ -1,63 +1,57 @@
 # Wellgent Agent Skills
 
-The agentic engineering approach we design and run in production at [Wellgent](https://wellgent.ai), published for anyone to adopt: the skills, the setup paths, and the normative doctrine behind them.
+The agentic engineering approach we design and run in production at [Wellgent](https://wellgent.ai), published for anyone to adopt: the development flow, the setup paths, and the normative doctrine behind them.
 
-Install skills into a project with the [skills](https://www.skills.sh/) CLI:
+## The flow
 
-```bash
-npx skills add wellgent/skills
-```
+[`FLOW.md`](FLOW.md) is the development flow on one page: eleven stages from Readiness to Retro, each with one role, one input, one output and a quality bar, and the artifacts handed between them.
+[`GLOSSARY.md`](GLOSSARY.md) defines its terms.
 
-Select specific skills with `-s`:
+The flow is read in place from one checkout of this repo per run host, at `~/repos/wellgent-skills`.
+Nothing from it is installed or pinned into a project, so a flow change reaches every project with one `git pull` on the host.
+A project pins only the third-party skills a step names, by commit sha.
 
-```bash
-npx skills add wellgent/skills -s orchestrate
-```
+## Layout
 
-## Skills
-
-Distributed skills: installed into consumer projects as ordinary `npx skills` pins and read in place there.
-
-- **orchestrate** - run one dev-loop session as the driver: preflight, select, drive one spec end to end, tear down, report.
-  Harness-generic: grooming drafts run in fresh subagents of the driving harness; implementation takes run on the executor the project contract names - the harness's native subagents by default, or an external harness via a runner file (`runners/codex.md` ships takes as `codex exec` sessions). Review and every tracker write stay with the driver.
+- [`FLOW.md`](FLOW.md), [`GLOSSARY.md`](GLOSSARY.md) - the flow doc and its language.
+- `lead/` - the lead skill: the stages the lead runs itself (Readiness, Shape, Plan, Release, Retro) and how it starts and sequences every step. Linked into the user's skills directory on each run host.
+- `stages/<stage>/` - one skill per spawned stage: `ux-design`, `system-design`, `grooming`, `build`, `review`, `qa`, `audit`. Each opens with its header from `FLOW.md`. `flow spawn` puts the skill's absolute path in the session's start prompt; a `-second` step and the `audit-architecture` steps read their stage's skill.
+- `bin/` - the `flow` command (`spawn`, `gate`, `land`, `ledger`) and its scripts, Bash with `jq`. `bin/flow` is linked into the user's `PATH` on each run host.
+- `ledger/` - the ledger schema and the price table the cost script reads. The ledger files themselves live in the driving brain.
+- [`templates/artifacts/`](templates/artifacts/) - the hand-off artifact formats `FLOW.md` names.
+- `templates/project/` - what the setup skills scaffold into a project: `AGENTS.md`, `docs/agents/dev-loop.md`, `CODING_STANDARDS.md`.
+- `templates/brain/` - what the setup skills scaffold into a driving brain: the flow config and the project card.
+- `source-log.md` - every upstream source the flow depends on, with the last version seen and its date. Readiness reviews it in full.
+- [`setup/`](setup/) - the setup skills.
+- [`standards/`](standards/) - the doctrine.
 
 ## Setup paths
 
-Operator skills under [`setup/`](setup/): run from a checkout of this repo against a target project path, in either harness (`.claude/skills/` and `.agents/skills/` link to them). They are never installed into a project and never listed by the skills CLI - they carry the catalog and the curated selection, so they run at this repo's HEAD by design.
+Operator skills under [`setup/`](setup/): run from a checkout of this repo against a target path, in either harness (`.claude/skills/` and `.agents/skills/` link to them).
 
-- **setup-matts-skills** - set up Matt Pocock's engineering workflow in a target project: the curated `mattpocock/skills` selection (declared in the skill - it is the stance), the AGENTS.md convention, and the orchestrate driver on top.
-- **setup-web-stack** - equip a web project from a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling, and known-good configs: two routes - scaffold greenfield from the defaults reference, or read an existing project and install just what fits it.
-- **setup-verify** - give a project its `verify` skill, the runtime manual every agent session reads to launch, sign in, and drive the app: the project-owned `SKILL.md` and `scripts/dev-server.sh` scaffolded once, the shared [protocol](setup/setup-verify/protocol.md) copied in as a managed file and replaced on every run.
-- **setup-web-product** - the golden path for a new web product: four inputs, then scaffold, claim, skills, workflow, verify, contract, hosting, and first ship, each stage deferred to its installer.
+- **setup-matts-skills** - set up Matt Pocock's engineering workflow in a target project: the curated `mattpocock/skills` selection and the `AGENTS.md` convention.
+- **setup-web-stack** - equip a web project from a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling and known-good configs.
+- **setup-web-product** - the golden path for a new web product, each stage deferred to its installer.
 
 ## The doctrine
 
 [`standards/web-products.md`](standards/web-products.md) is the normative approach the setup skills implement: judging criterion, frontend and toolchain stances, hosting classes, data layer, quality gate, skills model, and methodology.
-It carries the slow-moving rules; exact version pins and per-project membership are operational state and live in the adopter's own private registry.
+It carries the slow-moving rules and every stack-specific one; the flow skills name no stack.
+Exact version pins and per-project membership are operational state and live in the adopter's own private registry.
 
 ## What belongs here
 
 Everything we use regularly lives here - shared with the world, friends, clients, and the machines we manage.
-Truly internal things live at project or repo level: one project's specifics stay in that project; operational registries, version pins, and fleet machinery stay in private repos.
+Truly internal things live at project or repo level: one project's specifics stay in that project; project cards, iteration maps, ledgers, version pins and fleet machinery stay in private repos.
 
-A skill published here is internals-free - any coupling to a specific product, company, or environment is expressed generically - and works unmodified in a stranger's repo: install it, read it, run it, with no tribal knowledge required.
-A distributed skill under `skills/` is consumed like any third-party skill: an ordinary `npx skills` pin in the consuming repo's `skills-lock.json`. A setup path under `setup/` is consumed by cloning this repo and running it against the target.
+Everything published here is internals-free: no person, project, company or host is named, and it works unmodified from a stranger's checkout.
 
-## Conventions these skills assume
+## Conventions the flow assumes
 
-`orchestrate` is an **add-on to [mattpocock/skills](https://github.com/mattpocock/skills)**, not a standalone workflow: it drives that set's `to-tickets` (grooming) and `implement` (takes), and rides the triage-label conventions its `setup-matt-pocock-skills` establishes.
-Install the mattpocock set into the project first - `setup-matts-skills` is the path that does it.
-
-The loop's semantics ship with the skill and are read in place - [`dev-loop-protocol.md`](skills/orchestrate/references/dev-loop-protocol.md) - so skill updates carry protocol updates with no per-project reconcile.
-Takes always run on the driving harness's native subagent mechanism (Claude Code spawns Claude subagents, Codex its own way); an explicit invocation request may route takes through a runner file instead (`runners/codex.md`).
-
-On top of that, the project carries only what is project-specific:
-
-- a slim declarations contract at `docs/agents/dev-loop.md` - ports, scripts, gate proofs, and any deliberate protocol deviations; on conflict the contract wins. Scaffold it from [`dev-loop-declarations.md`](skills/orchestrate/references/dev-loop-declarations.md)
-- tracker mechanics at `docs/agents/issue-tracker.md`, and a project-local `verify` skill for runtime verification (its shared mechanics are the managed `protocol.md` beside it, set up and refreshed by [`setup-verify`](setup/setup-verify/SKILL.md))
-- a GitHub-style issue tracker with labels (`ready-for-agent`, `in-progress`, `needs-human`, `needs-triage`, `needs-info`), sub-issues, and blocking edges
-
-A project missing these can still read the skill as a reference workflow, but the loop's guarantees come from the protocol plus the contract.
+- [mattpocock/skills](https://github.com/mattpocock/skills) pinned in the project: the flow runs its `to-spec`, `to-tickets`, `implement-spec`, `code-review` and `retro` as written and builds only what they lack.
+- A GitHub-style issue tracker with sub-issues and native blocking edges.
+- herdr on the run host: every step runs as its own session and reports to the lead's session.
+- Claude Code and Codex on the run host: a step's harness follows its model in the flow config.
 
 ## License
 
