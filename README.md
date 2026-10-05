@@ -19,7 +19,7 @@ A project pins only the third-party skills a step names, by commit sha.
 - [`bin/`](bin/) - the `flow` command (`spawn`, `gate`, `land`, `tick`, `report`, `ask`, `ledger`) and its scripts, Bash with `jq`; `flow help` lists them and [`bin/README.md`](bin/README.md) holds what they read. `bin/flow` is linked into the user's `PATH` on each run host.
 - `ledger/` - the ledger schema and the price table the cost script reads. The ledger files themselves live in the driving brain.
 - [`templates/artifacts/`](templates/artifacts/) - the hand-off artifact formats `FLOW.md` names.
-- `templates/project/` - what the setup skills scaffold into a project: `AGENTS.md`, `docs/agents/dev-loop.md`, `CODING_STANDARDS.md`.
+- [`templates/project/`](templates/project/) - what the setup skills scaffold into a project: `AGENTS.md`, `docs/agents/dev-loop.md`, `CODING_STANDARDS.md` and the bug issue template with its origin-spec field.
 - `templates/brain/` - what the setup skills scaffold into a driving brain: the flow config and the project card.
 - `source-log.md` - every upstream source the flow depends on, with the last version seen and its date. Readiness reviews it in full.
 - [`setup/`](setup/) - the setup skills.
