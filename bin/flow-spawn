@@ -78,6 +78,13 @@ prompt="You are running flow step $step on $target as session $run. Read $skill 
 prompt="$prompt The lead is herdr agent $lead: send it a question or a conflict exit with flow ask and wait for its reply in this session, never ask in your own pane."
 prompt="$prompt End the session with flow report <outcome> <artifact link>."
 [ -z "$note" ] || prompt="$prompt Note from the lead: $note"
+# herdr types the start command into the pane's shell, and a terminal line holds 1024 bytes,
+# so a long prompt goes into a file and the command carries only a pointer to it.
+if [ ${#prompt} -gt 600 ]; then
+  mkdir -p "$(state_dir)/runs"
+  echo "$prompt" >"$(state_dir)/runs/$run.prompt"
+  prompt="You are running flow step $step on $target as session $run. Read your start instructions in $(state_dir)/runs/$run.prompt and follow them."
+fi
 
 args=()
 while IFS= read -r arg; do args+=("$arg"); done < <(jq -r --arg h "$harness" '.harness[$h] // [] | .[]' "$config")
