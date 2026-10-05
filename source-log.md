@@ -13,7 +13,7 @@ A source the flow starts to depend on gets a section here in the same change.
 
 - **Upstream:** `release:mattpocock/skills`
 - **Seen:** `v1.3.1`, 2026-10-05
-- **Pin:** `0b6cee10f260a2e048279cf737bfd3e37b1fce0b`
+- **Pin:** `24fe0ef7737efae15c87225755e9f6f5965e4888`
 - **Used by:** the lead (`wayfinder`, `grilling`, `research`, `triage`, `to-spec`, `retro`, `writing-for-agents`), Grooming (`to-tickets`), System design (`codebase-design`, `domain-modeling`), UX design (`prototype`), Build (`implement-spec`, `implement`, `tdd`, `code-review`, `diagnosing-bugs`), Review (`code-review`), Audit (`improve-codebase-architecture`). The required sets are in `setup/requires.json`.
 - **Skipped:** `pr`: the flow lands by fast-forward, without pull requests.
 
