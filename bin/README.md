@@ -27,8 +27,9 @@ A session talks to the lead with two commands:
 - `flow ask "<question>"`, or `flow ask --conflict "<what disagrees>"` for a conflict exit. The lead answers with `herdr agent prompt <session name> "<answer>"`, and the session waits for that message.
 - `flow report <outcome> <artifact link>` as its last act. The lead receives `run-end: <step> <target> <outcome> <link> <session id> (<session name>)`.
 
-`flow spawn` exits 4 when the harness waits on a startup prompt of its own, such as folder trust in a new worktree.
+`flow spawn` exits 4 when the harness waits on a startup prompt of its own, such as folder trust.
 The start prompt is kept and runs once the prompt is answered in the tab.
+Each harness asks for folder trust once per repository per host: a worktree of a trusted checkout starts without it.
 
 ## What the gate reads
 
