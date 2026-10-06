@@ -174,7 +174,7 @@ case $cmd in
           session: (if $session == "" then null else $session end),
           asks: $asks, conflict_exits: $conflicts, measures: $measures,
           cost: (if $cost == null then null else $cost | {usd, tokens, models, unpriced, prices_as_of} end)}')"
-        # The transcript on the run host keeps the session; the tab only clutters herdr once its row is in.
+    # The transcript on the run host keeps the session; the tab only clutters herdr once its row is in.
     if [ -z "$opt_keep" ] && command -v herdr >/dev/null 2>&1; then
       tab=$(herdr agent get "$run" 2>/dev/null | jq -r '.result.agent.tab_id // empty' || true)
       if [ -n "$tab" ] && herdr tab close "$tab" >/dev/null 2>&1; then echo "flow ledger: closed the tab of $run" >&2
