@@ -11,8 +11,9 @@ usage() {
   cat <<'USAGE'
 Usage: flow ledger <command> [args] [--iteration <id>]
 
-  run '<run-end line>' [--session <id>] [<measure>=<number> ...]
+  run '<run-end line>' [--session <id>] [--keep] [<measure>=<number> ...]
         One spawned session's row, from its run-end report and spawn record, with cost.
+        Then closes the session's herdr tab; --keep leaves it open to read.
   stage <stage> <target> <outcome> [<link>] [--reason <text>] [<measure>=<number> ...]
         A stage the lead ran itself, or a skipped stage (outcome skipped, --reason required).
   gate <target> [--commit <sha>]
@@ -46,13 +47,14 @@ cmd=${1:-help}
 case $cmd in help|-h|--help) usage; exit 0 ;; esac
 
 opt_iteration= opt_session= opt_reason= opt_commit= opt_round= opt_basis= opt_link= opt_reverses=
-opt_options= opt_pick= opt_origin= opt_found= opt_area=
+opt_options= opt_pick= opt_origin= opt_found= opt_area= opt_keep=
 pos=() measures=()
 while [ $# -gt 0 ]; do
   case $1 in
     --iteration|--session|--reason|--commit|--round|--basis|--link|--reverses|--options|--pick|--origin|--found|--area)
       [ $# -ge 2 ] || die "$1 needs a value"
       eval "opt_${1#--}=\$2"; shift 2 ;;
+    --keep) opt_keep=1; shift ;;
     -*) die "unknown option: $1" ;;
     *)
       case $cmd:$1 in
@@ -172,6 +174,12 @@ case $cmd in
           session: (if $session == "" then null else $session end),
           asks: $asks, conflict_exits: $conflicts, measures: $measures,
           cost: (if $cost == null then null else $cost | {usd, tokens, models, unpriced, prices_as_of} end)}')"
+        # The transcript on the run host keeps the session; the tab only clutters herdr once its row is in.
+    if [ -z "$opt_keep" ] && command -v herdr >/dev/null 2>&1; then
+      tab=$(herdr agent get "$run" 2>/dev/null | jq -r '.result.agent.tab_id // empty' || true)
+      if [ -n "$tab" ] && herdr tab close "$tab" >/dev/null 2>&1; then echo "flow ledger: closed the tab of $run" >&2
+      else echo "flow ledger: the tab of $run is not open" >&2; fi
+    fi
     ;;
 
   stage)

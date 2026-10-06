@@ -15,7 +15,7 @@ A count the lead passes as a measure is read from the stage's artifact, never es
 
 ## `run`: one stage run
 
-Appended by `flow ledger run '<run-end line>'` for a spawned session, `flow ledger stage` for a stage the lead ran or skipped, and `flow ledger lead` for the lead session itself.
+Appended by `flow ledger run '<run-end line>'` for a spawned session (it then closes the session's herdr tab, since the transcript keeps the session; `--keep` leaves the tab open), `flow ledger stage` for a stage the lead ran or skipped, and `flow ledger lead` for the lead session itself.
 
 - `stage`: one of the eleven stages, or `lead`. `step`: the spawned step, null for a lead-run stage.
 - `role`: `designer`, `architect`, `groomer`, `implementer`, `reviewer`, `qa`, `auditor` or `lead`.
