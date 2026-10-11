@@ -34,8 +34,8 @@ A source the flow starts to depend on gets a section here in the same change.
 ## vercel/next.js
 
 - **Upstream:** `git:vercel/next.js:skills`
-- **Seen:** `3452ebbcf93236ef9b9c6c1db5e2d706d722deb9`, 2026-10-05
-- **Pin:** `3452ebbcf93236ef9b9c6c1db5e2d706d722deb9`
+- **Seen:** `5f0b8deb3d416c5480ac86de8adc45ba8e22c870`, 2026-10-11
+- **Pin:** `5f0b8deb3d416c5480ac86de8adc45ba8e22c870`
 - **Used by:** the web catalog's `next-dev-loop` QA tool and the situational Next.js skills.
 
 ## get-convex/agent-skills
@@ -62,8 +62,9 @@ A source the flow starts to depend on gets a section here in the same change.
 ## Claude Code
 
 - **Upstream:** `npm:@anthropic-ai/claude-code`
-- **Seen:** `2.1.289`, 2026-10-05
+- **Seen:** `2.1.296`, 2026-10-11
 - **Used by:** the harness of every `claude-*` step and of the lead. Read its release notes for new native controls in a stage's area.
+- **Skipped:** the per-subagent `effort` setting on the Agent tool (2.1.292): every Claude step takes its effort from the flow config and its subagents inherit it (client, jarospm/jbrain#693).
 
 ## Codex
 
@@ -152,7 +153,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## Next.js
 
 - **Upstream:** `npm:next`
-- **Seen:** `16.3.8`, 2026-10-05
+- **Seen:** `16.4.0`, 2026-10-11
 - **Used by:** the web doctrine's framework stance and its bundled agent docs.
 
 ## Convex

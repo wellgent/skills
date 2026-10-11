@@ -12,7 +12,7 @@ A project pins a skill only when a flow step names it. Each entry says which ste
 - `web-design-guidelines` from `vercel-labs/agent-skills` - accessibility and UX audit; a Review lens on UI diffs
 - `vercel-composition-patterns` from `vercel-labs/agent-skills` - compound components, render props, context patterns; an Audit lens in the architecture review
 - `vercel-react-best-practices` from `vercel-labs/agent-skills` - React/Next performance patterns; an Audit lens in the defect review
-- Next.js docs ship inside the `next` package (`node_modules/next/dist/docs/`), not as a skill. On 16.3+ nothing to install: `next dev` maintains a small marker-delimited rules block in `AGENTS.md` pointing agents at the bundled docs (`agentRules: false` in `next.config` opts out). On 16.2 the docs are bundled but no block is written: point `AGENTS.md` at `node_modules/next/dist/docs/` by hand. On 16.1 and earlier run `npx @next/codemod@canary agents-md` to copy version-matched docs into a gitignored `.next-docs/` indexed from `AGENTS.md`, and re-run it after Next upgrades. Next.js workflow skills live in `vercel/next.js` `/skills`
+- Next.js docs ship inside the `next` package (`node_modules/next/dist/docs/`), not as a skill. On 16.3+ nothing to install: `next dev` maintains a small marker-delimited rules block in `AGENTS.md` pointing agents at the bundled docs (`agentRules: false` in `next.config` opts out). On 16.2 the docs are bundled but no block is written: point `AGENTS.md` at `node_modules/next/dist/docs/` by hand. On 16.1 and earlier run `npx @next/codemod@canary agents-md` to copy version-matched docs into a gitignored `.next-docs/` indexed from `AGENTS.md`, and re-run it after Next upgrades. On 16.4+ a Next upgrade runs through `next upgrade --agent`. Next.js workflow skills live in `vercel/next.js` `/skills`
 
 Design-system lint, blocking inside `check`:
 
@@ -261,4 +261,5 @@ Pinned by the lead when the condition is met, and named by the step shown. The C
 - `next-cache-components-optimizer` from `vercel/next.js` - a spec that targets route performance with `cacheComponents` on; a must-read entry for that spec
 - `next-cache-components-adoption` from `vercel/next.js` - a spec that turns `cacheComponents` on; a must-read entry for that spec, removed once adoption is done
 - `next-partial-prefetching-adoption` and `next-partial-prefetching-optimizer` from `vercel/next.js` - a spec that adopts or tunes `partialPrefetching` on Next 16.3+, after Cache Components; must-read entries for that spec
+- `next-bundle-optimizer` from `vercel/next.js` - a spec that targets bundle or initial-load size on Next 16.4+; a must-read entry for that spec, run in its audit mode first. Watch item for the next Retro: whether its output was used
 - `vercel-react-view-transitions` from `vercel-labs/agent-skills` - a spec doing page transitions or shared-element motion with the React View Transition API; a must-read entry for that spec
