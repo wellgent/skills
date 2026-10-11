@@ -11,7 +11,7 @@ The template is [`templates/brain/flow.json`](../templates/brain/flow.json).
 - `tracker`: the driving brain's repository, where the request issues live.
 - `projects["<owner>/<repo>"].checkout`: where the project is checked out on this host. A spawned session starts there unless `--cwd` names a worktree.
 - `projects["<owner>/<repo>"].card`: the project card's path in the driving brain. The lead reads it first.
-- `projects["<owner>/<repo>"].iteration`: the open iteration, as the iteration map's issue number. `flow ledger` writes to that iteration's file.
+- `projects["<owner>/<repo>"].iteration`: the open iteration, as the iteration map's issue number, while a map runs. `flow ledger` writes to that iteration's file; without the entry, rows go to the month's file.
 - `harness.claude`, `harness.codex`: arguments every session of that harness starts with.
 - `steps.<step>`: `model` and `effort`. The model's prefix picks the harness: `claude-*` runs in Claude Code, `gpt-*` in Codex. Model ids are full ids, never aliases.
 - `fallback.model`: the model a step stalled at a usage limit is respawned on, and the lead switches to when stalled itself.
@@ -128,8 +128,19 @@ The rows and the cost rules are in [`ledger/README.md`](../ledger/README.md).
 - `flow spawn` keeps each run's spawn record, and `flow ask` each question and conflict exit, under `$FLOW_STATE`. `flow ledger run` reads them, so it runs on the host the step was spawned on.
 - `flow ledger run` takes the run-end line as the lead received it, in quotes.
 - `flow ledger gate` reads the gate result from the project checkout named in the flow config.
-- `flow ledger health` is what `flow land` runs for the health check row.
+- `flow ledger health` is what `flow land` runs for the health check row; `flow ledger triage` records the pool triage report; `flow ledger lead` costs a lead session (`--stage audit` or `retro` for an occasional flow's lead).
+- `flow ledger bug` exits 2 for an escaped defect with an area; nothing runs on it but the lead's advise line.
+- `flow ledger rollup` reports over the Retro window, every row since the last Retro row across the project's files.
 - `flow cost` and `flow ledger fill` read transcripts from `~/.claude/projects` and `~/.codex/sessions` (`CLAUDE_CONFIG_DIR` and `CODEX_HOME` move them).
+
+## The status view
+
+`flow status <owner>/<repo>` prints the status view as Markdown and changes nothing.
+It finds the flow config like the other commands, or through the configs `flow spawn` remembered, so it runs from any directory on a run host where a step of the project has been spawned.
+
+- From the ledger: the window (the open iteration's rows, else the Retro window), each target with rows but no Release row, with its latest stage or gate result, and the cost split into steps and lead.
+- From the spawn records and `herdr agent list`: the live `flow-` sessions of the project, each with its step, target, `working` or `idle`, the last question or conflict exit it sent, a usage limit (first seen by the tick under `$FLOW_STATE/limits`, or showing on its pane), and how long ago it started; the live sessions with no ledger row yet are counted against the cost.
+- From the tracker with `gh`: the iteration map's title and state, the open `batch` issues of the project, and the open `lead:round` issues with their age, assignee and last comment. An unreachable tracker is said so on the line.
 
 ## The source log and the propagation check
 

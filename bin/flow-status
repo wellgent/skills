@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# flow status <owner>/<repo>
+# The read-only status view of one project, as Markdown: the open iteration or batches, each
+# target in flight with its current stage and live session, the live sessions with what they wait
+# on, the open request issues with their age, and the ledgered cost so far.
+# Reads the ledger in the driving brain, the spawn records and herdr on this host, and the tracker
+# through gh. Runs in any shell on a run host: the flow config is found from the current directory
+# or from the configs flow spawn remembered for the project.
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+need jq
+
+target=${1:-}
+[ -n "$target" ] && [ $# -eq 1 ] || die "usage: flow status <owner>/<repo>"
+parse_target "$target"
+[ -z "$TARGET_ISSUE" ] || die "status takes the project, <owner>/<repo>, without an issue"
+
+# The config: FLOW_CONFIG, flow.json up from here, or a remembered config that names the project.
+config=$(find_config 2>/dev/null) || config=
+if [ -z "$config" ] || [ "$(jq -r --arg r "$TARGET_REPO" '.projects[$r] // ""' "$config")" = "" ]; then
+  config=
+  for remembered in "$(state_dir)"/configs/*; do
+    [ -f "$remembered" ] && [ -f "$(cat "$remembered")" ] || continue
+    if [ "$(jq -r --arg r "$TARGET_REPO" '.projects[$r] // ""' "$(cat "$remembered")")" != "" ]; then config=$(cat "$remembered"); break; fi
+  done
+fi
+[ -n "$config" ] || die "no flow config names $TARGET_REPO: run from the driving brain, set FLOW_CONFIG, or spawn a step of the project on this host first"
+
+tracker=$(jq -r '.tracker // ""' "$config")
+iteration=$(jq -r --arg r "$TARGET_REPO" '.projects[$r].iteration // ""' "$config")
+case $iteration in *"<"*) iteration= ;; esac
+dir="$(cd "$(dirname "$config")" && pwd)/ledger/$TARGET_NAME"
+now=$(now_utc)
+
+# The ledger rows of the window: the open iteration's file, or every row since the last Retro row.
+if compgen -G "$dir/*.jsonl" >/dev/null; then all=$(cat "$dir"/*.jsonl | jq -s .); else all='[]'; fi
+if [ -n "$iteration" ]; then
+  rows=$(jq --arg it "$iteration" 'map(select((.iteration | tostring) == $it))' <<<"$all")
+  window="iteration $iteration"
+else
+  from=$(jq -r 'map(select(.kind == "run" and .stage == "retro") | .time) | max // empty' <<<"$all")
+  if [ -n "$from" ]; then
+    rows=$(jq --arg from "$from" 'map(select(.time > $from))' <<<"$all"); window="since the Retro row of $from"
+  else
+    rows=$all; window="since the first ledger row"
+  fi
+fi
+
+# Spawn records of this project on this host, joined with herdr's live sessions.
+records='[]'
+if compgen -G "$(state_dir)/runs/*.json" >/dev/null; then
+  records=$(for f in "$(state_dir)"/runs/*.json; do
+    [[ $f != *.start.json ]] || continue
+    jq -c --arg repo "$TARGET_REPO" 'select((.target // "") == $repo or ((.target // "") | startswith($repo + "#")))' "$f" 2>/dev/null || true
+  done | jq -s .)
+fi
+agents='[]'
+if command -v herdr >/dev/null 2>&1; then
+  agents=$(herdr agent list 2>/dev/null | jq -c '[.result.agents[] | select((.name // "") | startswith("flow-")) | {name, status: .agent_status, pane: .pane_id}]' || echo '[]')
+fi
+LIMIT='(usage limit|rate limit reached|limit reached|hit your limit)'
+live=$(jq -c --argjson agents "$agents" '
+  [.[] | . as $r | ($agents[] | select(.name == $r.run)) as $a | $r + {status: $a.status, pane: $a.pane}]' <<<"$records")
+# Per live session: the last question or conflict exit, and a usage limit on its pane.
+live=$(jq -c '.[]' <<<"$live" | while IFS= read -r r; do
+  run=$(jq -r .run <<<"$r")
+  events="$(state_dir)/runs/$run.events"
+  asked=
+  [ ! -f "$events" ] || asked=$(tail -n 1 "$events" 2>/dev/null || true)
+  limit_since=
+  if [ -f "$(state_dir)/limits/$run" ]; then
+    limit_since=$(jq -rn --argjson t "$(cat "$(state_dir)/limits/$run")" '$t | todate')
+  elif herdr agent read "$run" --source visible --lines 200 2>/dev/null | grep -Eiq "$LIMIT"; then
+    limit_since=$now
+  fi
+  jq -c --arg asked "$asked" --arg limit "$limit_since" '. + {asked: (if $asked == "" then null else $asked end), limit_since: (if $limit == "" then null else $limit end)}' <<<"$r"
+done | jq -s .)
+
+# The tracker: the iteration map, the open batches and the open requests.
+map_line="none"
+batches="none"
+requests='[]'
+tracker_note=
+if command -v gh >/dev/null 2>&1; then
+  if [ -n "$iteration" ] && [ -n "$tracker" ]; then
+    map_line=$(gh issue view "$iteration" -R "$tracker" --json title,url,createdAt,state 2>/dev/null |
+      jq -r --arg now "$now" '"[#\(.url | split("/") | last) \(.title)](\(.url)), \(.state | ascii_downcase), opened \(.createdAt[0:10])"' || echo "#$iteration (tracker unreachable)")
+  fi
+  batches=$(gh issue list -R "$TARGET_REPO" --label batch --state open --limit 50 --json number,title,url 2>/dev/null |
+    jq -r 'if length == 0 then "none open" else map("[#\(.number) \(.title)](\(.url))") | join(", ") end' || echo "unknown (tracker unreachable)")
+  if [ -n "$tracker" ]; then
+    requests=$(gh issue list -R "$tracker" --label lead:round --state open --limit 50 --json number,title,url,createdAt,assignees,comments 2>/dev/null || echo '[]')
+    [ "$requests" != '[]' ] || [ -n "$(gh issue list -R "$tracker" --limit 1 --json number 2>/dev/null)" ] || tracker_note=" (tracker unreachable)"
+  fi
+else
+  tracker_note=" (gh is not on PATH)"
+fi
+
+jq -r -n --arg repo "$TARGET_REPO" --arg now "$now" --arg window "$window" --arg map "$map_line" --arg batches "$batches" \
+  --arg note "$tracker_note" --arg iteration "$iteration" --argjson rows "$rows" --argjson live "$live" --argjson requests "$requests" \
+  -L "$FLOW_BIN" '
+  include "ledger";
+  def usd: if . == null then "$0" else "$" + (. * 100 | round / 100 | tostring) end;
+  def ago($t): (($now | epoch) - ($t | epoch)) as $s
+    | if $s < 3600 then "\($s / 60 | floor) min" elif $s < 172800 then "\($s / 3600 | floor) h" else "\($s / 86400 | floor) d" end;
+  def released($spec): $rows | map(select(.kind == "run" and .stage == "release" and .spec == $spec and .outcome != "skipped")) | length > 0;
+  def current($spec): $rows | map(select(.spec == $spec and (.kind == "run" or .kind == "gate"))) | sort_by(.time) | last
+    | if . == null then "no stage run yet"
+      elif .kind == "gate" then "gate \(.verdict)" + (if .diff_class then " (\(.diff_class))" else "" end)
+      else "\(.stage)" + (if .outcome and .outcome != "done" then " (\(.outcome))" else "" end) end;
+  def session_for($spec): $live | map(select((.target | split("#") | last | tonumber? // null) == $spec)) | first
+    | if . == null then "no live session" else "\(.run) \(.status)" end;
+  def waits: if .limit_since then "at a usage limit for \(ago(.limit_since))"
+    elif .status == "working" then "working"
+    elif .asked then "idle, last \(.asked | split(" ")[1:] | join(" ")) \(ago(.asked | split(" ")[0])) ago"
+    else "idle" end;
+  ($rows | [.[] | select(.spec != null) | .spec] | unique | map(select(released(.) | not))) as $open_targets
+  | ($rows | map(select(.kind == "run" and .role == "lead" and .cost != null) | .cost.usd) | add // 0) as $lead_usd
+  | ($rows | map(select(.kind == "run" and .role != "lead" and .cost != null) | .cost.usd) | add // 0) as $step_usd
+  | ($live | map(select(.run as $r | $rows | map(select(.run == $r)) | length == 0)) | length) as $unledgered
+  | "## \($repo) status, \($now[0:16] | sub("T"; " ")) UTC",
+    "",
+    "- Iteration: \($map)" + (if $iteration == "" then "; ledger window \($window)" else "" end),
+    "- Batches: \($batches)",
+    "- In flight:" + (if ($open_targets | length) == 0 then " nothing with ledger rows" else "" end),
+    ($open_targets[] | "  - #\(.): \(current(.)); \(session_for(.))"),
+    "- Sessions:" + (if ($live | length) == 0 then " none live on this host" else "" end),
+    ($live[] | "  - \(.run): \(.step) \(.target), \(waits), started \(ago(.started)) ago"),
+    "- Requests:" + (if ($requests | length) == 0 then " none open\($note)" else "" end),
+    ($requests[] | "  - [#\(.number) \(.title)](\(.url)), open \(ago(.createdAt))"
+      + (if (.assignees | length) > 0 then ", assigned \(.assignees | map(.login) | join(", "))" else ", unassigned" end)
+      + (if (.comments | length) > 0 then ", last comment \(ago(.comments | last | .createdAt)) ago by \(.comments | last | .author.login)" else "" end)),
+    "- Cost: \($lead_usd + $step_usd | usd) ledgered (steps \($step_usd | usd), lead \($lead_usd | usd))"
+      + (if $unledgered > 0 then "; \($unledgered) live session\(if $unledgered == 1 then "" else "s" end) not in the ledger yet" else "" end)'

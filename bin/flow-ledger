@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # flow ledger <command> ...
-# Appends rows to the iteration's ledger file in the driving brain, ledger/<repo>/<iteration>.jsonl,
-# and reads them back for the Retro. The row schema is in ledger/README.md.
-# The iteration is --iteration <id>, or projects["<owner>/<repo>"].iteration in the flow config.
+# Appends rows to the project's ledger in the driving brain, ledger/<repo>/<file>.jsonl, and reads
+# them back for the Retro and the status view. The row schema is in ledger/README.md.
+# The file is the open iteration's, <iteration>.jsonl, from --iteration <id> or
+# projects["<owner>/<repo>"].iteration in the flow config; rows outside a map go to the month's
+# file, <YYYY-MM>.jsonl.
 set -euo pipefail
 . "$FLOW_BIN/lib.sh"
 need jq
@@ -27,18 +29,18 @@ Usage: flow ledger <command> [args] [--iteration <id>]
         The Audit scanner pass.
   health <owner>/<repo> [--commit <sha>] <measure>=<number> ...
         The health check row flow land appends: the scanner pass on the landed commit.
-  bug <owner>/<repo>#<bug> --origin <spec issue>|unknown [--found <date>]
-        [--area authorization|money|data-integrity]
-        An escaped defect. Exit 2 when it triggers a Retro.
-  lead <owner>/<repo> <session id>
-        The lead session's cost from the iteration's first row until now.
+  triage <owner>/<repo> --link <report url> batch=<n> spec=<n> decide=<n> drop=<n> [<measure>=<number> ...]
+        The pool triage report's row, with its counts per class.
+  bug <owner>/<repo>#<bug> --origin <spec issue>|unknown [--found <date>] [--area authorization|money|data-integrity]
+        An escaped defect. Exit 2 when it has an area: the number behind the lead's advise line.
+  lead <owner>/<repo> <session id> [--stage lead|audit|retro] [--from <time>]
+        This lead session's row: cost and wall time from its transcript, from its last lead row
+        (or its start) until now. --stage audit or retro for an occasional flow's lead session.
   fill <owner>/<repo>
         Fill the cost of rows whose transcript or price was missing when they were appended.
   rollup <owner>/<repo>
-        The Retro report's ledger sections as Markdown, against the previous iteration.
-  check <owner>/<repo>#<spec>
-        Compare a released spec's measures with the previous ten. Exit 2 when one is outside
-        their spread.
+        The Retro report's ledger sections as Markdown over the Retro window: every row since
+        the last Retro row across the project's files, against the window before it.
 USAGE
 }
 
@@ -49,18 +51,18 @@ cmd=${1:-help}
 case $cmd in help|-h|--help) usage; exit 0 ;; esac
 
 opt_iteration= opt_session= opt_reason= opt_commit= opt_round= opt_basis= opt_link= opt_reverses=
-opt_options= opt_pick= opt_origin= opt_found= opt_area= opt_keep=
+opt_options= opt_pick= opt_origin= opt_found= opt_area= opt_keep= opt_stage= opt_from=
 pos=() measures=()
 while [ $# -gt 0 ]; do
   case $1 in
-    --iteration|--session|--reason|--commit|--round|--basis|--link|--reverses|--options|--pick|--origin|--found|--area)
+    --iteration|--session|--reason|--commit|--round|--basis|--link|--reverses|--options|--pick|--origin|--found|--area|--stage|--from)
       [ $# -ge 2 ] || die "$1 needs a value"
       eval "opt_${1#--}=\$2"; shift 2 ;;
     --keep) opt_keep=1; shift ;;
     -*) die "unknown option: $1" ;;
     *)
       case $cmd:$1 in
-        run:[a-z]*=*|stage:[a-z]*=*|scan:[a-z]*=*|health:[a-z]*=*) measures+=("$1") ;;
+        run:[a-z]*=*|stage:[a-z]*=*|scan:[a-z]*=*|health:[a-z]*=*|triage:[a-z]*=*) measures+=("$1") ;;
         *) pos+=("$1") ;;
       esac
       shift ;;
@@ -75,25 +77,27 @@ measures_json() {
 }
 
 # Sets TARGET_*, config, checkout, iteration, dir, file and base (the fields every row carries).
+# The file is the open iteration's when one is named, else the month's.
 open_ledger() {
   [ -n "$1" ] || { usage >&2; exit 64; }
   parse_target "$1"
   config=$(find_config)
   iteration=${opt_iteration:-$(jq -r --arg r "$TARGET_REPO" '.projects[$r].iteration // empty' "$config")}
   case $iteration in
-    ""|*"<"*) die "no iteration: pass --iteration <id> or set projects[\"$TARGET_REPO\"].iteration in $config" ;;
+    "") ;;
+    *"<"*) die "projects[\"$TARGET_REPO\"].iteration in $config is a placeholder; set the iteration map's issue number or remove the entry" ;;
     *[!A-Za-z0-9._-]*) die "iteration must be a plain id such as the iteration map's issue number, got: $iteration" ;;
   esac
   checkout=$(jq -r --arg r "$TARGET_REPO" '.projects[$r].checkout // ""' "$config")
   case $checkout in "~"*) checkout=$HOME${checkout#"~"} ;; esac
   dir="$(cd "$(dirname "$config")" && pwd)/ledger/$TARGET_NAME"
-  file="$dir/$iteration.jsonl"
+  file="$dir/${iteration:-$(date -u +%Y-%m)}.jsonl"
   base=$(jq -n --arg time "$(now)" --arg iteration "$iteration" --arg project "$TARGET_REPO" --arg spec "$TARGET_ISSUE" \
-    '{kind: null, time: $time, iteration: ($iteration | tonumber? // .), project: $project,
-      spec: (if $spec == "" then null else $spec | tonumber end)}')
+    '{kind: null, time: $time, iteration: (if $iteration == "" then null else $iteration | tonumber? // . end),
+      project: $project, spec: (if $spec == "" then null else $spec | tonumber end)}')
 }
 
-# Every row of the project, across iterations, as one JSON array.
+# Every row of the project, across its files, as one JSON array.
 all_rows() {
   if compgen -G "$dir/*.jsonl" >/dev/null; then cat "$dir"/*.jsonl | jq -s .; else echo '[]'; fi
 }
@@ -123,6 +127,8 @@ cost_of() {
 }
 
 STAGES="readiness shape ux-design system-design plan build review qa release audit retro"
+SCANNER_MEASURES='["unused_code", "duplication_source_pct", "duplication_tests_pct", "dependency_violations",
+  "suppressions", "tests", "test_seconds", "source_lines", "test_lines"]'
 
 case $cmd in
   run)
@@ -139,12 +145,13 @@ case $cmd in
       build) stage=build role=implementer ;;
       review) stage=review role=reviewer ;;
       qa) stage=qa role=qa ;;
-      audit|audit-second|audit-architecture|audit-architecture-second) stage=audit role=auditor ;;
+      audit|audit-second|audit-architecture) stage=audit role=auditor ;;
+      retro) stage=retro role=retro ;;
       *) die "unknown step: $step" ;;
     esac
     record="$(state_dir)/runs/$run.json"
     [ -f "$record" ] || die "no spawn record for $run at $record; append on the host the step was spawned on"
-    [ "$(file_rows | jq --arg run "$run" 'map(select(.run == $run)) | length')" -eq 0 ] || die "$run is already in $file"
+    [ "$(all_rows | jq --arg run "$run" 'map(select(.run == $run)) | length')" -eq 0 ] || die "$run is already in the ledger of $TARGET_REPO"
     events="$(state_dir)/runs/$run.events"
     asks=0 conflicts=0
     if [ -f "$events" ]; then
@@ -222,8 +229,8 @@ case $cmd in
           protected_open: ($g.flags_open // null),
           protected_carried: ($g.flags | map(select(.accepted != null and .accepted.commit != $g.commit)) | length),
           protected_accepted: $g.flags_accepted}')
-    [ "$(file_rows | jq --argjson row "$row" 'map(select(.kind == "gate" and .commit == $row.commit and .time == $row.time)) | length')" -eq 0 ] ||
-      die "the gate result of $(jq -r .time <<<"$row") on $(jq -r '.commit[0:12]' <<<"$row") is already in $file"
+    [ "$(all_rows | jq --argjson row "$row" 'map(select(.kind == "gate" and .commit == $row.commit and .time == $row.time)) | length')" -eq 0 ] ||
+      die "the gate result of $(jq -r .time <<<"$row") on $(jq -r '.commit[0:12]' <<<"$row") is already in the ledger"
     append "$row"
     ;;
 
@@ -232,7 +239,7 @@ case $cmd in
     [ -n "$rec" ] && [ -n "$opt_round" ] || die "usage: flow ledger rec <target> --round <n> <recommendation>"
     open_ledger "$(arg 0)"
     [ -n "$TARGET_ISSUE" ] || die "a recommendation belongs to a spec: <owner>/<repo>#<issue>"
-    [ "$(file_rows | jq --argjson spec "$TARGET_ISSUE" --argjson round "$opt_round" \
+    [ "$(all_rows | jq --argjson spec "$TARGET_ISSUE" --argjson round "$opt_round" \
       'map(select((.kind == "rec" or .kind == "decision") and .spec == $spec and .round == $round)) | length')" -eq 0 ] ||
       die "round $opt_round of #$TARGET_ISSUE already has a recommendation or a pick; a recommendation is sealed before the client picks"
     append "$(jq -n --argjson base "$base" --argjson round "$opt_round" --arg rec "$rec" \
@@ -266,7 +273,8 @@ case $cmd in
       [ "$(jq -r .id <<<"$reversed")" != null ] ||
         echo "flow ledger: $opt_reverses matches no decision in the ledger; its basis is recorded as unknown" >&2
     fi
-    id="$iteration-d$(($(file_rows | jq 'map(select(.kind == "decision")) | length') + 1))"
+    # The id counts the decisions of this file: <iteration>-d<n> in a map, <YYYY-MM>-d<n> outside one.
+    id="$(basename "$file" .jsonl)-d$(($(file_rows | jq 'map(select(.kind == "decision")) | length') + 1))"
     append "$(jq -n --argjson base "$base" --arg id "$id" --arg gist "$gist" --arg basis "$opt_basis" \
       --arg link "$opt_link" --arg reverses "$opt_reverses" --argjson reversed "$reversed" --argjson design "$design" '
       $base + {kind: "decision", id: $id, decision: $gist, basis: $basis, link: $link,
@@ -279,13 +287,23 @@ case $cmd in
     open_ledger "$(arg 0)"
     [ -z "$TARGET_ISSUE" ] || die "the scanner pass takes <owner>/<repo>, without an issue"
     values=$(measures_json)
-    missing=$(jq -r '["unused_code", "duplication_source_pct", "duplication_tests_pct", "dependency_violations",
-      "suppressions", "tests", "test_seconds", "source_lines", "test_lines"] - keys | join(" ")' <<<"$values")
+    missing=$(jq -r --argjson required "$SCANNER_MEASURES" '$required - keys | join(" ")' <<<"$values")
     [ -z "$missing" ] || die "the scanner row is missing: $missing"
     commit=$opt_commit
     [ -n "$commit" ] || { [ -d "$checkout" ] && commit=$(git -C "$checkout" rev-parse HEAD); } || die "pass --commit <sha>"
     append "$(jq -n --argjson base "$base" --arg kind "$cmd" --arg commit "$commit" --argjson measures "$values" \
       '$base + {kind: $kind, commit: $commit, measures: $measures}')"
+    ;;
+
+  triage)
+    [ -n "$opt_link" ] || die "usage: flow ledger triage <owner>/<repo> --link <report url> batch=<n> spec=<n> decide=<n> drop=<n>"
+    open_ledger "$(arg 0)"
+    [ -z "$TARGET_ISSUE" ] || die "the triage row takes <owner>/<repo>, without an issue; the report link names the pool issue"
+    values=$(measures_json)
+    missing=$(jq -r '["batch", "spec", "decide", "drop"] - keys | join(" ")' <<<"$values")
+    [ -z "$missing" ] || die "the triage row is missing the counts: $missing"
+    append "$(jq -n --argjson base "$base" --arg link "$opt_link" --argjson measures "$values" \
+      '$base + {kind: "triage", link: $link, measures: $measures}')"
     ;;
 
   bug)
@@ -295,7 +313,7 @@ case $cmd in
     open_ledger "$(arg 0)"
     [ -n "$TARGET_ISSUE" ] || die "a bug row takes the bug ticket: <owner>/<repo>#<issue>"
     found=${opt_found:-$(now)}
-    case $found in ????-??-??) found="${found}T12:00:00Z" ;; esac
+    case $found in ????-??-??) found="${found}T00:00:00Z" ;; esac
     released=null
     if [ "$opt_origin" != unknown ]; then
       released=$(all_rows | jq --argjson spec "$opt_origin" \
@@ -314,27 +332,36 @@ case $cmd in
                else ((($found | epoch) - ($released.time | epoch)) / 86400 | floor | if . < 0 then 0 else . end) end),
         area: (if $area == "" then null else $area end)}')
     append "$row"
-    if [ -n "$opt_area" ] && [ "$(jq -r '.origin_iteration == .iteration' <<<"$row")" = true ]; then
-      echo "flow ledger: Retro trigger: an escaped defect touching $opt_area from spec #$opt_origin of the open iteration; run a Retro now" >&2
+    if [ -n "$opt_area" ]; then
+      echo "flow ledger: an escaped defect touching $opt_area from spec #$opt_origin; the lead's next session start report advises a Retro with this row behind it" >&2
       exit 2
     fi
     ;;
 
   lead)
     session=$(arg 1)
-    [ -n "$session" ] || die "usage: flow ledger lead <owner>/<repo> <session id>"
+    [ -n "$session" ] || die "usage: flow ledger lead <owner>/<repo> <session id> [--stage lead|audit|retro] [--from <time>]"
+    stage=${opt_stage:-lead}
+    case $stage in lead|audit|retro) ;; *) die "--stage is lead, audit or retro, got: $stage" ;; esac
     open_ledger "$(arg 0)"
-    rows=$(file_rows)
-    from=$(jq -r 'map(.time) | min // empty' <<<"$rows")
-    [ -n "$from" ] || die "$file has no rows yet"
-    [ "$(jq --arg s "$session" 'map(select(.stage == "lead" and .session == $s)) | length' <<<"$rows")" -eq 0 ] ||
-      die "the lead session $session is already in $file"
+    # The window starts where this session's last lead row ended, so a long-lived session is costed once.
+    from=${opt_from:-$(all_rows | jq -r --arg s "$session" \
+      'map(select(.kind == "run" and .role == "lead" and .session == $s and .window != null) | .window.to) | max // empty')}
     to=$(now)
-    cost=$(cost_of "$session" --from "$from" --to "$to")
-    append "$(jq -n --argjson base "$base" --argjson cost "$cost" --arg session "$session" --arg from "$from" --arg to "$to" '
-      $base + {kind: "run", stage: "lead", step: null, role: "lead", harness: ($cost.harness? // null),
+    args=("$session" --to "$to")
+    [ -z "$from" ] || args+=(--from "$from")
+    cost=$(cost_of "${args[@]}")
+    [ -n "$from" ] || from=$(jq -r '.start // empty' <<<"$cost")
+    [ -n "$from" ] || from=$to
+    append "$(jq -n --argjson base "$base" --argjson cost "$cost" --arg stage "$stage" --arg session "$session" \
+      --arg from "$from" --arg to "$to" -L "$FLOW_BIN" '
+      include "ledger";
+      $base + {kind: "run", stage: $stage, step: null, role: "lead", harness: ($cost.harness? // null),
         model: ($cost.models // {} | to_entries | max_by(.value.output) | .key // null),
-        harness_version: ($cost.harness_version? // null), outcome: "done", link: null,
+        harness_version: ($cost.harness_version? // null),
+        start: ($cost.start? // $from), end: ($cost.end? // $to),
+        wall_s: ($cost.wall_s? // (($to | epoch) - ($from | epoch))),
+        outcome: "done", link: null,
         session: $session, window: {from: $from, to: $to}, measures: {},
         cost: (if $cost == null then null else $cost | {usd, tokens, models, unpriced, prices_as_of} end)}')"
     ;;
@@ -356,7 +383,8 @@ case $cmd in
         if [ "$cost" != null ]; then
           row=$(jq -c --argjson cost "$cost" '.cost = ($cost | {usd, tokens, models, unpriced, prices_as_of})
             | .harness_version = (.harness_version // $cost.harness_version)
-            | .model = (.model // ($cost.models | to_entries | max_by(.value.output) | .key // null))' <<<"$row")
+            | .model = (.model // ($cost.models | to_entries | max_by(.value.output) | .key // null))
+            | if .window != null then .start = (.start // $cost.start) | .end = (.end // $cost.end) | .wall_s = (.wall_s // $cost.wall_s) else . end' <<<"$row")
           filled=$((filled + 1))
         fi
       fi
@@ -368,46 +396,8 @@ case $cmd in
 
   rollup)
     open_ledger "$(arg 0)"
-    [ -f "$file" ] || die "no ledger file: $file"
-    all_rows | jq -r -L "$FLOW_BIN" --arg iteration "$iteration" -f "$FLOW_BIN/ledger-rollup.jq"
-    ;;
-
-  check)
-    open_ledger "$(arg 0)"
-    [ -n "$TARGET_ISSUE" ] || die "check takes a spec: <owner>/<repo>#<issue>"
-    out=$(all_rows | jq -r --argjson spec "$TARGET_ISSUE" '
-      def measures($rows):
-        {build_runs: ($rows | map(select(.stage == "build" and .kind == "run")) | length),
-         review_runs: ($rows | map(select(.stage == "review" and .outcome != "skipped")) | length),
-         blocking_findings: ($rows | map(.measures.blocking? // 0) | add // 0),
-         red_gates: ($rows | map(select(.kind == "gate" and .verdict == "red")) | length),
-         conflict_exits: ($rows | map(.conflict_exits? // 0) | add // 0),
-         cost_usd: ($rows | map(.cost.usd? // 0) | add // 0),
-         wall_hours: (($rows | map(.wall_s? // 0) | add // 0) / 360 | round / 10)};
-      . as $all
-      | [$all[] | select(.kind == "run" and .stage == "release" and .outcome != "skipped" and .spec != null)]
-        | group_by(.spec) | map(sort_by(.time) | .[0]) | sort_by(.time) as $released
-      | ($released | map(.spec) | index($spec)) as $at
-      | if $at == null then "error: spec #\($spec) has no Release row yet" else
-          ($released[([$at - 10, 0] | max):$at] | map(.spec)) as $before
-          | measures($all | map(select(.spec == $spec))) as $now
-          | if ($before | length) < 5
-            then "ok: \($before | length) earlier specs in the ledger, the comparison starts at five"
-            else [$before[] as $s | measures($all | map(select(.spec == $s)))] as $earlier
-              | [$now | to_entries[] | .key as $k | ($earlier | map(.[$k])) as $v
-                 | select(.value > ($v | max))
-                 | "flag: \($k) is \(.value), the previous \($v | length) specs ran from \($v | min) to \($v | max)"]
-              | if length == 0 then "ok: every measure of #\($spec) is inside the spread of the previous \($before | length) specs"
-                else join("\n") end
-            end
-        end')
-    echo "$out"
-    case $out in
-      error:*) exit 1 ;;
-      flag:*)
-        echo "flow ledger: Retro trigger: run a Retro, or record in the iteration map why not" >&2
-        exit 2 ;;
-    esac
+    compgen -G "$dir/*.jsonl" >/dev/null || die "no ledger files in $dir"
+    all_rows | jq -r -L "$FLOW_BIN" -f "$FLOW_BIN/ledger-rollup.jq"
     ;;
 
   *) usage >&2; exit 64 ;;
