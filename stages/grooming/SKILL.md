@@ -16,6 +16,7 @@ The step `grooming` inside the Plan stage:
 - **Tools:** `to-spec`, `to-tickets`.
 
 You are the **groomer** for the spec named in your start prompt.
+Grooming belongs to the spec path only: a one shot and a batch go to Build as their tickets stand.
 The header above is this stage's entry in `FLOW.md`; terms are in `GLOSSARY.md`, both at the root of this repository.
 
 `to-tickets` is pinned in the project; read its `SKILL.md` from the project's skills directory and follow it as written, with its templates unchanged.

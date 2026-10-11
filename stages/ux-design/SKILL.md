@@ -1,13 +1,13 @@
 ---
 name: ux-design
-description: The UX design stage of the development flow - coded options for one spec, critiqued, put to the client through the lead, and the pick written up as UX notes.
+description: The UX design stage of the development flow - coded options for one spec whose brief names a surface with real alternatives, critiqued, put to the client through the lead, and the pick written up as UX notes.
 disable-model-invocation: true
 ---
 
 # UX design
 
 - **Role:** designer (step `ux-design`).
-- **Runs:** per spec with a user-visible surface; skipped otherwise.
+- **Runs:** per spec whose brief names a surface with real alternatives; skipped and logged otherwise.
 - **Input:** the spec brief, `PRODUCT.md`, `DESIGN.md`, "Running the app" in `docs/agents/dev-loop.md`.
 - **Output:** the chosen prototype (branch) and UX notes.
 - **Quality bar:** no open P0 or P1 finding verified on the page, the design-system lint green, every option inside the design system; scores recorded, not gated.
@@ -25,7 +25,7 @@ Run impeccable with `DO_NOT_TRACK=1` set and `OPENAI_API_KEY` unset, so it stays
 impeccable's commands ask a person. Route each question by its kind and wait for the reply:
 
 - **The spec's intent** (`shape`): the lead, as product owner. Send it with `flow ask`.
-- **Audience, brand and tone** (`init`, `PRODUCT.md`): the client. Send it with `flow ask`; the lead puts it in a round, and the session waits for the client's own answer.
+- **Audience, brand and tone** (`init`, `PRODUCT.md`): the client. Send it with `flow ask`; the lead puts it in a request, and the session waits for the client's own answer.
 - **Gaps in `DESIGN.md`** (`document`): read the answer from the code; ask the lead only for what the code leaves open.
 - **`critique`'s questions**: you, from the spec brief and the shape brief.
 

@@ -15,4 +15,4 @@
   - Expected: <...>
   - Actual: <...>
   - Repro test: <path> at <commit> | no repro
-  - Caused by this spec: yes | no, origin spec <spec | unknown>
+  - Caused by this landing: yes | no, origin spec <spec | unknown>
