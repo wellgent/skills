@@ -20,8 +20,8 @@ A source the flow starts to depend on gets a section here in the same change.
 ## pbakaus/impeccable
 
 - **Upstream:** `git:pbakaus/impeccable:skill`
-- **Seen:** `f3132ffe7e8a99abe88b8867a59de261c3ed7b4d`, 2026-10-05
-- **Pin:** `f3132ffe7e8a99abe88b8867a59de261c3ed7b4d`
+- **Seen:** `d631a8827f99414d2b6daba4ef08b7f8701751d7`, 2026-10-11
+- **Pin:** `d631a8827f99414d2b6daba4ef08b7f8701751d7`
 - **Used by:** UX design (`impeccable`), and the design scanner line of `docs/agents/dev-loop.md`.
 
 ## vercel-labs/agent-skills
@@ -48,8 +48,8 @@ A source the flow starts to depend on gets a section here in the same change.
 ## upstash/context7
 
 - **Upstream:** `git:upstash/context7:skills`
-- **Seen:** `76140fc35897cf34ca4503b726b77a90c8fa4915`, 2026-10-05
-- **Pin:** `76140fc35897cf34ca4503b726b77a90c8fa4915`
+- **Seen:** `2c0f36202a06683d4a8fe2fc829098ff640cecfb`, 2026-10-11
+- **Pin:** `2c0f36202a06683d4a8fe2fc829098ff640cecfb`
 - **Used by:** the web catalog's `find-docs` must-read entry.
 
 ## vercel-labs/agent-browser
@@ -68,7 +68,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## Codex
 
 - **Upstream:** `npm:@openai/codex`
-- **Seen:** `0.160.1`, 2026-10-05
+- **Seen:** `0.162.1`, 2026-10-11
 - **Used by:** the harness of every `gpt-*` step. Read its release notes the same way.
 
 ## herdr
@@ -80,25 +80,25 @@ A source the flow starts to depend on gets a section here in the same change.
 ## skills CLI
 
 - **Upstream:** `npm:skills`
-- **Seen:** `1.7.0`, 2026-10-05
+- **Seen:** `1.7.2`, 2026-10-11
 - **Used by:** the setup skills' pins (`npx skills add <source>#<sha>`).
 
 ## agent-browser CLI
 
 - **Upstream:** `npm:agent-browser`
-- **Seen:** `0.38.2`, 2026-10-05
+- **Seen:** `0.39.0`, 2026-10-11
 - **Used by:** QA's exploratory pass.
 
 ## Playwright
 
 - **Upstream:** `npm:@playwright/test`
-- **Seen:** `1.63.0`, 2026-10-05
+- **Seen:** `1.64.0`, 2026-10-11
 - **Used by:** the journey tests.
 
 ## knip
 
 - **Upstream:** `npm:knip`
-- **Seen:** `6.39.0`, 2026-10-05
+- **Seen:** `6.41.0`, 2026-10-11
 - **Used by:** the check command and the scanner pass.
 
 ## oxlint
@@ -128,7 +128,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## jscpd
 
 - **Upstream:** `npm:jscpd`
-- **Seen:** `5.4.0`, 2026-10-05
+- **Seen:** `5.4.1`, 2026-10-11
 - **Used by:** the scanner pass's duplication measures.
 
 ## react-doctor
@@ -170,35 +170,35 @@ A source the flow starts to depend on gets a section here in the same change.
 ## @convex-dev/migrations
 
 - **Upstream:** `npm:@convex-dev/migrations`
-- **Seen:** `0.3.6`, 2026-10-05
+- **Seen:** `0.3.7`, 2026-10-11
 - **Used by:** production migrations and their `dryRun`.
 
 ## convex-test
 
 - **Upstream:** `npm:convex-test`
-- **Seen:** `0.0.60`, 2026-10-05
+- **Seen:** `0.0.61`, 2026-10-11
 - **Used by:** the Convex seam tests.
 
 ## Vercel CLI
 
 - **Upstream:** `npm:vercel`
-- **Seen:** `62.4.0`, 2026-10-05
+- **Seen:** `63.1.2`, 2026-10-11
 - **Used by:** Release and the prototype deploy.
 
 ## Vercel changelog
 
 - **Upstream:** `url:https://vercel.com/changelog`
-- **Seen:** `2026-10-05`, 2026-10-05
+- **Seen:** `2026-10-11`, 2026-10-11
 - **Used by:** new platform tools in the Review, QA and Release areas.
 
 ## Claude API pricing
 
 - **Upstream:** `url:https://platform.claude.com/docs/en/about-claude/pricing`
-- **Seen:** `2026-10-05`, 2026-10-05
+- **Seen:** `2026-10-11`, 2026-10-11
 - **Used by:** `ledger/prices.json`. A new model id needs a price entry before its runs can be costed.
 
 ## OpenAI API pricing
 
 - **Upstream:** `url:https://developers.openai.com/api/docs/pricing`
-- **Seen:** `2026-10-05`, 2026-10-05
+- **Seen:** `2026-10-11`, 2026-10-11
 - **Used by:** `ledger/prices.json`, the same way.
