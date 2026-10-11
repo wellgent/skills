@@ -9,7 +9,7 @@ A count the lead passes as a measure is read from the stage's artifact, never es
 
 ## Fields on every row
 
-- `kind`: `run`, `gate`, `rec`, `decision`, `scan` or `bug`.
+- `kind`: `run`, `gate`, `rec`, `decision`, `scan`, `health` or `bug`.
 - `time`: when the row was appended, UTC. A gate row carries the gate's own time.
 - `iteration`, `project` (`<owner>/<repo>`), `spec` (the spec's issue number, the bug ticket's on the single-bug path, null for iteration-level rows).
 
@@ -36,13 +36,15 @@ Appended by `flow ledger run '<run-end line>'` for a spawned session (it then cl
 
 Appended by `flow ledger gate <target>` after each `flow gate`.
 
-- `commit`, `branch`, `verdict` (`pass`, `red`, `flagged`).
+- `commit`, `branch`, `verdict` (`pass`, `red`, `flagged`), `diff_class` (`prose-only`, `no-surface-path`, `surface-path`).
 - `check_exit`, `check_s`, `journeys_exit`, `journeys_s`.
 - `protected_hits`: the number of protected-change flags. `protected_kinds`: the count per flag kind.
-- `protected_accepted`: the lead's reason when the flags were accepted, else null.
+- `protected_open`: flags not yet accepted. `protected_carried`: flags accepted on an earlier commit of the target.
+- `protected_accepted`: the lead's reason when this result's open flags were accepted, else null.
 
 A flagged row followed by a pass row with `protected_accepted` is an accepted hit.
 A flagged row with no such row after it went back to Build.
+A pass row with `protected_carried` above zero passed on flags judged earlier for the target.
 
 ## `rec` and `decision`: client decisions
 
@@ -51,9 +53,9 @@ A flagged row with no such row after it went back to Build.
 - A decision that undoes an earlier one carries `reverses` (that decision's `id` or `link`) and `reverses_basis`.
 - A design decision also carries `options_offered`, `pick` (`as-offered`, `mixed`, `redo`), `round` (per spec, from 1) and `lead_rec`, copied from the sealed `rec` row. A changed pick is a new decision row.
 
-## `scan`: the Audit scanner pass
+## `scan` and `health`: the scanner pass
 
-One row per Audit, with `commit` and `measures`:
+`scan` is one row per Audit; `health` is the health check row `flow land` appends at every landing. Both carry `commit` and `measures`:
 `unused_code`, `duplication_source_pct`, `duplication_tests_pct`, `dependency_violations`, `suppressions`, `tests`, `test_seconds`, `source_lines`, `test_lines`.
 A project adds the measures of its own scanners under further names.
 

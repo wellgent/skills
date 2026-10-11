@@ -1,38 +1,131 @@
 #!/usr/bin/env bash
-# flow spawn <step> <target> [--cwd <dir>] [--lead <agent>] [--note <text>]
+# flow spawn <step> <target> [--cwd <dir>] [--lead <agent>] [--note <text>] [--model <id>] [--effort <level>] [--wait]
 # Starts one step as its own herdr session in the project's flow workspace.
 # The harness follows the model in the flow config: claude-* runs in Claude Code, gpt-* in Codex.
 # An empty entry starts the lead's harness with no model or effort flags, so the session runs
 # on the same host defaults as the lead; FLOW_LEAD_MODEL and FLOW_LEAD_EFFORT name them when
-# the lead runs on something else.
-# The invocation is the session's start prompt. Prints the run as JSON and keeps it as the
-# spawn record flow ledger reads.
+# the lead runs on something else. --model and --effort override the entry for this run, which is
+# how a step stalled at a usage limit is respawned on the fallback model.
+# The invocation is the session's start prompt. Prints the run as JSON at once and keeps it as the
+# spawn record flow ledger reads; the start itself runs detached and reaches the lead's pane as
+#   spawn: <step> <target> <run> started|blocked|failed ...
+# --wait starts in the foreground instead: exit 0 started, 4 blocked at a startup prompt, 1 failed.
 set -euo pipefail
 . "$FLOW_BIN/lib.sh"
 need herdr jq
 
-step= target= cwd= lead=${FLOW_LEAD:-${HERDR_PANE_ID:-}} note=
+step= target= cwd= lead=$(lead_agent) note= model_opt= effort_opt= wait= start_run=
 while [ $# -gt 0 ]; do
   case $1 in
     --cwd) cwd=${2:?--cwd needs a directory}; shift 2 ;;
     --lead) lead=${2:?--lead needs a herdr agent}; shift 2 ;;
     --note) note=${2:?--note needs text}; shift 2 ;;
+    --model) model_opt=${2:?--model needs a model id}; shift 2 ;;
+    --effort) effort_opt=${2:?--effort needs a level}; shift 2 ;;
+    --wait) wait=1; shift ;;
+    --start) start_run=${2:?}; shift 2 ;;
     -*) die "unknown option: $1" ;;
     *) if [ -z "$step" ]; then step=$1; elif [ -z "$target" ]; then target=$1; else die "unexpected argument: $1"; fi; shift ;;
   esac
 done
-[ -n "$step" ] && [ -n "$target" ] || die "usage: flow spawn <step> <target> [--cwd <dir>] [--lead <agent>] [--note <text>]"
+
+runs="$(state_dir)/runs"
+mkdir -p "$runs"
+
+# new_tab: sets pane and tab to a fresh tab of the flow workspace. Uses ws, cwd, run, lead, step, target.
+new_tab() {
+  local out
+  out=$(herdr tab create --workspace "$ws" --cwd "$cwd" --label "$run" --no-focus \
+    --env "FLOW_LEAD=$lead" --env "FLOW_STEP=$step" --env "FLOW_TARGET=$target" --env "FLOW_RUN=$run" \
+    --env "FLOW_HOME=$FLOW_HOME")
+  pane=$(jq -r '.result.root_pane.pane_id // (.. | objects | .pane_id? // empty)' <<<"$out" | head -1)
+  tab=$(jq -r '.result.tab.tab_id // (.. | objects | .tab_id? // empty)' <<<"$out" | head -1)
+  [ -n "$pane" ] || die "herdr created no pane for $run"
+}
+
+# start_once: herdr agent start in $pane. Returns 0 started, 2 blocked at a startup prompt,
+# 1 with $reason when the pane holds no agent after the wait.
+start_once() {
+  local attempt out
+  for attempt in 1 2 3 4; do
+    if out=$(herdr agent start "$run" --kind "$harness" --pane "$pane" --timeout 120000 -- ${args[@]+"${args[@]}"} "$prompt" 2>&1); then
+      return 0
+    fi
+    case $out in
+      *agent_not_ready*)
+        # The harness is up but waits on its own startup prompt (folder trust, a login).
+        # The start prompt is kept and runs once that is answered in the tab.
+        return 2 ;;
+      *agent_pane_busy*) sleep 3 ;;
+      *'"timeout"'*|*agent_name_not_found*)
+        # herdr waits for an agent ready for input; one that went straight to work on its start
+        # prompt runs past that wait, and herdr then reports the name unknown or times out.
+        # The session is up when the pane holds the harness: name it and carry on.
+        if [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent // empty')" = "$harness" ]; then
+          [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.name // empty')" = "$run" ] ||
+            herdr agent rename "$pane" "$run" >/dev/null 2>&1 || true
+          return 0
+        fi
+        reason="no agent in pane $pane after the wait: $(echo "$out" | head -1)"; return 1 ;;
+      *) reason="could not start $harness in pane $pane: $(echo "$out" | head -3)"; return 1 ;;
+    esac
+  done
+  reason="pane $pane stayed busy"; return 1
+}
+
+# start_session: starts the step in its tab, once more in a fresh tab when the first pane holds no
+# agent after the wait. Sets outcome (started, blocked, failed), line and the record's pane.
+start_session() {
+  local code=0
+  start_once || code=$?
+  if [ "$code" -eq 1 ]; then
+    echo "flow spawn: $reason; closing tab $tab and starting once more" >&2
+    herdr tab close "$tab" >/dev/null 2>&1 || true
+    new_tab
+    code=0
+    start_once || code=$?
+  fi
+  case $code in
+    0) outcome=started; line="spawn: $step $target $run started (pane $pane)" ;;
+    2) outcome=blocked; line="spawn: $step $target $run blocked at startup: answer its prompt in pane $pane (herdr agent read $run --source visible)" ;;
+    *) outcome=failed; line="spawn: $step $target $run failed: $reason"
+       herdr tab close "$tab" >/dev/null 2>&1 || true ;;
+  esac
+  jq --arg pane "$pane" --arg tab "$tab" --arg outcome "$outcome" --arg reason "${reason:-}" \
+    '.pane = $pane | .tab = $tab | .start = $outcome | if $outcome == "failed" then .start_error = $reason else . end' \
+    "$runs/$run.json" >"$runs/$run.json.tmp"
+  mv "$runs/$run.json.tmp" "$runs/$run.json"
+}
+
+# The detached half: start the session described by the sidecar and tell the lead.
+if [ -n "$start_run" ]; then
+  run=$start_run
+  side="$runs/$run.start.json"
+  [ -f "$side" ] || die "no start record for $run"
+  step=$(jq -r .step "$side") target=$(jq -r .target "$side") harness=$(jq -r .harness "$side")
+  lead=$(jq -r .lead "$side") cwd=$(jq -r .cwd "$side") ws=$(jq -r .ws "$side")
+  pane=$(jq -r .pane "$side") tab=$(jq -r .tab "$side") prompt=$(jq -r .prompt "$side")
+  args=()
+  while IFS= read -r arg; do args+=("$arg"); done < <(jq -r '.args[]' "$side")
+  start_session
+  rm -f "$side"
+  echo "$line"
+  tell_lead "$lead" "$line"
+  exit 0
+fi
+
+[ -n "$step" ] && [ -n "$target" ] || die "usage: flow spawn <step> <target> [--cwd <dir>] [--lead <agent>] [--note <text>] [--model <id>] [--effort <level>] [--wait]"
 [ -n "$lead" ] || die "no lead: run inside the lead's herdr session, or pass --lead <agent>"
 parse_target "$target"
 
 case $step in
-  ux-design|grooming|build|review|qa) stage=$step ;;
+  ux-design|grooming|build|review|qa|retro) stage=$step ;;
   system-design|system-design-second) stage=system-design ;;
-  audit|audit-second|audit-architecture|audit-architecture-second) stage=audit ;;
+  audit|audit-second|audit-architecture) stage=audit ;;
   *) die "unknown step: $step (see flow help)" ;;
 esac
 case $stage in
-  audit) [ -z "$TARGET_ISSUE" ] || die "an audit step takes <owner>/<repo>, without an issue" ;;
+  audit|retro) [ -z "$TARGET_ISSUE" ] || die "step $step takes <owner>/<repo>, without an issue" ;;
   *) [ -n "$TARGET_ISSUE" ] || die "step $step takes <owner>/<repo>#<issue>" ;;
 esac
 skill="$FLOW_HOME/stages/$stage/SKILL.md"
@@ -40,14 +133,15 @@ skill="$FLOW_HOME/stages/$stage/SKILL.md"
 
 config=$(find_config)
 jq -e --arg s "$step" '.steps | has($s)' "$config" >/dev/null || die "$config has no steps.$step entry"
-model=$(jq -r --arg s "$step" '.steps[$s].model // ""' "$config")
-effort=$(jq -r --arg s "$step" '.steps[$s].effort // ""' "$config")
+model=${model_opt:-$(jq -r --arg s "$step" '.steps[$s].model // ""' "$config")}
+effort=${effort_opt:-$(jq -r --arg s "$step" '.steps[$s].effort // ""' "$config")}
 if [ -z "$cwd" ]; then
   cwd=$(jq -r --arg r "$TARGET_REPO" '.projects[$r].checkout // ""' "$config")
   [ -n "$cwd" ] || die "$config has no projects[\"$TARGET_REPO\"].checkout"
 fi
 case $cwd in "~"*) cwd=$HOME${cwd#"~"} ;; esac
 [ -d "$cwd" ] || die "not a directory: $cwd"
+remember_config "$cwd" "$config"
 
 case $model in
   claude-*) harness=claude ;;
@@ -69,7 +163,6 @@ case $step in
   grooming) tag=groom ;;
   audit-second) tag=audit2 ;;
   audit-architecture) tag=arch ;;
-  audit-architecture-second) tag=arch2 ;;
   *) tag=$step ;;
 esac
 suffix="-$tag-${TARGET_ISSUE:-main}-$(date +%H%M%S)"
@@ -81,9 +174,8 @@ prompt="$prompt End the session with flow report <outcome> <artifact link>."
 # herdr types the start command into the pane's shell, and a terminal line holds 1024 bytes,
 # so a long prompt goes into a file and the command carries only a pointer to it.
 if [ ${#prompt} -gt 600 ]; then
-  mkdir -p "$(state_dir)/runs"
-  echo "$prompt" >"$(state_dir)/runs/$run.prompt"
-  prompt="You are running flow step $step on $target as session $run. Read your start instructions in $(state_dir)/runs/$run.prompt and follow them."
+  echo "$prompt" >"$runs/$run.prompt"
+  prompt="You are running flow step $step on $target as session $run. Read your start instructions in $runs/$run.prompt and follow them."
 fi
 
 args=()
@@ -103,40 +195,28 @@ esac
 label="$TARGET_NAME-flow"
 ws=$(herdr workspace list | jq -r --arg l "$label" '.. | objects | select(.label? == $l) | .workspace_id' | head -1)
 [ -n "$ws" ] || ws=$(herdr workspace create --cwd "$cwd" --label "$label" --no-focus | jq -r '.result.workspace.workspace_id')
-pane=$(herdr tab create --workspace "$ws" --cwd "$cwd" --label "$run" --no-focus \
-  --env "FLOW_LEAD=$lead" --env "FLOW_STEP=$step" --env "FLOW_TARGET=$target" --env "FLOW_RUN=$run" \
-  --env "FLOW_HOME=$FLOW_HOME" | jq -r '.. | objects | .pane_id? // empty' | head -1)
-[ -n "$pane" ] || die "herdr created no pane for $run"
-
-started=
-for attempt in 1 2 3 4; do
-  if out=$(herdr agent start "$run" --kind "$harness" --pane "$pane" --timeout 120000 -- ${args[@]+"${args[@]}"} "$prompt" 2>&1); then
-    started=1; break
-  fi
-  case $out in
-    *agent_not_ready*)
-      # The harness is up but waits on its own startup prompt (folder trust, a login).
-      # The start prompt is kept and runs once that is answered in the tab.
-      FLOW_EXIT=4 die "$run is blocked at startup; answer its prompt in pane $pane (herdr agent read $run --source visible)" ;;
-    *agent_pane_busy*) sleep 3 ;;
-    *'"timeout"'*)
-      # herdr waits for an agent ready for input; one that went straight to work on its start
-      # prompt runs past that wait unnamed. The session is up: name it and carry on.
-      [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent // empty')" = "$harness" ] \
-        || die "could not start $harness in pane $pane: $(echo "$out" | head -3)"
-      herdr agent rename "$pane" "$run" >/dev/null || die "could not name the session in pane $pane $run"
-      started=1; break ;;
-    *) die "could not start $harness in pane $pane: $(echo "$out" | head -3)" ;;
-  esac
-done
-[ -n "$started" ] || die "pane $pane never became ready for $run"
+new_tab
 
 record=$(jq -n --arg run "$run" --arg step "$step" --arg target "$target" --arg harness "$harness" --arg model "$model" \
-  --arg effort "$effort" --arg lead "$lead" --arg pane "$pane" --arg cwd "$cwd" --arg skill "$skill" \
-  --arg time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg effort "$effort" --arg lead "$lead" --arg pane "$pane" --arg tab "$tab" --arg cwd "$cwd" --arg skill "$skill" \
+  --arg time "$(now_utc)" \
   --arg flow "$(git -C "$FLOW_HOME" rev-parse --short HEAD 2>/dev/null || echo unknown)" \
   '{run: $run, step: $step, target: $target, harness: $harness, model: $model, effort: $effort,
-    lead: $lead, pane: $pane, cwd: $cwd, skill: $skill, started: $time, flow_version: $flow}')
-mkdir -p "$(state_dir)/runs"
-echo "$record" >"$(state_dir)/runs/$run.json"
+    lead: $lead, pane: $pane, tab: $tab, cwd: $cwd, skill: $skill, started: $time, flow_version: $flow, start: "starting"}')
+echo "$record" >"$runs/$run.json"
+
+if [ -n "$wait" ]; then
+  start_session
+  cat "$runs/$run.json"
+  echo "$line" >&2
+  case $outcome in started) exit 0 ;; blocked) exit 4 ;; *) exit 1 ;; esac
+fi
+
+args_json=$(printf '%s\n' ${args[@]+"${args[@]}"} | jq -R . | jq -s 'map(select(. != ""))')
+jq -n --arg step "$step" --arg target "$target" --arg harness "$harness" --arg lead "$lead" --arg cwd "$cwd" \
+  --arg ws "$ws" --arg pane "$pane" --arg tab "$tab" --arg prompt "$prompt" --argjson args "$args_json" \
+  '{step: $step, target: $target, harness: $harness, lead: $lead, cwd: $cwd, ws: $ws, pane: $pane, tab: $tab,
+    prompt: $prompt, args: $args}' >"$runs/$run.start.json"
+detach "$runs/$run.start.log" "$FLOW_BIN/flow-spawn" --start "$run"
 echo "$record"
+echo "flow spawn: $run starting in pane $pane; the result arrives in $lead as spawn: $step $target $run started|blocked|failed" >&2

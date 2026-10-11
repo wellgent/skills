@@ -25,6 +25,8 @@ Usage: flow ledger <command> [args] [--iteration <id>]
         A client decision. The three design options go together and need a sealed recommendation.
   scan <owner>/<repo> [--commit <sha>] <measure>=<number> ...
         The Audit scanner pass.
+  health <owner>/<repo> [--commit <sha>] <measure>=<number> ...
+        The health check row flow land appends: the scanner pass on the landed commit.
   bug <owner>/<repo>#<bug> --origin <spec issue>|unknown [--found <date>]
         [--area authorization|money|data-integrity]
         An escaped defect. Exit 2 when it triggers a Retro.
@@ -58,7 +60,7 @@ while [ $# -gt 0 ]; do
     -*) die "unknown option: $1" ;;
     *)
       case $cmd:$1 in
-        run:[a-z]*=*|stage:[a-z]*=*|scan:[a-z]*=*) measures+=("$1") ;;
+        run:[a-z]*=*|stage:[a-z]*=*|scan:[a-z]*=*|health:[a-z]*=*) measures+=("$1") ;;
         *) pos+=("$1") ;;
       esac
       shift ;;
@@ -212,10 +214,13 @@ case $cmd in
     row=$(jq -n --argjson base "$base" --slurpfile gate "$result" '
       $gate[0] as $g
       | $base + {kind: "gate", time: $g.time, commit: $g.commit, branch: $g.branch, verdict: $g.verdict,
+          diff_class: ($g.diff_class // null),
           check_exit: $g.check.exit, check_s: $g.check.seconds,
           journeys_exit: ($g.journeys.exit? // null), journeys_s: ($g.journeys.seconds? // null),
           protected_hits: ($g.flags | length),
           protected_kinds: ($g.flags | group_by(.kind) | map({(.[0].kind): length}) | add // {}),
+          protected_open: ($g.flags_open // null),
+          protected_carried: ($g.flags | map(select(.accepted != null and .accepted.commit != $g.commit)) | length),
           protected_accepted: $g.flags_accepted}')
     [ "$(file_rows | jq --argjson row "$row" 'map(select(.kind == "gate" and .commit == $row.commit and .time == $row.time)) | length')" -eq 0 ] ||
       die "the gate result of $(jq -r .time <<<"$row") on $(jq -r '.commit[0:12]' <<<"$row") is already in $file"
@@ -270,7 +275,7 @@ case $cmd in
       + ($design // {})')"
     ;;
 
-  scan)
+  scan|health)
     open_ledger "$(arg 0)"
     [ -z "$TARGET_ISSUE" ] || die "the scanner pass takes <owner>/<repo>, without an issue"
     values=$(measures_json)
@@ -279,8 +284,8 @@ case $cmd in
     [ -z "$missing" ] || die "the scanner row is missing: $missing"
     commit=$opt_commit
     [ -n "$commit" ] || { [ -d "$checkout" ] && commit=$(git -C "$checkout" rev-parse HEAD); } || die "pass --commit <sha>"
-    append "$(jq -n --argjson base "$base" --arg commit "$commit" --argjson measures "$values" \
-      '$base + {kind: "scan", commit: $commit, measures: $measures}')"
+    append "$(jq -n --argjson base "$base" --arg kind "$cmd" --arg commit "$commit" --argjson measures "$values" \
+      '$base + {kind: $kind, commit: $commit, measures: $measures}')"
     ;;
 
   bug)
