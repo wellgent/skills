@@ -55,6 +55,8 @@ No `<placeholder>` is left in the three docs below: each is filled, or its line 
   For a stack with a setup skill, run it now: it fills the gate lines, worktrees, running the app, lenses, tools, scanner pass and design system.
   For any other stack, fill them from the project's own tooling and put what only the client can choose (lenses, QA tools, extra protected paths) to the client.
   The "Protected paths" line adds to the defaults in `~/repos/wellgent-skills/bin/protected-paths` and is deleted when the project adds none.
+  The "Surface paths" and "Prose paths" lines are required, since they decide which landings get Review and QA: surface paths cover every directory whose change can reach what a user sees or does (screens, a public API, an agent-facing tool, a CLI's commands), and prose paths cover docs and other files with no code and no test. A path in doubt is a surface path.
+  The "Scanner pass" names a command for each of the nine measures in `.project.scanner_measures`, each printing its number as the last line of its stdout, run once by hand on `main` to see that it does.
 - **`CODING_STANDARDS.md`** from the template when absent. An existing one is the project's.
 - **`GLOSSARY.md`** holds the domain language. A `CONTEXT.md` is renamed (`git mv`) with every reference to it; with neither, create the file with its title only.
 - **`docs/agents/issue-tracker.md`, `triage-labels.md`, `domain.md`**: copy the seed files `issue-tracker-github.md`, `triage-labels.md` and `domain.md` from the brain's pinned `setup-matt-pocock-skills` directory, and run none of that skill's steps.
@@ -73,7 +75,7 @@ Until the client has approved a list, the section says `none approved` and the g
 
 ## 6. Tracker
 
-- Create each label of `.project.labels` the tracker lacks, with `gh label create <label> --repo <owner>/<repo>`.
+- Create each label of `.project.labels` the tracker lacks, with `gh label create <label> --repo <owner>/<repo>`; `batch` marks the parent issue of a batch.
 - `main` lands by fast-forward only:
 
 ```bash
@@ -82,7 +84,7 @@ gh api -X PATCH repos/<owner>/<repo> -F allow_merge_commit=false -F allow_rebase
 
 ## 7. Check
 
-1. Run the check command on `main`. A step that is red moves out of the command and under "Pending checks" in `docs/agents/dev-loop.md`, until a cleanup spec gets it green.
+1. Run the check command on `main`. A step that is red moves out of the command into the "Pending checks" section of `docs/agents/dev-loop.md`, with a scanner pass measure counting its findings, until a cleanup spec gets it green.
 2. Commit on `main` and push.
 3. Done when `flow ready <owner>/<repo>` prints no `behind project` line and no `behind host` line about this checkout.
 

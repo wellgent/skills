@@ -127,8 +127,7 @@ cost_of() {
 }
 
 STAGES="readiness shape ux-design system-design plan build review qa release audit retro"
-SCANNER_MEASURES='["unused_code", "duplication_source_pct", "duplication_tests_pct", "dependency_violations",
-  "suppressions", "tests", "test_seconds", "source_lines", "test_lines"]'
+SCANNER_MEASURES=$(jq -c '.project.scanner_measures' "$FLOW_HOME/setup/requires.json")
 
 case $cmd in
   run)

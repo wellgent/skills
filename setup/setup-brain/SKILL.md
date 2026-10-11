@@ -23,12 +23,13 @@ What a brain must hold is in [`../requires.json`](../requires.json) under `brain
 `flow.json` sits at the brain's root, from [`templates/brain/flow.json`](../../templates/brain/flow.json).
 
 - Absent: copy the template, set `tracker` to the brain's `<owner>/<repo>` and `projects` to `{}`.
-- Present: add each step the template has and the file lacks, with the template's entry, and the `harness` block when absent.
-  An existing step entry is the brain's choice and stays as it is.
+- Present: the file holds exactly the template's steps. Add each step the template has and the file lacks with the template's entry (the `retro` step among them), and remove each step the template no longer has.
+  Add the `harness` block and the `fallback` entry when absent.
+  An existing step entry and an existing `fallback` are the brain's choice and stay as they are.
 
 ## 3. Labels
 
-Create each label of `.brain.labels` the tracker lacks:
+Create each label of `.brain.labels` the tracker lacks; `lead:round` marks a request to the client, the one label `flow tick` and `flow status` read on the brain's tracker:
 
 ```bash
 jq -r '.brain.labels[]' ~/repos/wellgent-skills/setup/requires.json | while read -r label; do
@@ -58,8 +59,8 @@ npx skills add "<source>#$(flow sources pin <source>)" --agent codex --copy -y -
    The brain's own page conventions (frontmatter, links, citations) wrap the template's lines.
    An existing card gains the template lines it lacks.
    Fill every line from the brain's pages and the project's repo; a line only the client can answer (the client, the seed allowlist, a change to authority) is asked, never guessed.
-2. **Config entry.** `projects["<owner>/<repo>"]` in `flow.json` holds `checkout` (the project's checkout on this host, `~` allowed) and `card` (the card's path in the brain). `iteration` is the lead's: a new entry has none, an existing one keeps its value.
-3. **Ledger directory.** `ledger/<repo>/` exists and is tracked (a `.gitkeep` when empty). The iteration's ledger file and its two merged Audit reports live there.
+2. **Config entry.** `projects["<owner>/<repo>"]` in `flow.json` holds `checkout` (the project's checkout on this host, `~` allowed) and `card` (the card's path in the brain). `iteration` is optional and the lead's: it names the open iteration map while one runs, so a new entry has none and an existing one keeps its value.
+3. **Ledger directory.** `ledger/<repo>/` exists and is tracked (a `.gitkeep` when empty). The project's ledger files, its Audit reports and its Retro reports live there.
 
 ## 6. Host
 

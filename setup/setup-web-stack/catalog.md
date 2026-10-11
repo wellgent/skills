@@ -89,7 +89,7 @@ Scripts (pnpm shape; adapt the `check` chain for npm):
 }
 ```
 
-`next typegen` (Next.js projects) rewrites the route types under `.next/types` before `tsc` reads them, so a build directory left by an earlier commit cannot fail the typecheck. `check` is the single command agents gate on, and every step in it blocks - the gate runs what production runs, so the full test suite and the real production build are inside it. A project with a design system adds its design-system lint to the chain, and a Convex project adds `convex` to the `depcruise` paths. `test:journeys` stays outside `check`: `flow gate` runs it once per spec from the "Journey tests" line of `docs/agents/dev-loop.md`. Notes:
+`next typegen` (Next.js projects) rewrites the route types under `.next/types` before `tsc` reads them, so a build directory left by an earlier commit cannot fail the typecheck. `check` is the single command agents gate on, and every step in it blocks - the gate runs what production runs, so the full test suite and the real production build are inside it. A project with a design system adds its design-system lint to the chain, and a Convex project adds `convex` to the `depcruise` paths. `test:journeys` stays outside `check`: `flow gate` runs it at every landing from the "Journey tests" line of `docs/agents/dev-loop.md`. Notes:
 
 - Canonical `oxlint.config.ts` (nkzw preset, tsgolint `typeAware`, react/nextjs plugins) and `.oxfmtrc.json` baseline: copy the designated canonical project's files verbatim, per the standard
 - Existing eslint + prettier projects: offer the migration, don't force it; if accepted, run oxc's own `migrate-oxlint` skill (`npx skills add https://github.com/oxc-project/oxc --skill migrate-oxlint`) or `npx @oxlint/migrate` on the flat config, get `check` green, and remove the replaced tooling in the same change. `@nkzw/oxlint-config` 2.x bundles its plugins: only `@nkzw/oxlint-config` and `@nkzw/eslint-plugin` stay in devDependencies, the individual `eslint-plugin-*` packages go
@@ -122,7 +122,7 @@ module.exports = {
 - A blocking check that is red on `main` when it is introduced stays out of `check` until a cleanup spec gets it green; until then its count is a scanner-pass number
 - Installing Matt's `code-review` project skill replaces the bundled `/code-review` (a project skill wins over a bundled one of the same name); the bundled review stays reachable as `/review`
 
-Scanner pass - measured at each Audit and recorded with `flow ledger scan`, never pass/fail. The commands go on the "Scanner pass" lines of `docs/agents/dev-loop.md`:
+Scanner pass - run by `flow land` on every landed commit and appended as the health check row, never pass/fail. The commands go on the "Scanner pass" lines of `docs/agents/dev-loop.md`, each printing its number as the last line of its stdout:
 
 - `unused_code`: `pnpm --reporter=silent run knip --reporter json`, counting issues; zero on a repo that carries knip in `check`. Without `--reporter=silent`, pnpm 12 prints the script line to stdout and the JSON does not parse
 - `duplication_source_pct`, `duplication_tests_pct`: `pnpm dlx jscpd@<pinned version> --min-tokens 50 --min-lines 5 --reporters json` twice, once over source with tests, fixtures and generated code ignored, once over the test and fixture files alone; the number is `.statistics.total.percentage` of the report. Pin the version so runs stay comparable. In this mode jscpd finds textual clones only; logic duplicated under different names is the Audit defect review's lens

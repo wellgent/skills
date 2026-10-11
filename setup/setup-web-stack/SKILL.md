@@ -57,7 +57,7 @@ With no approved journeys, scaffold nothing.
 The stack's facts go where the flow reads them, per the Methodology section of [`standards/web-products.md`](../../standards/web-products.md) ("What this stack puts in those files"):
 
 - `AGENTS.md`: the check command in "Rules for every session", and one must-read entry per pinned skill or file an implementer reads, each with its trigger.
-- `docs/agents/dev-loop.md`: the gate lines, worktrees, running the app, Review lenses, QA tools with their named checks, Audit lenses, the scanner pass commands, the design-system commands, and each deviation from the doctrine with its reason.
+- `docs/agents/dev-loop.md`: the gate lines with the surface and prose paths, worktrees, running the app, Review lenses, QA tools with their named checks, Audit lenses, the scanner pass commands, the design-system commands, and each deviation from the doctrine with its reason.
 
 Every skill pinned in step 3 is named on one of those lines; one that no line names is removed.
 

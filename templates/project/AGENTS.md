@@ -4,16 +4,16 @@
 
 ## Rules for every session
 
-- **Check before report.** `<check command>` is green on your branch tip before you report work as done or merge a branch.
-  Run it yourself on that commit and quote its result.
-- **Conflict exit.** When a ticket, its tests or the spec disagree, stop work on that ticket and report the disagreement to the session that started you: what disagrees with what.
-  A conflict exit is a correct outcome, and the reply settles which side changes.
+- **Check before report.** A session that changes files has `<check command>` green on its branch tip before it reports or merges a branch: run it yourself on that commit and quote its result.
+  A session that changes no file runs no check.
+- **Conflict exit.** Stop work on a ticket and report to the session that started you when the ticket, its tests or the spec disagree (say what disagrees with what), when the ticket needs a decision it does not hold, or when the work touches a hard-to-reverse thing the ticket does not name: stored-data shape or a migration, an external contract, money, authorization, a production delete.
+  Size is never a reason. A conflict exit is a correct outcome, and the reply settles what changes.
 - **Test tiers.**
   - A repro test handed to you with a bug ticket or a finding passes unchanged; a repro test you believe is wrong goes through the conflict exit.
   - An existing test changes freely when the ticket changes its behaviour.
     Your report names each test you deleted, each `.skip`, `.only`, `.todo` or `.fails` you added, each net loss of assertions and each loosened matcher, with the reason.
   - A new test is written first, at the seam the design record or the ticket names, with expected values copied as literals from the contract example or the bug report.
-  - A journey test changes only in a ticket that changes that journey, and only that ticket runs it.
+  - A journey test changes only in a ticket that changes that journey, and only that ticket runs it in its session; `flow gate` runs every journey test at each landing.
 - **Checks.** Tightening a check is free.
   Loosening a shared check (an ignore entry, a disabled rule, a step removed from the check command, a lowered threshold) needs the ticket to name it or the lead's approval.
   An inline suppression carries its reason on the same line.

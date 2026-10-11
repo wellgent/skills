@@ -114,20 +114,20 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
 - **One check command, everywhere**: `check` = typecheck + lint (oxlint + tsgolint, with the stack's lint plugins) + format check (oxfmt) + design-system lint + unused-code scan (knip) + dependency rules (dependency-cruiser) + full test suite + real production build (`next build`).
   Every step blocks, and tests outside `check` is drift by definition.
   Governing principle: the gate runs what production runs.
-- **A check blocks or is measured, never advisory**: it either sits in the check command, or it runs in the Audit scanner pass and lands as a number in the ledger.
+- **A check blocks or is measured, never advisory**: it either sits in the check command, or it runs in the scanner pass and lands as a number in the health check row `flow land` appends at every landing.
   Judgment belongs to Review and Audit sessions.
 - **Dependency rules**: no cycles, plus one rule per ADR that sets a module boundary; each rule's message carries the fix.
-- **Journey tests**: each project names at most five client-approved critical journeys, one plain Playwright test each, run once per spec by `flow gate` beside the check command.
+- **Journey tests**: each project names at most five client-approved critical journeys, one plain Playwright test each, run by `flow gate` beside the check command at every landing.
   Seam tests written test-first in Build are the regression net; the journey tests are the only browser-level suite.
-- **Measured in the scanner pass**: unused-code findings, duplication of source and of tests (jscpd), dependency-rule violations, the react-doctor finding count, inline suppressions, test count and wall time, source and test lines.
+- **Measured in the scanner pass** (the health check row): unused-code findings, duplication of source and of tests (jscpd), dependency-rule violations, the react-doctor finding count, inline suppressions, test count and wall time, source and test lines.
   No thresholds on duplication or complexity, and no mutation score.
 - **Changing a check**: tightening is free.
   Loosening a shared check (an ignore entry, a disabled rule, a step removed from `check`, a lowered threshold) needs the ticket to name it or the lead's approval, and an inline suppression carries its reason on the same line.
-  `flow gate` flags every such change on the spec diff for the lead to judge.
+  `flow gate` flags every such change on the landing's diff for the lead to judge.
 - **A blocking check that is red on `main` joins `check` once it is green**: until then it runs in the scanner pass, the readiness report lists it as pending, and a cleanup spec gets it green.
   No baseline or exemption files.
 - **CI: nowhere.**
-  `flow gate` on the spec's branch and `flow land`, which fast-forwards `main` only to a commit the gate passed, are the single enforcement point.
+  `flow gate` on the landing's branch and `flow land`, which fast-forwards `main` only to a commit the gate passed, are the single enforcement point.
   CI would duplicate it in a divergent environment with a demonstrated rot pattern.
   The fact that reopens this decision: unattended or scheduled pushes that bypass the gate becoming real.
 - **No residue**: code and docs describe what is; a replacement deletes what it replaces in the same diff; no unused files, exports, types, or dependencies (every dead-code suppression carries a written reason); every `TODO` carries an issue number; tests follow their code; vendor-owned trees are re-pinned, never edited.
@@ -211,7 +211,7 @@ Project rules an agent consults are in `AGENTS.md`, `CODING_STANDARDS.md` and `d
   The flow names no stack and no project; this document carries every stack rule.
 - **A project's methodology surface is three files**, scaffolded from [`templates/project/`](../templates/project/) and then project-owned:
   - `AGENTS.md`, loaded by every session: the check-before-report rule, the conflict exit, the test tiers, the check-change rule and the must-read list.
-  - `docs/agents/dev-loop.md`, read by path by the stages that need it: the gate lines, critical journeys, worktrees, running the app, Review lenses, QA tools, Audit lenses, the scanner pass, the design-system commands, deviations.
+  - `docs/agents/dev-loop.md`, read by path by the stages that need it: the gate lines with the surface and prose paths, critical journeys, worktrees, running the app, Review lenses, QA tools, Audit lenses, the scanner pass, the design-system commands, deviations.
   - `CODING_STANDARDS.md`, read by `code-review`, Review and Audit: code rules and the test bar.
 
   Promotion litmus: any line that should read identically in every project belongs to the template or the flow, and project files hold what is true of this repo.
@@ -221,15 +221,16 @@ Project rules an agent consults are in `AGENTS.md`, `CODING_STANDARDS.md` and `d
   - Review lenses: `web-design-guidelines` on UI diffs; `convex-reviewer` on Convex diffs.
   - QA tools: `agent-browser` and `next-dev-loop`, with the named check "`get_errors` returns nothing for the routes exercised".
   - Audit lenses: `vercel-composition-patterns` in the architecture review; `vercel-react-best-practices` in the defect review.
+  - Surface paths: everything that renders or serves a user (the app routes and components, the Convex functions, `public/`, global styles); prose paths: `*.md` and `docs/*`.
   - Scanner pass: knip, jscpd over source and over tests, dependency-cruiser, a suppression count, the test run's count and wall time, line counts, and the react-doctor finding count as the project measure `react_doctor`.
-- **Tracker conventions**: one label taxonomy across projects, identity-mapped - the five triage roles (`needs-triage`, `needs-info`, `ready-for-agent`, `needs-human`, `wontfix`), the `wayfinder:*` set, and the lead's `lead:iteration` and `lead:input`.
+- **Tracker conventions**: one label taxonomy across projects, identity-mapped - the five triage roles (`needs-triage`, `needs-info`, `ready-for-agent`, `needs-human`, `wontfix`), the `wayfinder:*` set and `batch` on the project tracker, and the lead's `lead:iteration`, `lead:input` and `lead:round` on the driving brain's tracker.
   Per-project freedom is topical labels only.
   `docs/agents/issue-tracker.md` and `triage-labels.md` stay per project but are template-owned generated surfaces, always generic `<owner>/<repo>`; a project's file diverges only to declare an actual deviation.
   Every bug ticket carries its origin spec, the spec whose change introduced the bug; the bug issue template has the field.
-- **One lane system**: the flow is the standard lane for an iteration toward a destination, run by the lead for a client; a single bug ticket takes the flow's single-bug path; work between iterations runs without the flow, through `implement` on a ticket.
-  Lane choice is judgment, not deviation.
-- **Where review runs**: `code-review` inside Build; Review on each spec's gated diff by the other model family, with the project's lenses; one exploratory QA pass per spec with a user-facing change; a two-family Audit of the whole codebase at the client's close.
-  Scanners feed the Audit as ledger numbers; a Review or QA finding blocks only as a correctness defect, a spec gap, a breach of a written standard, or a defect with a failing repro test.
+- **One flow**: every piece of work enters as a ticket, a batch, a spec or a map through the lead's triage, and every landing passes the same floor.
+  The path is judgment, not deviation.
+- **Where review runs**: `code-review` inside Build; Review on each landing's gated diff by the other model family, with the project's lenses, unless the diff is prose only; one exploratory QA pass per landing that touches a surface path; a two-family Audit of the whole codebase when the client starts one.
+  Scanners feed the health check rows; a Review or QA finding blocks only as a correctness defect, a spec gap, a breach of a written standard, or a defect with a failing repro test.
 
 ## Learning propagation
 

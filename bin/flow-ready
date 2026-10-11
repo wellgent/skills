@@ -71,8 +71,11 @@ elif brain=$(cd "$(dirname "$config")" && pwd) && jq -e . "$config" >/dev/null 2
     *) ok brain "flow.json names the tracker $tracker"; labels_current brain "$tracker" brain ;;
   esac
   missing=$(jq -r --slurpfile t "$FLOW_HOME/templates/brain/flow.json" '($t[0].steps | keys) - (.steps // {} | keys) | join(" ")' "$config")
+  extra=$(jq -r --slurpfile t "$FLOW_HOME/templates/brain/flow.json" '(.steps // {} | keys) - ($t[0].steps | keys) | join(" ")' "$config")
   [ -z "$missing" ] && ok brain "flow.json has every step" || bad brain "flow.json lacks the steps: $missing"
+  [ -z "$extra" ] || bad brain "flow.json has steps the flow no longer runs: $extra"
   jq -e '.harness.claude and .harness.codex' "$config" >/dev/null || bad brain "flow.json lacks the harness arguments"
+  jq -e '.fallback.model' "$config" >/dev/null || bad brain "flow.json has no fallback model"
 else
   bad brain "$config is not valid JSON"
 fi
@@ -104,11 +107,18 @@ if [ $# -ge 1 ]; then
       [ -z "$missing" ] && ok project "the project docs are present" || bad project "missing files:$missing"
       [ "$(readlink "$checkout/CLAUDE.md" 2>/dev/null)" = AGENTS.md ] || bad project "CLAUDE.md is not a symlink to AGENTS.md"
       [ ! -e "$checkout/CONTEXT.md" ] || bad project "CONTEXT.md exists: the domain language lives in GLOSSARY.md"
-      check=$(cd "$checkout" && dev_loop_values "Check command" | head -1)
-      case $check in
-        ""|*"<"*) bad project "docs/agents/dev-loop.md names no check command" ;;
-        *) ok project "the check command is $check" ;;
-      esac
+      while read -r line; do
+        values=$(cd "$checkout" && dev_loop_values "$line" | paste -sd ' ' -)
+        case $values in
+          ""|*"<"*) bad project "docs/agents/dev-loop.md has no filled \"$line\" line" ;;
+          *) ok project "$line: $values" ;;
+        esac
+      done < <(jq -r '.project.dev_loop_lines[]' "$REQ")
+      scanned=$(cd "$checkout" && dev_loop_section "Scanner pass" | grep -F '`: ' | sed 's/`: .*//' | grep -o '`[^`]*' | tr -d '`' || true)
+      missing=$(jq -r --arg have "$scanned" '.project.scanner_measures - ($have | split("\n")) | join(" ")' "$REQ")
+      if [ -n "$missing" ]; then bad project "the scanner pass in docs/agents/dev-loop.md lacks the measures: $missing"
+      elif (cd "$checkout" && dev_loop_section "Scanner pass" | grep -q '<'); then bad project "the scanner pass in docs/agents/dev-loop.md has unfilled lines"
+      else ok project "the scanner pass names every health check measure"; fi
       for dir in .agents/skills/verify .claude/skills/verify; do
         [ ! -e "$checkout/$dir" ] || bad project "$dir exists: a project carries no skill named verify"
       done

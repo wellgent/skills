@@ -20,7 +20,7 @@ A rule a lint rule can enforce becomes that lint rule and leaves this file.
 1. Every public function is tested per outcome: allowed, refused, a refusal writes nothing, and each named boundary.
 2. Pure domain logic is tested once, at its interface; an integration test adds one case, never the table again.
 3. A test asserts the fields it is about; whole-object equality only where the shape is the contract.
-4. One browser test per user action per surface; every control that triggers a write is exercised by a test.
+4. Every control that triggers a write is exercised by a test at the lowest seam that reaches it; a browser test only for a critical journey or for behaviour only a browser shows.
 5. One shared harness and fixture set; a new test file copies no setup.
 6. A flaky test is fixed or deleted in the ticket that meets it; a test is never retried.
 7. Tests mock at system boundaries, never the framework or the module under test.
