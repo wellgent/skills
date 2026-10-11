@@ -14,7 +14,7 @@
 
 ### Candidates, ranked
 
-1. <candidate>: check <ticket> | standard <ticket> | watch item | flow text change <file> | dropped, <reason>
+1. <candidate>. Evidence: <ledger rows, session and transcript lines, tickets>. Route: check | standard | watch item | flow text change <file> | dropped, <reason>. Outcome: <ticket | pushed <commit> | declined by the client, request <issue>>
 
 ### Flow text changes for the client
 

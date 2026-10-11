@@ -13,11 +13,9 @@ Steps: audit <session>, audit-second <session>, audit-architecture <session>
 
 - <lens>: <n>, <one line on what they are>
 
-## Standing rules
+## Closed
 
-- A glossary, ADR or doc line the code contradicts is a finding quoting both lines.
-- A bound a closed spec accepted is reported only with its failure scenario at the bound.
-- A finding a released spec already fixed is closed naming that spec.
+- <finding>: fixed by <released spec> | held by <open issue> | bound accepted by <spec>, no failure scenario at the bound
 
 ## Client's picks
 

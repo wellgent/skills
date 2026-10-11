@@ -1,6 +1,6 @@
 # flow ledger rollup: the Retro report's ledger sections as Markdown over the Retro window.
 # Input: every row of the project as one array. The window is every row after the last Retro row
-# (a run row of stage retro); the previous window ends there and starts at the Retro row before it.
+# (the retro lead's run row: stage retro, role lead); the previous window ends there and starts at the Retro row before it.
 include "ledger";
 
 def usd: if . == null then "-" else "$" + (. * 100 | round / 100 | tostring) end;
@@ -45,7 +45,7 @@ def landings: (map(select(.kind == "health")) | length) as $h
   | if $h > 0 then $h else map(select(.kind == "run" and .stage == "release" and .outcome != "skipped")) | length end;
 
 . as $all
-| ([$all[] | select(.kind == "run" and .stage == "retro")] | sort_by(.time) | map(.time)) as $retros
+| ([$all[] | select(.kind == "run" and .stage == "retro" and .role == "lead")] | sort_by(.time) | map(.time)) as $retros
 | ($retros | last) as $from
 | (if ($retros | length) > 1 then $retros[-2] else null end) as $prev_from
 | ($all | map(select($from == null or .time > $from))) as $rows

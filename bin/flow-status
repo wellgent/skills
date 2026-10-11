@@ -38,7 +38,7 @@ if [ -n "$iteration" ]; then
   rows=$(jq --arg it "$iteration" 'map(select((.iteration | tostring) == $it))' <<<"$all")
   window="iteration $iteration"
 else
-  from=$(jq -r 'map(select(.kind == "run" and .stage == "retro") | .time) | max // empty' <<<"$all")
+  from=$(jq -r 'map(select(.kind == "run" and .stage == "retro" and .role == "lead") | .time) | max // empty' <<<"$all")
   if [ -n "$from" ]; then
     rows=$(jq --arg from "$from" 'map(select(.time > $from))' <<<"$all"); window="since the Retro row of $from"
   else

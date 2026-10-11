@@ -1,37 +1,46 @@
-# Retro
+# The Retro
 
-Header: `FLOW.md`, stage 11.
-Retro runs in a fresh lead session, so it judges the iteration from its records and not from memory of running it.
+Header: `FLOW.md`, stage 11. The `retro` step's part is `stages/retro/SKILL.md`.
+You are the **retro lead**: this session was started with `/lead <owner>/<repo> retro`, by the client.
+A Retro reads the ledger since the last Retro, finds what to change in the checks, the standards and the flow itself, and lands what the client accepts; it never blocks delivery, which may run beside it.
+Readiness has run and its advise line is `none`.
 
-## Starting it
-
-From the long-running lead session, at the client's close or on a trigger (exit 2 from `flow ledger bug` or `flow ledger check`):
+## 1. Spawn the step
 
 ```bash
-pane=$(herdr tab create --cwd <driving brain> --label retro-<repo> --no-focus | jq -r '.. | objects | .pane_id? // empty' | head -1)
-herdr agent start retro-<repo> --kind claude --pane "$pane" -- $(jq -r '.harness.claude[]' flow.json) "/lead <owner>/<repo> retro"
+flow spawn retro <owner>/<repo> --note "report: <driving brain>/ledger/<repo>/retro-<YYYY-MM-DD>.md"
+flow tick arm
 ```
 
-The Retro session reaches you with `herdr agent prompt` and you answer the same way.
+The path is absolute; the step writes the report there and leaves committing it to you.
+At its run-end report append the row with `flow ledger run '<the line>'`.
 
-## Running it
+## 2. Check the report
 
-You are the fresh session. Read the card, the iteration map and `FLOW.md`, then:
+The report meets the stage's quality bar when every rollup section is in, every escaped defect and watch item has its line, and every candidate has one route and its evidence.
+Fill a gap yourself from the ledger, the tracker and the transcripts, or respawn the step with `--note` naming the gap.
+Re-route a candidate you judge differently, and say why in its line.
 
-1. `flow ledger fill <owner>/<repo>`, then `flow ledger rollup <owner>/<repo>`.
-2. Sample transcripts on the run host by ledger outliers: the specs with the most Build runs, the most Review runs, the highest cost, and the origin spec of every escaped defect. Session ids are in the rows.
-3. Read `retro` from the project's pinned skills as a file and run it over the ledger, the tracker and those transcripts.
-   On a trigger, scope it to the bug or spec that raised it.
-4. Route every candidate to exactly one of:
-   - a mechanical violation → a deterministic check in the project's check command;
-   - a judgment call → a rule in the project's `CODING_STANDARDS.md`;
-   - a stage measure that got worse → a re-test trigger, written as a watch item;
-   - a candidate tool, model or effort change → a trial ticket on the driving brain's tracker;
-   - dropped, with the reason.
-5. File each check and each standards rule as a ticket on the project tracker and hand the list to the long-running lead, which takes them through the single-bug path.
-6. Every change to skill or flow text (the flow repo, the project's `AGENTS.md` and `docs/agents/dev-loop.md`) goes to the client in a Retro [round](rounds.md), one item each with the proposed diff and why.
-   Apply what the client approves, reading `writing-for-agents` first; commit and push in the owning repo.
-7. Post the Retro report from `templates/artifacts/retro-report.md` on the iteration map: the rollup as printed, where each escaped defect was found, the adopt-and-watch outcomes for items adopted at Readiness, the ranked candidates with their routing, and the text changes with the client's answers.
-   At the client's close it is the map's closing comment.
-8. `flow ledger stage retro <owner>/<repo> done <comment link>`; commit and push the ledger.
-9. Tell the long-running lead the report link, then end.
+## 3. Walk the client through it
+
+In this pane, go through the report with the client: what the window shows against the one before, what is notable, and what you would act on, candidate by candidate.
+The client may re-route any candidate or drop it.
+Anything the client says that decides or directs is recorded per [requests](rounds.md) before you continue.
+
+## 4. Act on each route
+
+- **Check** and **standard**: one one-shot ticket each on the project tracker, labelled `ready-for-agent`, holding the candidate, its evidence and the check or the rule as it should read. A delivery lead session lands them through the floor.
+- **Flow text change**: one request per [requests](rounds.md) for all of them, one question per change with its proposed diff and why, basis text; this session opens it itself. Wait for the answer as the waiting rule says.
+  - Accepted in the flow repo (`FLOW.md`, a stage or lead skill, a template): read `writing-for-agents`, edit, commit and push in `~/repos/wellgent-skills`.
+  - Accepted in the project (`AGENTS.md`, `docs/agents/dev-loop.md`): a one-shot ticket holding the accepted diff, landed through the floor like a check.
+  - Declined: its decision row is the record.
+- **Watch item**: stays in the report, where the next Readiness and the next Retro read it.
+- **Dropped**: stays in the report with its reason.
+
+Write each candidate's "Outcome" in the report: the ticket, the pushed commit, or the request that declined it.
+
+## 5. End
+
+1. Commit and push the report in the driving brain.
+2. `flow tick disarm`, then `flow ledger lead <owner>/<repo> <this session's id> --stage retro`; commit and push the ledger. This row is the Retro row the next window starts from.
+3. Tell the client the report's path and the filed tickets, then end.

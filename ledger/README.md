@@ -108,7 +108,8 @@ The price pages under `sources` in `prices.json` are Readiness sources.
 
 ## The Retro window and the rollup
 
-The **Retro window** is every row of the project, across its files, after the last Retro row (a `run` row of stage `retro`: the `retro` step's or the retro lead's); with no Retro row yet it is every row.
+The **Retro window** is every row of the project, across its files, after the last Retro row; with no Retro row yet it is every row.
+The **Retro row** is the retro lead's own row (`run`, stage `retro`, role `lead`), appended as the Retro's last row, so the `retro` step's row and the Retro's decision rows fall inside the window it closes.
 The window before it, between the two most recent Retro rows, is the comparison.
 
 `flow ledger rollup <owner>/<repo>` prints the Retro report's ledger sections as Markdown over the window, the previous window in brackets: the window line (landings, specs, maps), per stage, the gate with its diff classes, per container (spec, ticket or batch), escaped defects per origin spec within 7 and 30 days, decisions and reversals by basis, design decisions, and the health check trend from the window's first to its last row.
