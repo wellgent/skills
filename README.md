@@ -4,7 +4,7 @@ The agentic engineering approach we design and run in production at [Wellgent](h
 
 ## The flow
 
-[`FLOW.md`](FLOW.md) is the development flow on one page: eleven stages from Readiness to Retro, each with one role, one input, one output and a quality bar, and the artifacts handed between them.
+[`FLOW.md`](FLOW.md) is the development flow on one page: the triage that scales alignment before build to the cost of being wrong, the floor every landing passes after build, the eleven stages from Readiness to Retro, each with one role, one input, one output and a quality bar, and the artifacts handed between them.
 [`GLOSSARY.md`](GLOSSARY.md) defines its terms.
 
 The flow is read in place from one checkout of this repo per run host, at `~/repos/wellgent-skills`.

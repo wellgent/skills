@@ -1,19 +1,21 @@
-## Retro report
+# Retro report: <project>, <date>
 
-**Trigger:** client's close | escaped defect <ticket> | stage measure outlier on <spec>
+**Window:** since <last Retro row | the first ledger row>: <n> landings, <n> specs, <n> maps
 
-<the output of `flow ledger rollup <owner>/<repo>`, as printed: the rollup per stage and per spec, the gate, escaped defects, client decisions, reversals by basis, design decisions and the scanner pass, against the previous iteration>
+<the output of `flow ledger rollup <owner>/<repo>` over the window, as printed: per stage and per container, the gate, escaped defects, client decisions, reversals by basis, design decisions and the health check trend, against the previous window>
 
-<under Escaped defects, one line per bug on where it was found>
+### Escaped defects
 
-### Adopt-and-watch outcomes
+- <bug>: origin <spec>, found by <where>, <what the record, note or check missed>
 
-- <item adopted at Readiness>: <what the ledger shows>
+### Watch items from the last Retro
+
+- <item>: <what the ledger shows>
 
 ### Candidates, ranked
 
-1. <candidate>: <check | standard | re-test trigger | trial ticket | dropped, reason>
+1. <candidate>: check <ticket> | standard <ticket> | watch item | flow text change <file> | dropped, <reason>
 
-### Skill and flow text changes for the client
+### Flow text changes for the client
 
-- <file>: <proposed diff>, <why>
+- <file>: <proposed diff>, <why> (request <issue>)

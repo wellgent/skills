@@ -7,6 +7,7 @@
     "claude": ["--permission-mode", "bypassPermissions"],
     "codex": ["--dangerously-bypass-approvals-and-sandbox"]
   },
+  "fallback": { "model": "claude-opus-5-5[1m]" },
   "steps": {
     "ux-design": {},
     "system-design": { "model": "claude-fable-5-1[1m]", "effort": "xhigh" },
@@ -18,6 +19,6 @@
     "audit": { "model": "claude-fable-5-1[1m]", "effort": "xhigh" },
     "audit-second": { "model": "gpt-6-astra", "effort": "xhigh" },
     "audit-architecture": { "model": "claude-fable-5-1[1m]", "effort": "xhigh" },
-    "audit-architecture-second": { "model": "gpt-6-astra", "effort": "xhigh" }
+    "retro": {}
   }
 }

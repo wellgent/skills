@@ -1,12 +1,15 @@
-# Audit architecture report: <project>, <iteration>
+# Audit architecture report: <project>
 
 Audited commit: <sha on `main`>
 
-## Candidates
+## Notable problems
 
-- <modules>
+- **A<nn>** <modules>
   - Problem: <...>
+  - Makes expensive: <the named kind of change>
   - Proposed deepening: <...>
-  - Strength: <Strong | Worth exploring | Speculative>
-  - Proposed by: <family | both>
-  - Triage: <Shape candidate | cleanup spec | closed, reason>
+  - Strength: <Strong | Worth exploring>
+
+## Below the bar
+
+- <count>, <one line on what they are>

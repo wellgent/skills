@@ -9,7 +9,7 @@
 
 ### Major changes
 
-- <what changed>. Stage: <stage it touches>. Recommendation: <adopt | adopt and watch | skip>. Client's pick: <pick, with the reason on a skip>.
+- <what changed>. Stage: <stage it touches>. Recommendation: <adopt | adopt and watch | skip>. Client's pick: <pick, with the reason on a skip> (request <issue>)
 
 ### Propagation
 
@@ -18,15 +18,20 @@
 - Project: current | <what is behind>
 - Host: current | <what is behind>
 
+### Usage and load
+
+- <harness>: <headroom until reset> for <planned sessions>
+- Host load: <load> against <planned parallelism>
+
 ### Pending checks
 
-- <blocking check still red on `main`, and the cleanup spec that gets it green>
+- <blocking check still red on `main`, and the ticket that gets it green>
 
-### Audit input
+### Latest reports
 
-- Reused closing audit | fresh audit: <links to the defect report and the architecture report>
+- Audit: <report path, date> | none
+- Retro: <report path, date> | none; watch items: <item>
 
-### Carried from the last Retro
+### Advise
 
-- Watch: <item>
-- Pending trial: <item>
+- none | Audit | Retro: <the number behind it>
