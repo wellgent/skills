@@ -117,7 +117,7 @@ if [ $# -ge 1 ]; then
       scanned=$(cd "$checkout" && dev_loop_section "Scanner pass" | grep -F '`: ' | sed 's/`: .*//' | grep -o '`[^`]*' | tr -d '`' || true)
       missing=$(jq -r --arg have "$scanned" '.project.scanner_measures - ($have | split("\n")) | join(" ")' "$REQ")
       if [ -n "$missing" ]; then bad project "the scanner pass in docs/agents/dev-loop.md lacks the measures: $missing"
-      elif (cd "$checkout" && dev_loop_section "Scanner pass" | grep -q '<'); then bad project "the scanner pass in docs/agents/dev-loop.md has unfilled lines"
+      elif (cd "$checkout" && dev_loop_section "Scanner pass" | grep -q '<[a-z]'); then bad project "the scanner pass in docs/agents/dev-loop.md has unfilled lines"
       else ok project "the scanner pass names every health check measure"; fi
       for dir in .agents/skills/verify .claude/skills/verify; do
         [ ! -e "$checkout/$dir" ] || bad project "$dir exists: a project carries no skill named verify"

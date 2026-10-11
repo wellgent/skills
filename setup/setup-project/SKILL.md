@@ -46,7 +46,7 @@ npx skills add "<source>#$(flow sources pin <source>)" --agent codex --copy -y -
 
 The templates are in [`templates/project/`](../../templates/project/).
 The template's prose reads the same in every project and is replaced on a re-run; a line that states a fact of this repo is the project's and is kept.
-No `<placeholder>` is left in the three docs below: each is filled, or its line is deleted when it does not apply, and a section left with nothing to declare says `none` under its heading.
+No `<placeholder>` is left in `AGENTS.md`, `docs/agents/dev-loop.md` and `CODING_STANDARDS.md`: each is filled, or its line is deleted when it does not apply, and a section left with nothing to declare says `none` below the template's prose.
 
 - **`AGENTS.md`** is the real file and `CLAUDE.md` a symlink to it. A lone real `CLAUDE.md` is renamed (`git mv`); when both are real files, show the client the difference and ask.
   The sections "Rules for every session", "Must-read" and "Where things live" carry the template's text, with the project's check command and must-read entries.
@@ -56,8 +56,8 @@ No `<placeholder>` is left in the three docs below: each is filled, or its line 
   For any other stack, fill them from the project's own tooling and put what only the client can choose (lenses, QA tools, extra protected paths) to the client.
   The "Protected paths" line adds to the defaults in `~/repos/wellgent-skills/bin/protected-paths` and is deleted when the project adds none.
   The "Surface paths" and "Prose paths" lines are required, since they decide which landings get Review and QA: surface paths cover every directory whose change can reach what a user sees or does (screens, a public API, an agent-facing tool, a CLI's commands), and prose paths cover docs and other files with no code and no test. A path in doubt is a surface path.
-  The "Scanner pass" names a command for each of the nine measures in `.project.scanner_measures`, each printing its number as the last line of its stdout, run once by hand on `main` to see that it does.
-- **`CODING_STANDARDS.md`** from the template when absent. An existing one is the project's.
+  The "Scanner pass" names a command for each of the nine measures in `.project.scanner_measures`, each exiting 0 and printing its number as the last line of its stdout (a count of zero is a number, so `grep -c` goes through `|| true`), run once by hand on `main` to see that it does.
+- **`CODING_STANDARDS.md`** from the template when absent, its project rules line filled with the rules the code already follows or deleted. An existing one is the project's.
 - **`GLOSSARY.md`** holds the domain language. A `CONTEXT.md` is renamed (`git mv`) with every reference to it; with neither, create the file with its title only.
 - **`docs/agents/issue-tracker.md`, `triage-labels.md`, `domain.md`**: copy the seed files `issue-tracker-github.md`, `triage-labels.md` and `domain.md` from the brain's pinned `setup-matt-pocock-skills` directory, and run none of that skill's steps.
   In `issue-tracker.md`, delete the "Wayfinding operations" section: maps live on the brain's tracker.

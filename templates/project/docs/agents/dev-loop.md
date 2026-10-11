@@ -6,7 +6,7 @@ Rules for every session are in [AGENTS.md](../../AGENTS.md); code rules and the 
 
 ## Gate
 
-`flow gate` reads these five lines at every landing.
+`flow gate` reads these lines at every landing.
 
 - **Check command:** `<check command>`
 - **Journey tests:** `<journey tests command>`
@@ -15,7 +15,7 @@ Rules for every session are in [AGENTS.md](../../AGENTS.md); code rules and the 
 - **Prose paths:** `<glob>`, `<glob>`
 
 The check command blocks on every step it runs: <the steps, in order>.
-The journey tests run in every gate, once per landing.
+The journey tests, when the project has critical journeys, run in every gate, once per landing.
 The protected paths extend the flow's default list of check-defining files.
 The surface and prose paths decide the diff class the gate prints: a diff whose every file is a prose path is prose only (no Review, no QA), a diff that touches a surface path gets Review and QA, any other gets Review.
 A surface path is one whose change can reach what a user sees or does; a prose path holds no code and no test.
@@ -68,7 +68,7 @@ Each lens names the review it joins: the defect review or the architecture revie
 ## Scanner pass
 
 The source of the health check: `flow land` runs these commands on every landed commit and appends the numbers to the ledger as the health check row.
-One line per measure or group of measures, with one command per measure in the same order; each command prints its number as the last line of its stdout.
+One line per measure or group of measures, with one command per measure in the same order; each command exits 0 and prints its number as the last line of its stdout.
 The nine named measures are required; a project adds its own below them.
 
 - `unused_code`: `<command>`

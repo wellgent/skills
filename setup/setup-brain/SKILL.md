@@ -23,7 +23,7 @@ What a brain must hold is in [`../requires.json`](../requires.json) under `brain
 `flow.json` sits at the brain's root, from [`templates/brain/flow.json`](../../templates/brain/flow.json).
 
 - Absent: copy the template, set `tracker` to the brain's `<owner>/<repo>` and `projects` to `{}`.
-- Present: the file holds exactly the template's steps. Add each step the template has and the file lacks with the template's entry (the `retro` step among them), and remove each step the template no longer has.
+- Present: the file holds exactly the template's steps. Add each step the template has and the file lacks with the template's entry, and remove each step the template no longer has.
   Add the `harness` block and the `fallback` entry when absent.
   An existing step entry and an existing `fallback` are the brain's choice and stay as they are.
 
