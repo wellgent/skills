@@ -59,7 +59,7 @@ The project's QA tools and their named checks are declared in `docs/agents/dev-l
    Push the `qa/` branch, stop the app, and remove the worktree and its dev deployment per the worktree section.
 
 8. **Post the findings.**
-   Fill `templates/artifacts/qa-findings.md` from this repository and post it as one comment on the target issue.
+   Fill `$FLOW_HOME/templates/artifacts/qa-findings.md` and post it as one comment on the target issue.
 
 9. **Report.**
    End the session with `flow report clean <link to the comment>` when no finding blocks, otherwise `flow report blocking <link to the comment>`.

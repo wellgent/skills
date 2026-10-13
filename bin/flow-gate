@@ -74,6 +74,10 @@ fi
 check=$(dev_loop_values "Check command" | head -1)
 journeys=$(dev_loop_values "Journey tests" | head -1)
 [ -n "$check" ] || die 'docs/agents/dev-loop.md has no "- **Check command:** `<command>`" line'
+# "- **Journeys port:** `<variable>` `<from>-<to>`": the gate exports a free port of that range
+# in that variable, so two gates' journey servers never share one.
+port_var=$(dev_loop_values "Journeys port" | sed -n 1p)
+port_range=$(dev_loop_values "Journeys port" | sed -n 2p)
 
 # Without --wait the checks run detached and the result goes to the lead's pane.
 if [ -z "$wait" ]; then
@@ -82,6 +86,32 @@ if [ -z "$wait" ]; then
   detach "$dir/$commit.run.log" "$FLOW_BIN/flow-gate" "$target" --wait --deliver --lead "$lead"
   echo "gate: $target running ${commit:0:12} ($branch); the result arrives in $lead as gate: $target <verdict> <diff class> $result_file"
   exit 0
+fi
+
+# One gate at a time per repository: the check and the journeys load the host, and two journey
+# runs would reset one deployment under each other. A lock whose holder is gone is taken over.
+lock="$(gate_dir)/lock"
+waited=0
+until mkdir "$lock" 2>/dev/null; do
+  holder=$(cat "$lock/holder" 2>/dev/null || echo "unknown unknown 0")
+  holder_pid=$(echo "$holder" | awk '{print $3}')
+  if [ -n "$holder_pid" ] && ! kill -0 "$holder_pid" 2>/dev/null; then
+    rm -rf "$lock"; continue
+  fi
+  [ "$waited" -gt 0 ] || echo "flow gate: waiting for the gate held by ${holder% *}" >&2
+  [ "$waited" -lt 7200 ] || die "the gate lock is held by ${holder% *} for over two hours; remove $lock when that gate is gone"
+  sleep 15; waited=$((waited + 15))
+done
+echo "$target ${commit:0:12} $$ $(now_utc)" >"$lock/holder"
+trap 'rm -rf "$lock"' EXIT
+
+if [ -n "$journeys" ] && [ -n "$port_var" ] && [ -z "${!port_var:-}" ]; then
+  from=${port_range%-*} to=${port_range#*-}
+  for p in $(seq "$from" "$to"); do
+    if ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then export "$port_var=$p"; break; fi
+  done
+  [ -n "${!port_var:-}" ] || die "no free port from $from to $to for the journey tests"
+  echo "flow gate: journeys on $port_var=${!port_var}" >&2
 fi
 
 # The diff class, from the path lists of docs/agents/dev-loop.md.

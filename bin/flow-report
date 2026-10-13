@@ -23,7 +23,7 @@ esac
 
 if [ "$mode" = ask ]; then
   [ $# -ge 1 ] || die "usage: flow ask [--conflict] <question>"
-  line="$kind from $FLOW_RUN ($FLOW_STEP $FLOW_TARGET): $* Reply with: herdr agent prompt $FLOW_RUN \"<answer>\""
+  line="$kind from $FLOW_RUN ($FLOW_STEP $FLOW_TARGET): $* Reply with: flow answer $FLOW_RUN \"<answer>\""
 else
   [ $# -ge 1 ] && [ $# -le 2 ] || die "usage: flow report <outcome> [<artifact link>]"
   session=$(herdr agent get "${HERDR_PANE_ID:-$FLOW_RUN}" 2>/dev/null | jq -r '.result.agent.agent_session.value // empty' || true)

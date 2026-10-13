@@ -57,7 +57,7 @@ Each stage's header (role, input, output, quality bar, tools) is in `FLOW.md`; a
 
 - **Start** a step with `flow spawn <step> <owner>/<repo>#<issue>` (`<owner>/<repo>` for an audit or retro step). `--note` carries what the step cannot find from its target; `--cwd` starts it in a worktree. It returns at once; `spawn: <step> <target> <run> started|blocked|failed ...` arrives in your pane. On `blocked`, answer the harness prompt in the tab it names.
 - **Arm the tick** with `flow tick arm` at your first spawn; `flow tick disarm` when the session ends with nothing in flight.
-- **A question** arrives as `question from <run> ...`. Answer with `herdr agent prompt <run> "<answer>"`.
+- **A question** arrives as `question from <run> ...`. Answer with `flow answer <run> "<answer>"`.
   Technical questions you answer yourself.
   A question only the client can answer goes into a request, and the session waits; tell it so.
 - **A conflict exit** arrives as `conflict exit from <run> ...`: the ticket, its tests or the spec disagree, or the session hit a decision its ticket lacks or a hard-to-reverse thing its ticket did not name. Decide which side is right and answer, or re-triage the ticket onto a path that settles it; a disagreement about behaviour the client decided goes into a request.

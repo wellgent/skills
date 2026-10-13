@@ -42,6 +42,8 @@ Running the app belongs to QA.
      "Find defects in this diff. Read each changed hunk together with the code it calls and the code that calls it. Cover wrong results, states and inputs the code does not handle, failures swallowed or reported as success, who may call each changed public operation and whose records it touches, and writes that can be left half done. Report a defect only when you can state its failure scenario: the concrete input or state, the path through the code, and the wrong result. Per finding: file, line, failure scenario."
    - **Lenses**: for each Review lens whose trigger matches the diff, one subagent that runs the named skill on the matching files and reports in the same form.
 
+   On a fix run every pass takes the fix diff, the spec source for `code-review` is the findings' tickets with the spec lines they cite, and a lens runs only on a file the fix diff touches beyond the findings' files.
+
 4. **Check the contract tests** yourself.
    For every example in the behavioural contracts of the design record or design note, find the test that exercises it.
    - The example has a test.
@@ -58,6 +60,7 @@ Running the app belongs to QA.
 
    On a fix run, also confirm for each blocking ticket of the previous run that the fix diff resolves it.
    An unresolved one stays blocking under its existing ticket.
+   The classification is yours; `flow ask` carries a tip mismatch, or a disagreement between a contract example, an ADR and the ticket that these rules leave open.
 
 6. **File one ticket per finding** on the project tracker, per the project's tracker doc.
    The body carries the axis, `<file>:<line>`, the failure scenario and the spec line or rule it rests on.
@@ -65,7 +68,7 @@ Running the app belongs to QA.
    A filed finding stands alone for the lead's triage, names the target it was found in, and says whether the diff introduced it.
 
 7. **Post the findings.**
-   Fill `templates/artifacts/review-findings.md` from this repository and post it as one comment on the target issue.
+   Fill `$FLOW_HOME/templates/artifacts/review-findings.md` and post it as one comment on the target issue.
    The run number is one more than the Review findings comments already there.
 
 8. **Report.**

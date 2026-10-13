@@ -4,7 +4,8 @@
 
 ## Rules for every session
 
-- **Check before report.** A session that changes files has `<check command>` green on its branch tip before it reports or merges a branch: run it yourself on that commit and quote its result.
+- **Check before report.** A session that changes files has `<check command>` green on its branch tip before it reports: run it yourself on that commit and quote its result.
+  A subagent inside the session proves its diff with the lint, the typecheck and the test files the diff touches; the session's one full check covers every branch it merges.
   A session that changes no file runs no check.
 - **Conflict exit.** Stop work on a ticket and report to the session that started you when the ticket, its tests or the spec disagree (say what disagrees with what), when the ticket needs a decision it does not hold, or when the work touches a hard-to-reverse thing the ticket does not name: stored-data shape or a migration, an external contract, money, authorization, a production delete.
   Size is never a reason. A conflict exit is a correct outcome, and the reply settles what changes.

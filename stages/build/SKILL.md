@@ -18,6 +18,8 @@ The header above is this stage's entry in `FLOW.md`; terms are in `GLOSSARY.md`,
 
 `implement-spec`, `implement`, `tdd`, `code-review` and `diagnosing-bugs` are pinned in the project; when the harness does not list one, read its `SKILL.md` from the project's skills directory and follow it as written.
 The project's `AGENTS.md` carries the rules every implementer works under: check before report, the conflict exit, the test tiers and the must-read list.
+An implementer subagent proves its tickets with the lint, the typecheck and the test files its diff touches; the full check runs once per run, in [Before reporting](#before-reporting).
+A subagent's end arrives as the harness's task notification, which is what the session waits on.
 This skill adds only what the flow needs around them.
 
 ## Pick the run
@@ -59,6 +61,7 @@ Work in the worktree the newest Build run comment names, and note the tip the ru
 1. Fix what the note names:
    - **Finding tickets**: one implementer fixes every ticket the note names, with `tdd`.
      A finding that carries a failing repro test names the test's commit: cherry-pick it onto the branch, and the finding is fixed when that test passes unchanged.
+     A finding whose steps ran on a deployment is fixed when those steps, replayed on the worktree's deployment, give the expected answers.
    - **A failing check**: fix the cause in the code.
    - **Gate flags**: each flag names a file and line.
      Restore the test, check setting or line the flag points at, or give it what the lead's note says it lacks.
@@ -88,12 +91,12 @@ Every other question an implementer cannot settle from the ticket, the spec, the
 ## Before reporting
 
 1. The branch tip holds every ticket of the run, apart from tickets the lead took out.
-   A run that changed files has the project's check command green on its tip; a run that changed none runs no check.
+   A run that changed files has the project's check command green on its final tip, run once after its own review's fixes landed; a run that changed none runs no check.
 2. Push the branch.
    Landing is the lead's: the main branch stays untouched.
 3. Post one comment on the target issue, headed "Build run":
    - the branch, its tip commit and the worktree path;
    - `tickets=<n>`, the number of tickets merged in this run, with their links, and each ticket taken out of the run with the lead's reason;
    - each test removed, skipped or weakened, each check setting loosened and each inline suppression added, with the ticket that asked for it;
-   - on a fix run, each finding its own review confirmed and the commit that fixed it, and each source-of-truth sentence it edited.
+   - on a fix run, each finding its own review confirmed and the commit that fixed it, each source-of-truth sentence it edited, and each deployment step replayed with its answer.
 4. End the session with `flow report done <link to the comment>`.

@@ -60,30 +60,51 @@ start_once() {
       *'"timeout"'*|*agent_name_not_found*)
         # herdr waits for an agent ready for input; one that went straight to work on its start
         # prompt runs past that wait, and herdr then reports the name unknown or times out.
-        # The session is up when the pane holds the harness: name it and carry on.
-        if [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent // empty')" = "$harness" ]; then
-          [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.name // empty')" = "$run" ] ||
-            herdr agent rename "$pane" "$run" >/dev/null 2>&1 || true
-          return 0
-        fi
-        reason="no agent in pane $pane after the wait: $(echo "$out" | head -1)"; return 1 ;;
+        # The session is up when the pane holds the harness, which a slow start on a loaded host
+        # reaches after the wait: poll for it, then name it and carry on.
+        local waited=0
+        while [ "$waited" -le 90 ]; do
+          if [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent // empty')" = "$harness" ]; then
+            [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.name // empty')" = "$run" ] ||
+              herdr agent rename "$pane" "$run" >/dev/null 2>&1 || true
+            return 0
+          fi
+          sleep 5; waited=$((waited + 5))
+        done
+        reason="no agent in pane $pane 90 s after the wait: $(echo "$out" | head -1)"; return 1 ;;
       *) reason="could not start $harness in pane $pane: $(echo "$out" | head -3)"; return 1 ;;
     esac
   done
   reason="pane $pane stayed busy"; return 1
 }
 
+# tab_gone: is the tab closed? herdr answers a missing tab with an error object.
+tab_gone() {
+  local out
+  out=$(herdr tab get "$tab" 2>&1) || return 0
+  case $out in *'"error"'*) return 0 ;; *) return 1 ;; esac
+}
+
 # start_session: starts the step in its tab, once more in a fresh tab when the first pane holds no
-# agent after the wait. Sets outcome (started, blocked, failed), line and the record's pane.
+# agent after the wait and that tab is closed; a tab that stays open holds a session the ledger
+# must not lose, so no second one is started. Sets outcome (started, blocked, failed), line and
+# the record's pane.
 start_session() {
-  local code=0
+  local code=0 tries=0
   start_once || code=$?
   if [ "$code" -eq 1 ]; then
     echo "flow spawn: $reason; closing tab $tab and starting once more" >&2
-    herdr tab close "$tab" >/dev/null 2>&1 || true
-    new_tab
-    code=0
-    start_once || code=$?
+    until tab_gone || [ "$tries" -ge 6 ]; do
+      herdr tab close "$tab" >/dev/null 2>&1 || true
+      sleep 2; tries=$((tries + 1))
+    done
+    if tab_gone; then
+      new_tab
+      code=0
+      start_once || code=$?
+    else
+      reason="$reason; tab $tab stayed open, so no second session was started: read it with herdr pane read $pane"
+    fi
   fi
   case $code in
     0) outcome=started; line="spawn: $step $target $run started (pane $pane)" ;;

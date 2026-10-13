@@ -37,6 +37,10 @@ Lead commands:
         scanner pass and append the health check row, reported to the lead's pane as
         health: <target> <commit> appended|failed|skipped.
         Exit 3 when the main branch moved and the gate must run again.
+  answer <run> <text>
+        Deliver a reply to a step waiting on flow ask: on a refused prompt it sends
+        Escape to the step's pane, which ends a wait inside a shell command, and
+        prompts again. Prints answer: <run> delivered | failed: <reason>.
   tick arm|disarm|run [<lead>]
         Manage or run the crontab entry that every 30 minutes reports stalled
         sessions and new request comments to the lead, then nudges it.
@@ -74,7 +78,7 @@ USAGE
 cmd=${1:-help}
 [ $# -gt 0 ] && shift
 case $cmd in
-  spawn|gate|land|tick|protected|report|cost|ledger|status|sources|ready|trust) exec "$FLOW_BIN/flow-$cmd" "$@" ;;
+  spawn|gate|land|tick|protected|report|cost|ledger|status|sources|ready|trust|answer) exec "$FLOW_BIN/flow-$cmd" "$@" ;;
   ask) exec "$FLOW_BIN/flow-report" --ask "$@" ;;
   help|-h|--help) usage ;;
   *) usage >&2; exit 64 ;;

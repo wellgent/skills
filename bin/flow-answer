@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# flow answer <run> <text>
+# Delivers the lead's reply to a step waiting on flow ask. A step waiting inside a shell command
+# reads as not ready to herdr and refuses the prompt; an Escape to its pane ends that wait and
+# the prompt then lands, prefixed so the session knows its wait was cut. Prints
+#   answer: <run> delivered | failed: <reason>
+set -euo pipefail
+. "$FLOW_BIN/lib.sh"
+need herdr jq
+
+run=${1:-}
+[ -n "$run" ] && [ $# -ge 2 ] || die "usage: flow answer <run> <text>"
+shift
+text=$*
+
+record="$(state_dir)/runs/$run.json"
+pane=
+[ ! -f "$record" ] || pane=$(jq -r '.pane // empty' "$record")
+[ -n "$pane" ] || pane=$(herdr agent get "$run" 2>/dev/null | jq -r '.result.agent.pane_id // empty' || true)
+
+out= cut=
+for attempt in 1 2 3 4 5 6; do
+  if out=$(herdr agent prompt "$run" "${cut:+Reply from the lead (your wait was interrupted to deliver it): }$text" 2>&1); then
+    echo "answer: $run delivered${cut:+ after an Escape to pane $pane}"
+    exit 0
+  fi
+  case $out in
+    *agent_not_ready*)
+      [ -z "$pane" ] || { herdr pane send-keys "$pane" Escape >/dev/null 2>&1 && cut=1; }
+      sleep 4 ;;
+    *) sleep 5 ;;
+  esac
+done
+echo "answer: $run failed: $(echo "$out" | head -1)" >&2
+exit 1

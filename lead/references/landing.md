@@ -32,7 +32,7 @@ After every run-end report: append the row (`flow ledger run`), read the artifac
 
 Skipped only on `prose-only`: `flow ledger stage review <target> skipped --reason "diff class prose-only"`.
 
-1. `flow spawn review <target> --cwd <the worktree>`.
+1. `flow spawn review <target> --cwd <the worktree>`; after a rebase since the Build run comment, `--note` names the tip and the gate result path.
 2. Blocking findings (correctness, a spec gap, a breach of a documented standard) are tickets under the target.
    `flow spawn build <target>` with `--note` naming them; the fix run reviews its own diff before it reports.
    Then the gate, then `flow spawn review <target> --cwd <the worktree> --note "fix diff from <base commit>"`.

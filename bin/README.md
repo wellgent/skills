@@ -40,14 +40,14 @@ The lead is `FLOW_LEAD` inside a spawned step, the calling pane (`HERDR_PANE_ID`
 
 A session talks to the lead with two commands:
 
-- `flow ask "<question>"`, or `flow ask --conflict "<what disagrees>"` for a conflict exit. The lead answers with `herdr agent prompt <session name> "<answer>"`, and the session waits for that message.
+- `flow ask "<question>"`, or `flow ask --conflict "<what disagrees>"` for a conflict exit. The lead answers with `flow answer <session name> "<answer>"`, and the session waits for that message.
 - `flow report <outcome> <artifact link>` as its last act. The lead receives `run-end: <step> <target> <outcome> <link> <session id> (<session name>)`.
 
 How the start can go, each reported in the `spawn:` line:
 
-- The harness runs and took its start prompt: `started`. A session that goes straight to work runs past herdr's readiness wait, so herdr reports a timeout or an unknown name; `flow spawn` sees the harness in the pane, names it and reports `started`.
+- The harness runs and took its start prompt: `started`. A session that goes straight to work runs past herdr's readiness wait, so herdr reports a timeout or an unknown name; `flow spawn` polls the pane for up to 90 s more, sees the harness, names it and reports `started`.
 - The harness waits on a startup prompt of its own, such as folder trust: `blocked`. The start prompt is kept and runs once the prompt is answered in the tab. Each harness asks for folder trust once per repository per host (`flow trust` writes it); a worktree of a trusted checkout starts without it.
-- The pane holds no agent after the wait: `flow spawn` closes the tab and starts once more in a fresh one; a second miss is `failed` with the reason, and the record carries it.
+- The pane holds no agent after the wait: `flow spawn` closes the tab and, once it is gone, starts once more in a fresh one; a second miss is `failed` with the reason, and the record carries it. A tab that stays open holds a session, so no second one is started and the reason says which pane to read.
 
 `--model <id>` and `--effort <level>` override the step's config entry for this run.
 The spawn record under `$FLOW_STATE/runs/<run>.json` carries the model, effort, pane, tab and how the start went; `flow ledger run` reads it.
@@ -55,6 +55,7 @@ The spawn record under `$FLOW_STATE/runs/<run>.json` carries the model, effort, 
 ## What the gate reads
 
 `flow gate` and `flow land` run in the directory where the target's branch is checked out, with a clean working tree.
+`flow gate` holds one lock per repository while its checks run, so a second gate waits (a lock whose holder process is gone is taken over), and when `docs/agents/dev-loop.md` has a "- **Journeys port:** `<variable>` `<from>-<to>`" line it exports a free port of that range in that variable for the journey tests.
 The gate reads five lines from the project's `docs/agents/dev-loop.md`:
 
 ```markdown
