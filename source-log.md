@@ -20,8 +20,8 @@ A source the flow starts to depend on gets a section here in the same change.
 ## pbakaus/impeccable
 
 - **Upstream:** `git:pbakaus/impeccable:skill`
-- **Seen:** `d631a8827f99414d2b6daba4ef08b7f8701751d7`, 2026-10-11
-- **Pin:** `d631a8827f99414d2b6daba4ef08b7f8701751d7`
+- **Seen:** `44c00a2a28f7cf3e48acec7f1950e71f7bcf8b65`, 2026-10-13
+- **Pin:** `44c00a2a28f7cf3e48acec7f1950e71f7bcf8b65`
 - **Used by:** UX design (`impeccable`), and the design scanner line of `docs/agents/dev-loop.md`.
 
 ## vercel-labs/agent-skills
@@ -48,8 +48,8 @@ A source the flow starts to depend on gets a section here in the same change.
 ## upstash/context7
 
 - **Upstream:** `git:upstash/context7:skills`
-- **Seen:** `2c0f36202a06683d4a8fe2fc829098ff640cecfb`, 2026-10-11
-- **Pin:** `2c0f36202a06683d4a8fe2fc829098ff640cecfb`
+- **Seen:** `615e72b018f2254d32bf49b5eff55d0e61a5cce5`, 2026-10-13
+- **Pin:** `615e72b018f2254d32bf49b5eff55d0e61a5cce5`
 - **Used by:** the web catalog's `find-docs` must-read entry.
 
 ## vercel-labs/agent-browser
@@ -105,13 +105,13 @@ A source the flow starts to depend on gets a section here in the same change.
 ## oxlint
 
 - **Upstream:** `npm:oxlint`
-- **Seen:** `1.87.0`, 2026-10-05
+- **Seen:** `1.88.0`, 2026-10-13
 - **Used by:** the check command.
 
 ## oxfmt
 
 - **Upstream:** `npm:oxfmt`
-- **Seen:** `0.72.0`, 2026-10-05
+- **Seen:** `0.73.0`, 2026-10-13
 - **Used by:** the check command.
 
 ## @nkzw/oxlint-config
@@ -123,7 +123,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## dependency-cruiser
 
 - **Upstream:** `npm:dependency-cruiser`
-- **Seen:** `18.5.0`, 2026-10-05
+- **Seen:** `18.6.0`, 2026-10-13
 - **Used by:** the check command's dependency rules and the scanner pass.
 
 ## jscpd
@@ -135,7 +135,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## react-doctor
 
 - **Upstream:** `npm:react-doctor`
-- **Seen:** `0.9.17`, 2026-10-05
+- **Seen:** `0.9.18`, 2026-10-13
 - **Used by:** the scanner pass's `react_doctor` measure.
 
 ## TypeScript
@@ -147,7 +147,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## Vitest
 
 - **Upstream:** `npm:vitest`
-- **Seen:** `5.0.3`, 2026-10-05
+- **Seen:** `5.0.4`, 2026-10-13
 - **Used by:** the check command's tests.
 
 ## Next.js
