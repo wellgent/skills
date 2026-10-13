@@ -12,7 +12,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## mattpocock/skills
 
 - **Upstream:** `release:mattpocock/skills`
-- **Seen:** `v1.3.1`, 2026-10-05
+- **Seen:** `v1.3.1`, 2026-10-13
 - **Pin:** `24fe0ef7737efae15c87225755e9f6f5965e4888`
 - **Used by:** the lead (`wayfinder`, `grilling`, `research`, `triage`, `to-spec`, `retro`, `writing-for-agents`), Grooming (`to-tickets`), System design (`codebase-design`, `domain-modeling`), UX design (`prototype`), Build (`implement-spec`, `implement`, `tdd`, `code-review`, `diagnosing-bugs`), Review (`code-review`), Audit (`improve-codebase-architecture`). The required sets are in `setup/requires.json`.
 - **Skipped:** `pr`: the flow lands by fast-forward, without pull requests.
@@ -27,21 +27,21 @@ A source the flow starts to depend on gets a section here in the same change.
 ## vercel-labs/agent-skills
 
 - **Upstream:** `git:vercel-labs/agent-skills:skills`
-- **Seen:** `0c04547b953d49d5e91f512a7c4a6ecfcb3a7055`, 2026-10-05
+- **Seen:** `0c04547b953d49d5e91f512a7c4a6ecfcb3a7055`, 2026-10-13
 - **Pin:** `0c04547b953d49d5e91f512a7c4a6ecfcb3a7055`
 - **Used by:** the web catalog's Review and Audit lenses and the Vercel CLI skill.
 
 ## vercel/next.js
 
 - **Upstream:** `git:vercel/next.js:skills`
-- **Seen:** `5f0b8deb3d416c5480ac86de8adc45ba8e22c870`, 2026-10-11
+- **Seen:** `5f0b8deb3d416c5480ac86de8adc45ba8e22c870`, 2026-10-13
 - **Pin:** `5f0b8deb3d416c5480ac86de8adc45ba8e22c870`
 - **Used by:** the web catalog's `next-dev-loop` QA tool and the situational Next.js skills.
 
 ## get-convex/agent-skills
 
 - **Upstream:** `git:get-convex/agent-skills:skills`
-- **Seen:** `2cfe645c87f971242cfc8ef3eb53662cbec26a53`, 2026-10-05
+- **Seen:** `2cfe645c87f971242cfc8ef3eb53662cbec26a53`, 2026-10-13
 - **Pin:** `2cfe645c87f971242cfc8ef3eb53662cbec26a53`
 - **Used by:** the web catalog's Convex must-read entries and Review lens.
 
@@ -55,51 +55,51 @@ A source the flow starts to depend on gets a section here in the same change.
 ## vercel-labs/agent-browser
 
 - **Upstream:** `git:vercel-labs/agent-browser:skills`
-- **Seen:** `021d9255e543d2f1ab66b87f338d85c3d7a910be`, 2026-10-05
+- **Seen:** `021d9255e543d2f1ab66b87f338d85c3d7a910be`, 2026-10-13
 - **Pin:** `021d9255e543d2f1ab66b87f338d85c3d7a910be`
 - **Used by:** the web catalog's `agent-browser` QA tool (the skill stub; the CLI is its own source below).
 
 ## Claude Code
 
 - **Upstream:** `npm:@anthropic-ai/claude-code`
-- **Seen:** `2.1.296`, 2026-10-11
+- **Seen:** `2.1.296`, 2026-10-13
 - **Used by:** the harness of every `claude-*` step and of the lead. Read its release notes for new native controls in a stage's area.
 - **Skipped:** the per-subagent `effort` setting on the Agent tool (2.1.292): every Claude step takes its effort from the flow config and its subagents inherit it (client, jarospm/jbrain#693).
 
 ## Codex
 
 - **Upstream:** `npm:@openai/codex`
-- **Seen:** `0.162.1`, 2026-10-11
+- **Seen:** `0.162.1`, 2026-10-13
 - **Used by:** the harness of every `gpt-*` step. Read its release notes the same way.
 
 ## herdr
 
 - **Upstream:** `brew:herdr`
-- **Seen:** `0.9.3`, 2026-10-05
+- **Seen:** `0.9.3`, 2026-10-13
 - **Used by:** `flow spawn`, `flow report`, `flow ask` and `flow tick`.
 
 ## skills CLI
 
 - **Upstream:** `npm:skills`
-- **Seen:** `1.7.2`, 2026-10-11
+- **Seen:** `1.7.2`, 2026-10-13
 - **Used by:** the setup skills' pins (`npx skills add <source>#<sha>`).
 
 ## agent-browser CLI
 
 - **Upstream:** `npm:agent-browser`
-- **Seen:** `0.39.0`, 2026-10-11
+- **Seen:** `0.39.0`, 2026-10-13
 - **Used by:** QA's exploratory pass.
 
 ## Playwright
 
 - **Upstream:** `npm:@playwright/test`
-- **Seen:** `1.64.0`, 2026-10-11
+- **Seen:** `1.64.0`, 2026-10-13
 - **Used by:** the journey tests.
 
 ## knip
 
 - **Upstream:** `npm:knip`
-- **Seen:** `6.41.0`, 2026-10-11
+- **Seen:** `6.41.0`, 2026-10-13
 - **Used by:** the check command and the scanner pass.
 
 ## oxlint
@@ -117,7 +117,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## @nkzw/oxlint-config
 
 - **Upstream:** `npm:@nkzw/oxlint-config`
-- **Seen:** `2.0.1`, 2026-10-05
+- **Seen:** `2.0.1`, 2026-10-13
 - **Used by:** the lint preset.
 
 ## dependency-cruiser
@@ -129,7 +129,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## jscpd
 
 - **Upstream:** `npm:jscpd`
-- **Seen:** `5.4.1`, 2026-10-11
+- **Seen:** `5.4.1`, 2026-10-13
 - **Used by:** the scanner pass's duplication measures.
 
 ## react-doctor
@@ -141,7 +141,7 @@ A source the flow starts to depend on gets a section here in the same change.
 ## TypeScript
 
 - **Upstream:** `npm:typescript`
-- **Seen:** `7.0.2`, 2026-10-05
+- **Seen:** `7.0.2`, 2026-10-13
 - **Used by:** the check command.
 
 ## Vitest
@@ -153,53 +153,53 @@ A source the flow starts to depend on gets a section here in the same change.
 ## Next.js
 
 - **Upstream:** `npm:next`
-- **Seen:** `16.4.0`, 2026-10-11
+- **Seen:** `16.4.0`, 2026-10-13
 - **Used by:** the web doctrine's framework stance and its bundled agent docs.
 
 ## Convex
 
 - **Upstream:** `npm:convex`
-- **Seen:** `1.46.0`, 2026-10-05
+- **Seen:** `1.46.0`, 2026-10-13
 - **Used by:** the web doctrine's data layer, the worktree and prototype recipes, and the guidelines file a toolchain sweep refreshes.
 
 ## @convex-dev/eslint-plugin
 
 - **Upstream:** `npm:@convex-dev/eslint-plugin`
-- **Seen:** `5.0.0`, 2026-10-05
+- **Seen:** `5.0.0`, 2026-10-13
 - **Used by:** the Convex lint rules inside the check command.
 
 ## @convex-dev/migrations
 
 - **Upstream:** `npm:@convex-dev/migrations`
-- **Seen:** `0.3.7`, 2026-10-11
+- **Seen:** `0.3.7`, 2026-10-13
 - **Used by:** production migrations and their `dryRun`.
 
 ## convex-test
 
 - **Upstream:** `npm:convex-test`
-- **Seen:** `0.0.61`, 2026-10-11
+- **Seen:** `0.0.61`, 2026-10-13
 - **Used by:** the Convex seam tests.
 
 ## Vercel CLI
 
 - **Upstream:** `npm:vercel`
-- **Seen:** `63.1.2`, 2026-10-11
+- **Seen:** `63.1.2`, 2026-10-13
 - **Used by:** Release and the prototype deploy.
 
 ## Vercel changelog
 
 - **Upstream:** `url:https://vercel.com/changelog`
-- **Seen:** `2026-10-11`, 2026-10-11
+- **Seen:** `2026-10-13`, 2026-10-13
 - **Used by:** new platform tools in the Review, QA and Release areas.
 
 ## Claude API pricing
 
 - **Upstream:** `url:https://platform.claude.com/docs/en/about-claude/pricing`
-- **Seen:** `2026-10-11`, 2026-10-11
+- **Seen:** `2026-10-13`, 2026-10-13
 - **Used by:** `ledger/prices.json`. A new model id needs a price entry before its runs can be costed.
 
 ## OpenAI API pricing
 
 - **Upstream:** `url:https://developers.openai.com/api/docs/pricing`
-- **Seen:** `2026-10-11`, 2026-10-11
+- **Seen:** `2026-10-13`, 2026-10-13
 - **Used by:** `ledger/prices.json`, the same way.
