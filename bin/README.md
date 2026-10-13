@@ -45,9 +45,11 @@ A session talks to the lead with two commands:
 
 How the start can go, each reported in the `spawn:` line:
 
-- The harness runs and took its start prompt: `started`. A session that goes straight to work runs past herdr's readiness wait, so herdr reports a timeout or an unknown name; `flow spawn` polls the pane for up to 90 s more, sees the harness, names it and reports `started`.
+- The harness runs and took its start prompt: `started`. A session that goes straight to work runs past herdr's readiness wait, so herdr reports a timeout or an unknown name; `flow spawn` polls the pane for up to 90 s more, sees the harness, names it and reports `started`. herdr's agent detection can miss such a session on a loaded host, so the session also counts as seen when the run has sent its run-end report (`flow report` leaves `<run>.reported` beside the spawn record) or a question, or when `herdr pane process-info` shows the harness in the pane.
 - The harness waits on a startup prompt of its own, such as folder trust: `blocked`. The start prompt is kept and runs once the prompt is answered in the tab. Each harness asks for folder trust once per repository per host (`flow trust` writes it); a worktree of a trusted checkout starts without it.
-- The pane holds no agent after the wait: `flow spawn` closes the tab and, once it is gone, starts once more in a fresh one; a second miss is `failed` with the reason, and the record carries it. A tab that stays open holds a session, so no second one is started and the reason says which pane to read.
+- The pane holds no agent after the wait and no session of the run was seen: `flow spawn` closes the tab and, once it is gone, starts once more in a fresh one; a second miss is `failed` with the reason, and the record carries it. A tab that stays open holds a session, so no second one is started and the reason says which pane to read.
+
+`bash tests/flow-spawn-second-session.sh` replays these starts against a fake herdr.
 
 `--model <id>` and `--effort <level>` override the step's config entry for this run.
 The spawn record under `$FLOW_STATE/runs/<run>.json` carries the model, effort, pane, tab and how the start went; `flow ledger run` reads it.

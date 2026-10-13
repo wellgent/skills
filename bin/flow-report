@@ -32,9 +32,11 @@ fi
 
 tell_lead "$FLOW_LEAD" "$line" || exit 1
 echo "sent to $FLOW_LEAD: $line"
+mkdir -p "$(state_dir)/runs"
+# flow spawn reads this as proof the run's session started, and starts no second one.
+[ "$mode" = ask ] || touch "$(state_dir)/runs/$FLOW_RUN.reported"
 if [ "$mode" = ask ]; then
   # flow ledger counts these lines into the run's row.
-  mkdir -p "$(state_dir)/runs"
   echo "$(now_utc) $kind" >>"$(state_dir)/runs/$FLOW_RUN.events"
   echo "Wait for the lead's reply in this session before continuing."
 fi

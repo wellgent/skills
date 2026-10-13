@@ -63,19 +63,29 @@ start_once() {
         # The session is up when the pane holds the harness, which a slow start on a loaded host
         # reaches after the wait: poll for it, then name it and carry on.
         local waited=0
-        while [ "$waited" -le 90 ]; do
-          if [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent // empty')" = "$harness" ]; then
+        while [ "$waited" -le "${FLOW_SPAWN_POLL_SECONDS:-90}" ]; do
+          if [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent // empty')" = "$harness" ] || session_seen; then
             [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.name // empty')" = "$run" ] ||
               herdr agent rename "$pane" "$run" >/dev/null 2>&1 || true
             return 0
           fi
           sleep 5; waited=$((waited + 5))
         done
-        reason="no agent in pane $pane 90 s after the wait: $(echo "$out" | head -1)"; return 1 ;;
+        reason="no agent in pane $pane ${FLOW_SPAWN_POLL_SECONDS:-90} s after the wait: $(echo "$out" | head -1)"; return 1 ;;
       *) reason="could not start $harness in pane $pane: $(echo "$out" | head -3)"; return 1 ;;
     esac
   done
   reason="pane $pane stayed busy"; return 1
+}
+
+# session_seen: did a session of this run start, though herdr never named it? herdr's agent
+# detection can miss a session that went straight to work on a loaded host. The run has then sent
+# a run-end report or a question, or the harness runs in its pane.
+session_seen() {
+  if [ -f "$runs/$run.reported" ] || [ -f "$runs/$run.events" ]; then return 0; fi
+  herdr pane process-info --pane "$pane" 2>/dev/null |
+    jq -e --arg h "$harness" '[.result.process_info.foreground_processes[]?
+      | [.argv0, (.argv // [])[]] | .[] | strings | split("/") | last] | index($h) != null' >/dev/null
 }
 
 # tab_gone: is the tab closed? herdr answers a missing tab with an error object.
@@ -86,12 +96,16 @@ tab_gone() {
 }
 
 # start_session: starts the step in its tab, once more in a fresh tab when the first pane holds no
-# agent after the wait and that tab is closed; a tab that stays open holds a session the ledger
-# must not lose, so no second one is started. Sets outcome (started, blocked, failed), line and
-# the record's pane.
+# agent after the wait, no session of the run was seen there, and that tab is closed; a tab that
+# stays open holds a session the ledger must not lose, so no second one is started. Sets outcome
+# (started, blocked, failed), line and the record's pane.
 start_session() {
   local code=0 tries=0
   start_once || code=$?
+  if [ "$code" -eq 1 ] && session_seen; then
+    echo "flow spawn: $reason; a session of $run started in pane $pane, so no second one is started" >&2
+    code=0
+  fi
   if [ "$code" -eq 1 ]; then
     echo "flow spawn: $reason; closing tab $tab and starting once more" >&2
     until tab_gone || [ "$tries" -ge 6 ]; do
