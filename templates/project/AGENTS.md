@@ -20,3 +20,5 @@ Read each file when its trigger matches your work, before you write code.
 - [DESIGN.md](DESIGN.md): the design system and the kit map.
 - [docs/agents/dev-loop.md](docs/agents/dev-loop.md): the check command, CI, running the app, worktrees and the critical journeys.
 - `.agents/playbooks/`: this project's playbooks extending pstack's bundled ones.
+
+@~/.claude/pstack-models.md

@@ -20,8 +20,10 @@ This skill names no stack: the project's stack setup writes everything stack-spe
 - `claude plugin marketplace list` names `pstack-claude`; otherwise `claude plugin marketplace add michael-denyer/pstack-claude`. A host managed from a dotfiles repo declares it there.
 - `claude plugin install pstack@pstack-claude -s project` in the checkout, and `.claude/settings.json` is committed. Project scope only, so a brain session keeps its own skills.
 - The version moves only through `claude plugin update pstack@pstack-claude`, run on purpose: read the port's `CHANGES.md` between the two versions first, then run `node <plugin root>/skills/poteto-mode/scripts/check-playbooks.mjs` in the checkout and fix every project playbook it flags in the same commit.
-- `~/.claude/pstack-models.md` exists on the host and `~/.claude/CLAUDE.md` includes it. Values are family names with an effort suffix (`fable @xhigh`); the `Agent` tool rejects a full `claude-*` id.
-- `claude` has been started once in the checkout and its folder trust prompt accepted, so an unattended start is not held by it.
+- Every host that runs the project has `claude plugin install pstack@pstack-claude -s project` run once in its own checkout; the committed setting alone downloads nothing.
+- The host has `gh` signed in, Bun (pstack's `watch-pr` and `orch` scripts) and `plugin-dev@claude-plugins-official` at user scope (the skill-authoring guidance pstack's `reflect`, `automate-me` and skill-authoring playbook hand work to). A host managed from a dotfiles repo declares the plugin there.
+- `~/.claude/pstack-models.md` exists on the host, and the project's `AGENTS.md` ends with the line `@~/.claude/pstack-models.md`, so the sheet loads in the project's sessions only. Values are family names with an effort suffix (`fable @xhigh`); the `Agent` tool rejects a full `claude-*` id.
+- `claude` has been started once in the checkout and its folder trust prompt and its prompt for the external include accepted, so an unattended start is not held by either. Unattended, both are the checkout's `hasTrustDialogAccepted` and `hasClaudeMdExternalIncludesApproved` set to `true` under `projects` in `~/.claude.json`, written while no session of that checkout runs.
 
 ## 3. Skills
 
