@@ -32,7 +32,7 @@ When a skill asks for a category and neither `defect` nor `change` fits, apply `
 Triage labels record *whether the issue is real and who acts next*.
 Both apply to the same issue without conflict: a wayfinder child ticket can carry `wayfinder:task`, `effort` and `ready-for-agent` at once.
 
-`run` marks a run request for `/operate`, assigned to the requester while a note or a question waits for them.
+`run` marks a run request for `/operate`, assigned to the requester while a call or a checked note waits for them.
 
 Triage is the entry path for ad-hoc issues that arrive outside a map.
 Wayfinder children are already scoped by the map, so they need triage only when their state is in question.

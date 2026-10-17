@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# watch <request issue> [<after comment id>]
+# Run from the brain's checkout. Waits for the next comment on the run request after the given
+# comment (default: the newest one now), then prints every newer comment and exits 0, so the
+# operator session that started it in the background reads what the run posted.
+# Exit 3 when the run's herdr session is gone with no new comment, 1 on an error.
+set -euo pipefail
+die() { echo "watch: $*" >&2; exit 1; }
+for tool in gh jq herdr; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+
+issue=${1:?usage: watch <request issue> [<after comment id>]}
+issue=${issue##*/}
+case $issue in *[!0-9]*|"") die "issue must be a number or an issue URL, got: $1" ;; esac
+interval=${WATCH_INTERVAL:-60}
+
+comments() { gh issue view "$issue" --json comments --jq '[.comments[] | {id: (.url | sub(".*issuecomment-"; "") | tonumber), author: .author.login, at: .createdAt, url, body}]'; }
+after=${2:-$(comments | jq 'map(.id) | max // 0')}
+
+# The session name follows start: op-<repo>-<issue>, cut to herdr's 32 characters.
+repo=$(gh issue view "$issue" --json body --jq '.body' | sed -n 's/^- \*\*Repo:\*\* *\([^ ]*\).*/\1/p' | head -1)
+[ -n "$repo" ] || die "request $issue names no repo"
+name=${repo##*/}
+session="op-${name:0:$((28 - ${#issue}))}-$issue"
+
+while :; do
+  new=$(comments | jq --argjson after "$after" '[.[] | select(.id > $after)]')
+  if [ "$(jq length <<<"$new")" -gt 0 ]; then
+    jq -r '.[] | "=== comment \(.id) by \(.author) at \(.at) \(.url)\n\(.body)\n"' <<<"$new"
+    exit 0
+  fi
+  if ! herdr agent get "$session" >/dev/null 2>&1; then
+    echo "watch: $session is gone and request $issue has no comment after $after" >&2
+    exit 3
+  fi
+  sleep "$interval"
+done
