@@ -29,7 +29,7 @@ An issue that turns out to be work on a project becomes a run request; one that 
 
 ## Run requests
 
-A run request is one issue labelled `run`, created from the "Run request" issue template: the repo as `<owner>/<repo>`, the goal, a done check that passes or fails, the proof, what is known, constraints. `/operate <issue>` hands it to pstack; the run comments its note on the issue and assigns the requester when it is done or when a stop needs an answer. Open `run` issues assigned to you are what waits for you. Closing the issue is the acceptance.
+A run request is one issue labelled `run`, created from the "Run request" issue template: the project as `owner/repo`, the goal, a done check that passes or fails, the proof, what is known, constraints. `/operate <issue>` hands it to pstack; the run comments its note on the issue and assigns the requester when it is done or when a stop needs an answer. Open `run` issues assigned to you are what waits for you. Closing the issue is the acceptance.
 
 ## When a skill says "publish to the issue tracker"
 
