@@ -1,0 +1,16 @@
+[
+  { "name": "wayfinder:map", "color": "5319E7", "description": "Wayfinder map - the shared planning surface for one effort" },
+  { "name": "wayfinder:research", "color": "0E8A16", "description": "Wayfinder AFK research ticket" },
+  { "name": "wayfinder:prototype", "color": "FBCA04", "description": "Wayfinder prototype ticket - draft artifact to react to" },
+  { "name": "wayfinder:grilling", "color": "D93F0B", "description": "Wayfinder grilling ticket - HITL decision interview" },
+  { "name": "wayfinder:task", "color": "1D76DB", "description": "Wayfinder task ticket - work that unblocks a decision" },
+  { "name": "run", "color": "0E8A16", "description": "A request for /operate" },
+  { "name": "defect", "color": "D73A4A", "description": "Something in the brain or its tooling is wrong" },
+  { "name": "change", "color": "A2EEEF", "description": "New capability or improvement" },
+  { "name": "effort", "color": "5319E7", "description": "Investigation or operational work" },
+  { "name": "needs-triage", "color": "E4E669", "description": "Maintainer needs to evaluate this issue" },
+  { "name": "needs-info", "color": "FBCA04", "description": "Waiting on reporter for more information" },
+  { "name": "ready-for-agent", "color": "0E8A16", "description": "Fully specified, ready for an AFK agent" },
+  { "name": "ready-for-human", "color": "1D76DB", "description": "Requires human judgment or action" },
+  { "name": "wontfix", "color": "ffffff", "description": "This will not be worked on" }
+]

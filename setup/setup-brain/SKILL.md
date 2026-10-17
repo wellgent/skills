@@ -1,6 +1,6 @@
 ---
 name: setup-brain
-description: Make a brain able to operate projects through pstack - pin the operate skill and the brain's planning skills by commit, create the run label and the request issue template, and write the operating section into its AGENTS.md. Idempotent.
+description: Make a brain able to plan with wayfinder and operate projects through pstack - the operate skill and the planning skills pinned by commit, the tracker labels, the tracker docs and the request template, and the planning and operating sections of its AGENTS.md. Idempotent.
 argument-hint: "<path to the brain checkout>"
 disable-model-invocation: true
 ---
@@ -34,19 +34,24 @@ npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill 
 
 ## 3. Tracker
 
-- The label: `gh label create run --repo <tracker> --description "A request for /operate" --color 0E8A16`, when missing.
+- Every label in [`templates/brain/labels.json`](../../templates/brain/labels.json) exists on the tracker with that colour and description: `gh label create <name> --repo <tracker> --color <color> --description <description> --force`.
 - `.github/ISSUE_TEMPLATE/run.md` in the brain is a copy of [`skills/operate/request.md`](../../skills/operate/request.md), written on every run.
 
-## 4. AGENTS.md
+## 4. Docs
 
-The brain's `AGENTS.md` carries the section in [`templates/brain/operating.md`](../../templates/brain/operating.md) with the template's text, wrapped in the brain's own conventions (citations, links), and it is the brain's only section on running projects.
-A section under the same heading is replaced; any other section on running projects is removed and named in the report.
+`docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md` and `docs/agents/domain.md` in the brain carry the files of the same name in [`templates/brain/`](../../templates/brain/), with `<owner>/<repo>` filled.
+Template prose is replaced on a re-run; a line that states a fact of this brain (its own handoff rules, its page and citation conventions, its directories) is the brain's and is kept.
 
-## 5. Check
+## 5. AGENTS.md
+
+The brain's `AGENTS.md` carries the two sections in [`templates/brain/operating.md`](../../templates/brain/operating.md) with the template's text, wrapped in the brain's own conventions (citations, links); lines the brain adds under them are the brain's and are kept.
+Sections under the same headings are replaced; any other section on planning skills or on running projects is removed and named in the report.
+
+## 6. Check
 
 Commit and push the brain by its own rules.
-Done when `.agents/skills/` holds the nine skills with working `.claude/skills/` links and a `ref` each in `skills-lock.json`, the `run` label and the template exist, and `AGENTS.md` carries the section.
+Done when `.agents/skills/` holds the nine skills with working `.claude/skills/` links and a `ref` each in `skills-lock.json`, every label and the request template exist, the three docs carry the template's sections, and `AGENTS.md` carries both sections.
 
 ## Report
 
-Skills added, re-pinned and removed; the label and template; the `AGENTS.md` sections written and removed.
+Skills added, re-pinned and removed; labels created or changed; the template and docs written; the `AGENTS.md` sections written and removed.

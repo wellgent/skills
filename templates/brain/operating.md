@@ -1,3 +1,11 @@
+## Planning workflow
+
+Big or fuzzy efforts are charted with `wayfinder` as a map of decision tickets on this tracker and worked one ticket per session; `grilling`, `domain-modeling`, `research` and `prototype` resolve the tickets, `wizard` scripts the steps only a person can do, `ask-matt` routes between them, and `writing-for-agents` is the reference for authoring skills and this file.
+
+- The tracker is GitHub Issues on `<owner>/<repo>`: operations, the label axes and the handoff rules are in `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md`.
+- Domain-doc conventions map to brain surfaces per `docs/agents/domain.md`: vocabulary from the brain's schema and subject pages; decisions on subject pages, not ADRs.
+- The eight skills and `operate` are pinned by commit in `skills-lock.json` and converged by `setup-brain` in wellgent/skills; changes go through explicit `npx skills add|remove`, never `skills update`.
+
 ## Operating projects
 
 Product work on a project runs through pstack, started from this brain with `/operate <issue>`.

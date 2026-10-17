@@ -13,12 +13,12 @@ How we run product work with agents at [Wellgent](https://wellgent.ai), publishe
 - [`AGENTS.md`](AGENTS.md) - the entry for an agent pointed at this repo.
 - [`skills/operate/`](skills/operate/) - the operator skill: the request template, the prompt template, the start script and the cost script. Installed into a brain by `setup-brain`.
 - [`setup/`](setup/) - the setup skills, run from this checkout:
-  - **setup-brain** - pins `operate` and the brain's planning skills from mattpocock/skills, creates the `run` label and the request issue template, and writes the operating section into the brain's `AGENTS.md`.
+  - **setup-brain** - pins `operate` and the brain's planning skills from mattpocock/skills, creates the tracker labels, the tracker docs under `docs/agents/` and the request issue template, and writes the planning and operating sections into the brain's `AGENTS.md`.
   - **setup-project** - enables the pstack plugin at project scope, pins the project's stack skills by commit, writes CI for the check command, lays down `AGENTS.md` and `docs/agents/dev-loop.md` from the templates, and offers pstack's verification skill. It names no stack. It is also where the plugin pin moves, on purpose.
   - **setup-web-stack** - the stack setup for a web product: a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling and known-good configs, the CI workflow, the journey tests and the Convex branch.
   - **setup-web-product** - the golden path for a new web product, each stage deferred to its installer.
 - [`templates/project/`](templates/project/) - `AGENTS.md` and `docs/agents/dev-loop.md` as the setup scaffolds them into a project.
-- [`templates/brain/`](templates/brain/) - the operating section `setup-brain` writes into a brain's `AGENTS.md`.
+- [`templates/brain/`](templates/brain/) - what `setup-brain` writes into a brain: the labels, the three tracker docs and the `AGENTS.md` sections.
 - [`standards/web-products.md`](standards/web-products.md) - the stack doctrine for web products: frontend, toolchain, hosting, data layer, checks, design, version control, skills.
 
 ## What belongs here
