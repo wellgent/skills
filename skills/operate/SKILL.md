@@ -43,7 +43,7 @@ A start that stops at a startup prompt (folder trust, a login) is answered in th
 ## 5. Record and stop
 
 Comment on the request: `run: <session> started on <hostname> at <UTC time>`, then end the turn.
-The run posts its note on the request and assigns the requester when it is done; nothing here waits for it.
+The run posts its decision log and then its note on the request and assigns the requester when it is done; nothing here waits for it.
 
 ## Cost
 
