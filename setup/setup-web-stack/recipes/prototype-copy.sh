@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copy one reviewer's own records from production into a prototype's preview deployment.
-# It reads production, so the lead runs it from the main checkout's root, where the host's
+# It reads production, so the operator runs it from the main checkout's root, where the host's
 # Convex login reaches production; a deploy key in scope would send --prod to its own
 # deployment. The tables are the client-approved allowlist on the project card; the read
 # function refuses any table the copy does not carry. The write takes every table in one

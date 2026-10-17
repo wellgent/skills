@@ -1,60 +1,37 @@
 # Wellgent Agent Skills
 
-The agentic engineering approach we design and run in production at [Wellgent](https://wellgent.ai), published for anyone to adopt: the development flow, the setup paths, and the normative doctrine behind them.
+How we run product work with agents at [Wellgent](https://wellgent.ai), published for anyone to adopt: [pstack](https://github.com/cursor/plugins/tree/main/pstack) runs each project, a brain decides what to run, and the pieces here connect the two.
 
-## The flow
+## The shape
 
-[`FLOW.md`](FLOW.md) is the development flow on one page: the triage that scales alignment before build to the cost of being wrong, the floor every landing passes after build, the eleven stages from Readiness to Retro, each with one role, one input, one output and a quality bar, and the artifacts handed between them.
-[`GLOSSARY.md`](GLOSSARY.md) defines its terms.
-
-The flow is read in place from one checkout of this repo per run host, at `~/repos/wellgent-skills`.
-Nothing from it is installed or pinned into a project, so a flow change reaches every project with one `git pull` on the host.
-A project pins only the third-party skills a step names, by commit sha.
+- **pstack** (the [Claude Code port](https://github.com/michael-denyer/pstack-claude), installed as the plugin `pstack@pstack-claude` per project) owns everything inside a project: planning, build, review, verification, pull requests, shipping and retro.
+- **A brain** is the repository where decisions and requests live: wayfinder maps for what to do, and **run requests** for what pstack should run. A request is one tracker issue with the five parts pstack's own prompting guide asks for: goal, a done check that passes or fails, the proof, what is known, constraints.
+- **`/operate <issue>`**, run from the brain, turns a request into a pstack run: it writes the prompt, starts the run as its own herdr session in the project checkout with landing authority, and stops. The run merges what its verifier passes and posts its note back on the request.
 
 ## Layout
 
-- [`FLOW.md`](FLOW.md), [`GLOSSARY.md`](GLOSSARY.md) - the flow doc and its language.
-- `lead/` - the lead skill: the triage, the stages the lead runs itself (Readiness, Shape, Plan, Release), the floor of every landing, requests to the client, and how it starts and sequences every step; the audit lead and retro lead references for the occasional flows. Linked into the user's skills directory on each run host.
-- `stages/<stage>/` - one skill per spawned stage: `ux-design`, `system-design`, `grooming`, `build`, `review`, `qa`, `audit`. Each opens with its header from `FLOW.md`. `flow spawn` puts the skill's absolute path in the session's start prompt; a `-second` step and the `audit-architecture` steps read their stage's skill.
-- [`bin/`](bin/) - the `flow` command (`spawn`, `gate`, `land`, `tick`, `report`, `ask`, `ledger`, `sources`, `ready`, `trust`) and its scripts, Bash with `jq`; `flow help` lists them and [`bin/README.md`](bin/README.md) holds what they read. `bin/flow` is linked into the user's `PATH` on each run host.
-- `ledger/` - the ledger schema and the price table the cost script reads. The ledger files themselves live in the driving brain.
-- [`templates/artifacts/`](templates/artifacts/) - the hand-off artifact formats `FLOW.md` names.
-- [`templates/project/`](templates/project/) - what the setup skills scaffold into a project: `AGENTS.md`, `docs/agents/dev-loop.md`, `CODING_STANDARDS.md` and the bug issue template with its origin-spec field.
-- [`templates/brain/`](templates/brain/) - what the setup skills scaffold into a driving brain: the flow config and the project card.
-- [`source-log.md`](source-log.md) - every upstream source the flow depends on, with the last version seen, its date and, for a source of pinned skills, the commit every brain and project pins. Readiness reviews it in full.
-- [`setup/`](setup/) - the setup skills.
-- [`standards/`](standards/) - the doctrine.
-
-## Setup paths
-
-Operator skills under [`setup/`](setup/): run from a checkout of this repo against a target path, in either harness (`.claude/skills/` and `.agents/skills/` link to them).
-
-- **setup-brain** - scaffold the flow into a driving brain: flow config, labels, the lead's pinned skills, and a card, config entry and ledger directory per project.
-- **setup-project** - bring a project onto the flow: folder trust, pinned skills, the three project docs from the templates, critical journeys, tracker labels. It names no stack.
-- **setup-web-stack** - the stack setup for a web product: a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling and known-good configs, the journey tests and the Convex branch.
-- **setup-web-product** - the golden path for a new web product, each stage deferred to its installer.
-
-The first two are idempotent and Readiness re-runs them; [`setup/requires.json`](setup/requires.json) holds what a brain and a project must carry, and `flow ready` checks it.
-
-## The doctrine
-
-[`standards/web-products.md`](standards/web-products.md) is the normative approach the setup skills implement: judging criterion, frontend and toolchain stances, hosting classes, data layer, quality gate, skills model, and methodology.
-It carries the slow-moving rules and every stack-specific one; the flow skills name no stack.
-Exact version pins and per-project membership are operational state and live in the adopter's own private registry.
+- [`AGENTS.md`](AGENTS.md) - the entry for an agent pointed at this repo.
+- [`skills/operate/`](skills/operate/) - the operator skill: the request template, the prompt template, the start script and the cost script. Installed into a brain by `setup-brain`.
+- [`setup/`](setup/) - the setup skills, run from this checkout:
+  - **setup-brain** - pins `operate` and the brain's planning skills from mattpocock/skills, creates the `run` label and the request issue template, and writes the operating section into the brain's `AGENTS.md`.
+  - **setup-project** - enables the pstack plugin at project scope, pins the project's stack skills by commit, writes CI for the check command, lays down `AGENTS.md` and `docs/agents/dev-loop.md` from the templates, and offers pstack's verification skill. It names no stack. It is also where the plugin pin moves, on purpose.
+  - **setup-web-stack** - the stack setup for a web product: a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling and known-good configs, the CI workflow, the journey tests and the Convex branch.
+  - **setup-web-product** - the golden path for a new web product, each stage deferred to its installer.
+- [`templates/project/`](templates/project/) - `AGENTS.md` and `docs/agents/dev-loop.md` as the setup scaffolds them into a project.
+- [`templates/brain/`](templates/brain/) - the operating section `setup-brain` writes into a brain's `AGENTS.md`.
+- [`standards/web-products.md`](standards/web-products.md) - the stack doctrine for web products: frontend, toolchain, hosting, data layer, checks, design, version control, skills.
 
 ## What belongs here
 
-Everything we use regularly lives here - shared with the world, friends, clients, and the machines we manage.
-Truly internal things live at project or repo level: one project's specifics stay in that project; project cards, iteration maps, ledgers, version pins and fleet machinery stay in private repos.
-
+Everything we use regularly lives here, shared with the world, friends, clients and the machines we manage.
+Truly internal things live at project or repo level: one project's specifics stay in that project; maps, requests, version pins and fleet machinery stay in private repos.
 Everything published here is internals-free: no person, project, company or host is named, and it works unmodified from a stranger's checkout.
 
-## Conventions the flow assumes
+## Conventions assumed
 
-- [mattpocock/skills](https://github.com/mattpocock/skills) pinned in the project: the flow runs its `to-spec`, `to-tickets`, `implement-spec`, `code-review` and `retro` as written and builds only what they lack.
-- A GitHub-style issue tracker with sub-issues and native blocking edges.
-- herdr on the run host: every step runs as its own session and reports to the lead's session.
-- Claude Code and Codex on the run host: a step's harness follows its model in the flow config.
+- Claude Code with the pstack plugin on every host that runs a project, and [herdr](https://github.com/herdr) on the host `/operate` runs on.
+- A GitHub repository per project and per brain, with GitHub Issues as the tracker and GitHub Actions for the check command.
+- [mattpocock/skills](https://github.com/mattpocock/skills) for the brain's planning skills, pinned by commit.
 
 ## License
 

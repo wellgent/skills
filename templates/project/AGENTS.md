@@ -4,24 +4,9 @@
 
 ## Rules for every session
 
-- **Check before report.** A session that changes files has `<check command>` green on its branch tip before it reports: run it yourself on that commit and quote its result.
-  A subagent inside the session proves its diff with the lint, the typecheck and the test files the diff touches; the session's one full check covers every branch it merges.
-  A session that changes no file runs no check.
-- **Conflict exit.** Stop work on a ticket and report to the session that started you when the ticket, its tests or the spec disagree (say what disagrees with what), when the ticket needs a decision it does not hold, or when the work touches a hard-to-reverse thing the ticket does not name: stored-data shape or a migration, an external contract, money, authorization, a production delete.
-  Size is never a reason. A conflict exit is a correct outcome, and the reply settles what changes.
-- **Test tiers.**
-  - A repro test handed to you with a bug ticket or a finding passes unchanged; a repro test you believe is wrong goes through the conflict exit.
-  - An existing test changes freely when the ticket changes its behaviour.
-    Your report names each test you deleted, each `.skip`, `.only`, `.todo` or `.fails` you added, each net loss of assertions and each loosened matcher, with the reason.
-  - A new test is written first, at the seam the design record or the ticket names, with expected values copied as literals from the contract example or the bug report.
-  - A journey test changes only in a ticket that changes that journey, and only that ticket runs it in its session; `flow gate` runs every journey test at each landing.
-- **Checks.** Tightening a check is free.
-  Loosening a shared check (an ignore entry, a disabled rule, a step removed from the check command, a lowered threshold) needs the ticket to name it or the lead's approval.
-  An inline suppression carries its reason on the same line.
-- **Standards.** `CODING_STANDARDS.md` holds the code rules and the test bar your work is reviewed against.
-- **Production.** Sessions work on their own dev environment per [docs/agents/dev-loop.md](docs/agents/dev-loop.md).
-  A production read or write is a request to the lead.
-- **Landing.** `main` history stays linear: a branch lands by rebase onto `origin/main` and a fast-forward push, and landing a spec's branch is the lead's.
+- **Check before report.** A session that changes files has `<check command>` green on its branch tip before it reports: run it yourself on that commit and quote its result. CI runs the same command on every pull request.
+- **Production.** Sessions work on their own dev environment per [docs/agents/dev-loop.md](docs/agents/dev-loop.md). A production read or write, a deploy, a data deletion and a message to a user are stops: each goes to the request issue, or to the person in the chat, and waits for the answer.
+- **Landing.** Work lands through a pull request squash-merged onto `main`, which stays linear. A run merges only under the landing authority its prompt grants.
 
 ## Must-read
 
@@ -31,9 +16,7 @@ Read each file when its trigger matches your work, before you write code.
 
 ## Where things live
 
-- [GLOSSARY.md](GLOSSARY.md): the project's domain language. Use its terms in code, tests, tickets and commits.
-- [CODING_STANDARDS.md](CODING_STANDARDS.md): code rules and the test bar.
-- [docs/agents/dev-loop.md](docs/agents/dev-loop.md): the gate, worktrees, running the app, critical journeys, and the lenses and tools of Review, QA and Audit.
-- `docs/adr/`: architecture decisions. An ADR is settled; a ticket that contradicts one is a conflict exit.
-- [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md), [docs/agents/triage-labels.md](docs/agents/triage-labels.md): tracker mechanics and label strings.
-- [docs/agents/domain.md](docs/agents/domain.md): how to read the glossary and the ADRs before exploring the code.
+- [PRODUCT.md](PRODUCT.md): what the product does, for whom, and the product rules a change must keep.
+- [DESIGN.md](DESIGN.md): the design system and the kit map.
+- [docs/agents/dev-loop.md](docs/agents/dev-loop.md): the check command, CI, running the app, worktrees and the critical journeys.
+- `.agents/playbooks/`: this project's playbooks extending pstack's bundled ones.

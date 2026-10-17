@@ -3,7 +3,7 @@
 How we build web products with agents.
 This document is normative for our own products and published as the approach we preach.
 It carries the stances - the slow-moving rules.
-Exact version pins, skill membership, and per-project registrations are operational state: they live in the consumer's private registry and roll as sweeps, never here.
+Exact version pins and per-project registrations are operational state: they live in the consumer's private registry and roll as sweeps, never here.
 
 ## Scope
 
@@ -16,7 +16,7 @@ Every choice is judged by convenience for agents to build, deploy, overview, and
 Simplicity over engineering: add nothing for its own sake.
 Lean to latest technology versions - newer tends to be more agent-friendly.
 
-Deviations from any rule are allowed with a written justification, recorded where the deviation lives: the `Deviations` section of the project's `docs/agents/dev-loop.md` for workflow rules, an ADR in the project repo for stack rules.
+Deviations from any rule are allowed with a written justification in the `Deviations` section of the project's `docs/agents/dev-loop.md`: a workflow deviation as its own entry, a stack deviation as a sentence in the same section.
 
 ## Frontend
 
@@ -39,7 +39,7 @@ Deviations from any rule are allowed with a written justification, recorded wher
 ## Toolchain
 
 - **TypeScript**: the TS 7 line, one version fleet-wide, installed under the plain `typescript` package name - never the `@typescript/native` alias split (it breaks `convex typecheck`).
-  Next 16.3+ runs the project's `tsc` inside `next build` by default (`experimental.useTypeScriptCli`); it is never set `false`, and `next build` remains the enforcement gate.
+  Next 16.3+ runs the project's `tsc` inside `next build` by default (`experimental.useTypeScriptCli`); it is never set `false`, and `next build` inside `check` is where type errors block.
   No dev-build tsgo pins.
   Re-evaluation checkpoint: TS 7.1, when the programmatic compiler API returns.
 - **Lint**: oxlint with `@nkzw/oxlint-config`, plus `oxlint-tsgolint` with `typeAware: true`, and the `react`/`nextjs` plugins where applicable.
@@ -81,24 +81,24 @@ Two first-class data layers, applied as a decision rule rather than a default wi
 - If the app's domain data *is* a knowledge base's content, the data layer is that knowledge base's checkout: co-located reads, markdown-first writes.
 - Otherwise, if the app needs a database, it is Convex - no per-project debate.
 
-**Skip-criteria** for anything else (supabase pg, sqlite, ...): an ADR in the project repo naming the concrete blocker Convex demonstrably cannot serve (execution limit, relational/analytical need, offline/local constraint), judged against the judging criterion.
+**Skip-criteria** for anything else (supabase pg, sqlite, ...): a sentence in the `Deviations` section of `docs/agents/dev-loop.md` naming the concrete blocker Convex demonstrably cannot serve (execution limit, relational/analytical need, offline/local constraint), judged against the judging criterion.
 Preference and familiarity do not qualify.
 
 **Convex canon** (one product is designated the canonical config and directory-layout reference):
 
-- Execution limits are design inputs consulted at spec time: 16,384-doc query cap, batch mutation budget, 4,096-read-call cap, 64-char index names.
-- The volume-rehearsal ladder is a first-class gate proof for data-heavy specs.
+- Execution limits are design inputs consulted at planning time: 16,384-doc query cap, batch mutation budget, 4,096-read-call cap, 64-char index names.
+- The volume-rehearsal ladder is the proof a data-heavy change carries.
 - Components are per-product and namespaced (aggregates, migrations, rate-limiter adopted per need).
 - Testing: vitest edge-runtime with inlined `convex-test`.
 - Lint: `@convex-dev/eslint-plugin` runs inside `pnpm lint` through oxlint `jsPlugins`, over `convex/` minus tests and fixtures, every rule an error and `require-access-control` on.
-  The rule sees raw `query`, `mutation` and `action` registrars only, so ownership inside custom function builders stays a Review judgment backed by negative tests.
+  The rule sees raw `query`, `mutation` and `action` registrars only, so ownership inside custom function builders is read by hand against the same shapes and backed by negative tests.
 - The catalog's Convex skill set from `get-convex/agent-skills` is installed as ordinary `npx skills` pins (see Skills). The Convex SDK's own file manager stays off (`convex.json`: `{"aiFiles": {"enabled": false}}`): `convex ai-files` installs the whole upstream pack with no subset option, and one of its skills sends session transcripts to Convex.
   With the file manager off nothing refreshes `convex/_generated/ai/guidelines.md`, so every toolchain sweep replaces it with the current upstream `convex_rules.txt`.
 - Migrations run through `@convex-dev/migrations`.
   A production migration is dry-run first (`dryRun: true`), and its row counts are part of the production-write approval.
-- **Scoped keys guard production.** The run host's Convex login is used by the lead session and by the worktree setup script.
-  Every worktree's `.env.local` carries a `CONVEX_DEPLOY_KEY` scoped to that worktree's own dev deployment (`convex deployment token create`), so every `convex` command a spawned session runs there reaches that deployment and no other.
-  The login stays readable on the host: the key stops a stray production command, and the `AGENTS.md` rule that a production read or write is a request to the lead covers the rest.
+- **Scoped keys guard production.** The run host's Convex login is used by the operator and by the worktree setup script.
+  Every worktree's `.env.local` carries a `CONVEX_DEPLOY_KEY` scoped to that worktree's own dev deployment (`convex deployment token create`), so every `convex` command a session runs there reaches that deployment and no other.
+  The login stays readable on the host: the key stops a stray production command, and the `AGENTS.md` rule that a production read or write is a stop pstack raises to the request covers the rest.
   Build pipelines hold keys scoped the same way: the production deploy key in the production build environment, the preview deploy key in the preview one.
 - **One dev deployment per worktree.** The worktree setup script creates an expiring cloud dev deployment (`convex deployment create dev/<worktree> --type dev --select --expiration`), mints its scoped key, pushes once (`convex dev --once`) and runs the seed, so parallel sessions share no schema or data and every runtime check runs against the worktree's own code.
   The seed lives in the repo as an idempotent function and creates the test identities `docs/agents/dev-loop.md` names.
@@ -109,134 +109,111 @@ Preference and familiarity do not qualify.
 **Knowledge-base-checkout apps**: named as a class, not legislated here.
 Apps read a co-located checkout and write markdown-first under the owning knowledge base's write model; mechanics (allowlists, sync triggering, derived-state refresh) are governed per knowledge base.
 
-## Quality gate
+## Checks
 
 - **One check command, everywhere**: `check` = typecheck + lint (oxlint + tsgolint, with the stack's lint plugins) + format check (oxfmt) + design-system lint + unused-code scan (knip) + dependency rules (dependency-cruiser) + full test suite + real production build (`next build`).
   Every step blocks, and tests outside `check` is drift by definition.
-  Governing principle: the gate runs what production runs.
-- **A check blocks or is measured, never advisory**: it either sits in the check command, or it runs in the scanner pass and lands as a number in the health check row `flow land` appends at every landing.
-  Judgment belongs to Review and Audit sessions.
-- **Dependency rules**: no cycles, plus one rule per ADR that sets a module boundary; each rule's message carries the fix.
-- **Journey tests**: each project names at most five client-approved critical journeys, one plain Playwright test each, run by `flow gate` beside the check command at every landing.
-  Seam tests written test-first in Build are the regression net; the journey tests are the only browser-level suite.
-- **Measured in the scanner pass** (the health check row): unused-code findings, duplication of source and of tests (jscpd), dependency-rule violations, the react-doctor finding count, inline suppressions, test count and wall time, source and test lines.
-  No thresholds on duplication or complexity, and no mutation score.
+  Governing principle: the check runs what production runs.
+- **Where it runs**: locally on the branch tip before a session reports, and in CI on every pull request and on pushes to `main` (`.github/workflows/check.yml`, from [`setup-web-stack/check.yml`](../setup/setup-web-stack/check.yml)).
+  Build-time values the production build reads are repository secrets.
+- **Dependency rules**: no cycles, plus one rule per module boundary the project sets; each rule's message carries the fix.
+- **Journey tests**: each project names at most five client-approved critical journeys, one plain Playwright test each.
+  The project's verification skill runs them before a pull request opens, and CI runs them where the stack wires a deployment for it.
+  They are the only browser-level suite; the tests inside `check` are the regression net.
+- **Code quality judgment is pstack's**: its review (interrogate, thermos, no-comments, deslop) and its principle skills judge a diff, and `/correct` turns a repeated mistake into a lint rule, a type or a test.
+  A project rule a lint can enforce is a lint rule.
 - **Changing a check**: tightening is free.
-  Loosening a shared check (an ignore entry, a disabled rule, a step removed from `check`, a lowered threshold) needs the ticket to name it or the lead's approval, and an inline suppression carries its reason on the same line.
-  `flow gate` flags every such change on the landing's diff for the lead to judge.
-- **A blocking check that is red on `main` joins `check` once it is green**: until then it runs in the scanner pass, the readiness report lists it as pending, and a cleanup spec gets it green.
+  Loosening a shared check (an ignore entry, a disabled rule, a step removed from `check`) is named in the pull request, and an inline suppression carries its reason on the same line.
+- **A blocking check that is red on `main` joins `check` once it is green**: until then it sits in the "Pending checks" section of `docs/agents/dev-loop.md` with what gets it green, and a run gets it green.
   No baseline or exemption files.
-- **CI: nowhere.**
-  `flow gate` on the landing's branch and `flow land`, which fast-forwards `main` only to a commit the gate passed, are the single enforcement point.
-  CI would duplicate it in a divergent environment with a demonstrated rot pattern.
-  The fact that reopens this decision: unattended or scheduled pushes that bypass the gate becoming real.
-- **No residue**: code and docs describe what is; a replacement deletes what it replaces in the same diff; no unused files, exports, types, or dependencies (every dead-code suppression carries a written reason); every `TODO` carries an issue number; tests follow their code; vendor-owned trees are re-pinned, never edited.
-  Each project's `CODING_STANDARDS.md` carries these rules and the seven-point test bar that Review judges a diff against.
+- **No residue, tool-enforced**: knip fails unused files, exports, types and dependencies; dependency-cruiser fails a boundary breach; every ignore entry carries a written reason.
 - **Coverage: no metric, no minimum counts.**
-  Tests must exist and run inside `check`; the behavioural contracts of a spec name the examples its tests must carry; the volume-rehearsal ladder governs data-heavy specs.
+  Tests exist and run inside `check`; the volume-rehearsal ladder governs data-heavy changes.
   Test allocation stays per-product and risk-driven.
 - **Prod-parity proofs, per hosting class**:
-  - Platform-hosted: the gate's `next build` pre-ship, a mandatory deploy-status check post-ship.
+  - Platform-hosted: `next build` inside `check` pre-ship, a mandatory deploy-status check post-ship.
   - Self-hosted: a `systemd-run --user` env-parity smoke proof pre-ship, the commit-equality healthcheck post-ship.
 - **Build-environment pins are deploy-shaped and locally unprovable**: a diff touching `engines`, `packageManager`, a node version file, or platform build settings carries a pre-ship check that the pinned values are supported by the hosting platform's build image (for Vercel, the supported-runtimes doc).
-  A preview deploy is not a gate proof.
+  A preview deploy does not prove it.
 - **A ship is complete when the production surface is verified serving the shipped commit** - not when the push succeeds.
 
 ## Design
 
-- **impeccable is the design tool of the UX design stage**, pinned at 4.5.0 or later (engine 0.1.11 or later, the first that honours detector ignores in linked git worktrees).
-  Its scanner runs through one command, the pinned `.agents/skills/impeccable/scripts/impeccable detect`, so every stage runs the same engine.
+- **impeccable is the design scanner**, pinned at 4.5.0 or later (engine 0.1.11 or later, the first that honours detector ignores in linked git worktrees).
+  It runs through one command, the pinned `.agents/skills/impeccable/scripts/impeccable detect`, named on the "Design scanner" line of `docs/agents/dev-loop.md`, so every session runs the same engine.
 - **Environment**: `DO_NOT_TRACK=1` is set on every run host, and `OPENAI_API_KEY` stays unset, which keeps impeccable on its code-led path.
 - **Design-system lint** blocks inside `check`: arbitrary radius, font-size, colour, spacing and size values fail; the theme resets the framework's default palette so only design tokens exist; raw controls in app code fail through oxlint `react/forbid-elements`, so screens compose kit components.
-- **Client choices are made on coded prototypes**: two or three options on a `prototype/<spec>-<slug>` branch, switched by a variant switcher that lives on `main` and is hidden in production by a `VERCEL_ENV` gate.
+- **Client choices are made on coded prototypes**: two or three options on a `prototype/<slug>` branch, switched by a variant switcher that lives on `main` and is hidden in production by a `VERCEL_ENV` gate.
   An idempotent seed and unseed for the reviewer's records also lives on `main`; only the variant code lives on the branch.
 - **Where prototypes run**:
   - Vercel-hosted Convex projects: one Convex preview deployment per `prototype/*` branch.
     The build script runs `convex deploy` with the preview deploy key only for those branches and seeds through `--preview-run`; sign-in env comes from the Convex project's default environment variables for previews.
     Every other preview build points at the project's default dev deployment.
   - Self-hosted projects: a scratch dev deployment with an expiry, and a dev server on a tailnet port.
-- **Production records in a prototype**: the client approves, once per project, an allowlist of tables keyed to the reviewer's own user that reference no other user.
-  One scripted read, run by the lead, copies those records from production into the prototype's preview deployment and nowhere else; credentials and tokens are never on the allowlist.
+- **Production records in a prototype**: the product's owner approves, once per project, an allowlist of tables keyed to the reviewer's own user that reference no other user; the allowlist is a rule in `PRODUCT.md`.
+  One scripted read, run by the operator, copies those records from production into the prototype's preview deployment and nowhere else; credentials and tokens are never on the allowlist.
   Surfaces that involve other users run on seeded synthetic identities.
 
 ## Version control
 
-- **Linear history on `main`**: every commit on the default branch is one development step by its author.
+- **Linear history on `main`**: every commit on the default branch is one pull request, squash-merged.
   A merge commit carries no content, so the default branch never gets one.
-- **Branch freely, land linearly**: work is committed on `main` directly or on a branch or worktree.
-  A branch lands by rebasing onto the remote default branch, fast-forwarding (`git merge --ff-only`), and pushing.
-  Never `--no-ff`, never a merge-commit button, never a `git pull` that merges.
-  `flow land` is this rule applied.
-- **No pull requests by default**: review runs in the flow and the gate is local, so a PR adds nothing.
-  One is opened only when the operator asks, and it lands the same way - the fast-forward push marks it merged.
-- **Squash is not the default**: it collapses the commit chain; it is used only when the operator asks.
-- **Repo settings**: merge commits off, rebase merging on, squash left available, head branches deleted on merge.
+- **Work lands through pull requests**: a run works on a branch in its own worktree, opens a pull request once `check` is green and the verification skill passes, and pstack squash-merges it under the landing authority the run's prompt grants.
+  Never a merge-commit button, never a `git pull` that merges.
+- **Repo settings**: squash and rebase merging on, merge commits off, head branches deleted on merge.
 
 ## Skills
 
-Membership splits along the stance/operations fault line: the sets every brain and every project carry are declared in this repo's [`setup/requires.json`](../setup/requires.json), and the commit each source is pinned at in [`source-log.md`](../source-log.md) (the stance); capability packs, per-project assignment, and retired-skill lists live in the consumer's private registry (the operations).
-[`setup-web-stack/catalog.md`](../setup/setup-web-stack/catalog.md) keeps rationale (what each skill is for and which step names it), never membership.
+A project pins only stack skills: the entries of [`setup-web-stack/catalog.md`](../setup/setup-web-stack/catalog.md) its stack setup names, nothing from `mattpocock/skills` and nothing from this repo.
+A brain pins `operate` and the planning skills [`setup-brain`](../setup/setup-brain/SKILL.md) names; pstack's own skills come from the plugin.
+The catalog keeps rationale (what each skill is for and where it is named), never membership.
 
-- **A skill runs only when it is named**: by a step's stage skill, or by path and trigger in the project's `AGENTS.md` must-read list or `docs/agents/dev-loop.md`.
+- **A skill runs only when it is named**: by a must-read line in the project's `AGENTS.md`, a line in `docs/agents/dev-loop.md`, or a project playbook.
   Nothing relies on a skill's description firing.
-- **A project pins only the skills a step names.**
-  The flow's own skills, scripts and templates are read in place from the flow checkout on the run host and are never pinned into a project.
-  Skills only a person invokes live in the driving brain or at user scope.
-- **Three tiers**: a base set every project carries, capability add-on packs keyed to repo facts, and per-project assignment (packs plus recorded extras).
-- **Pack triggers are repo facts, not preferences**: convex pack when the project has a `convex/` directory; vercel-hosted pack when it deploys through Vercel; cache-components-adoption pack only while `cacheComponents` is being adopted, removed once adoption is done.
-- **Situational skills** are catalog-documented, each with the condition that pins it and the step that then names it.
-  The lead pins one when its condition is met and records it in the registry as a per-project extra.
-- **Retired skills** are named in the private registry; sweeps remove them wherever found.
-- **Distribution**: `npx skills` pins by commit sha (`npx skills add <source>#<sha>`, the sha from the source log), recorded as `ref` in `skills-lock.json`, converged by explicit `add` / `remove` per delta, never `skills update`.
+- **Skills only a person invokes** live in the driving brain or at user scope.
+- **Situational skills** are catalog-documented, each with the condition that pins it and the line that then names it.
+  The operator pins one when its condition is met.
+- **Distribution**: `npx skills` pins by commit sha (`npx skills add <source>#<sha>`), recorded as `ref` in `skills-lock.json`, converged by explicit `add` / `remove` per delta, never `skills update`.
   `<source>@<name>` selects a skill by name and pins nothing.
   Cadence: manual, drift-triggered - no cron.
 
 **Where agent-facing content lives** - two axes decide it, ownership and form.
 Ownership: vendor-owned content arrives by pin or managed copy and is replaced wholesale on update, so nothing project-owned may live inside a pinned directory; project-owned content is scaffolded once and then belongs to the repo.
 Form: a skill is a procedure an agent invokes, and the harness fixes its home under `.agents/skills/`; a doc is what an agent consults, and `docs/agents/` is the project's home for agent-facing docs, with `AGENTS.md` as the entry.
-Project rules an agent consults are in `AGENTS.md`, `CODING_STANDARDS.md` and `docs/agents/`; procedures an agent runs are skills; anything vendor-owned is a pin or a marked managed file wherever it sits.
+Project rules an agent consults are in `AGENTS.md`, `PRODUCT.md` and `docs/agents/`; procedures an agent runs are skills; anything vendor-owned is a pin or a marked managed file wherever it sits.
 
 **Custom skill homing** - three homes:
 
 - **Project-local**: skills whose content is the project's specifics.
-  No project-local skill is mandated, and no project carries a skill named `verify`: the harness tells every committing session to run a project skill of that name, which would put a browser walk into every implementer.
-  How to launch, sign in to and drive the app is the "Running the app" section of `docs/agents/dev-loop.md`.
+  The one every project carries is its verification skill, `verify` or `verify-<app>`, written by pstack's `create-verification-skill` from the "Running the app" section of `docs/agents/dev-loop.md`, which stays the home of how to launch, sign in to and drive the app.
 - **This repo** (public): everything we use regularly and can express internals-free - it must work unmodified from a stranger's checkout.
-  Read in place from one checkout per run host.
+  The setup skills run from a checkout on the host; `operate` is pinned into brains.
 - **Private fleet machinery** (sweeps, registries, machine alignment): stays in the operator's private repos, never pinned into product repos.
 
 ## Methodology
 
-- **Two-layer model**: the flow lives in this repo ([`FLOW.md`](../FLOW.md), the lead skill, the stage skills, the `flow` command) and is read in place, never copied into projects.
-  The flow names no stack and no project; this document carries every stack rule.
-- **A project's methodology surface is three files**, scaffolded from [`templates/project/`](../templates/project/) and then project-owned:
-  - `AGENTS.md`, loaded by every session: the check-before-report rule, the conflict exit, the test tiers, the check-change rule and the must-read list.
-  - `docs/agents/dev-loop.md`, read by path by the stages that need it: the gate lines with the surface and prose paths, critical journeys, worktrees, running the app, Review lenses, QA tools, Audit lenses, the scanner pass, the design-system commands, deviations.
-  - `CODING_STANDARDS.md`, read by `code-review`, Review and Audit: code rules and the test bar.
+- **The process is pstack's**: planning, build, review, verification, pull requests, shipping and retro run inside the project through the plugin, started from the brain by `/operate`.
+  pstack names no stack; this document carries every stack rule.
+- **A project's own surface**, scaffolded from [`templates/project/`](../templates/project/) and then project-owned:
+  - `AGENTS.md`, loaded by every session: the rules for every session, the must-read list, where things live, and the rule table `/correct` keeps.
+  - `docs/agents/dev-loop.md`, the stack facts: the check command and CI, the critical journeys, worktrees, running the app, the design-system commands, pending checks, deviations.
+  - `PRODUCT.md`: what the product does, for whom, and the product rules a change must keep.
+  - `DESIGN.md`, where there are screens: the design system and the kit map.
+  - `.agents/playbooks/`, optional: project playbooks that extend pstack's bundled ones with After, Before and In lines, never Replace.
 
-  Promotion litmus: any line that should read identically in every project belongs to the template or the flow, and project files hold what is true of this repo.
+  Promotion litmus: any line that should read identically in every project belongs to the template, and project files hold what is true of this repo.
+  A product rule lives in `PRODUCT.md`; rationale lives in pull request bodies and pstack's decision trail.
 - **What this stack puts in those files** (Next.js with Convex; a project without one of them drops its lines):
-  - Must-read list: `convex/_generated/ai/guidelines.md` and the `convex-authz` checklist when touching Convex code; `convex-migrate` when a ticket changes the schema of a populated table; `find-docs` for a library API; `diagnosing-bugs` on a bug ticket.
-    Implementers get stack rules through this list and no judgment lenses.
-  - Review lenses: `web-design-guidelines` on UI diffs; `convex-reviewer` on Convex diffs.
-  - QA tools: `agent-browser` and `next-dev-loop`, with the named check "`get_errors` returns nothing for the routes exercised".
-  - Audit lenses: `vercel-composition-patterns` in the architecture review; `vercel-react-best-practices` in the defect review.
-  - Surface paths: everything that renders or serves a user (the app routes and components, the Convex functions, `public/`, global styles); prose paths: `*.md` and `docs/*`.
-  - Scanner pass: knip, jscpd over source and over tests, dependency-cruiser, a suppression count, the test run's count and wall time, line counts, and the react-doctor finding count as the project measure `react_doctor`.
-- **Tracker conventions**: one label taxonomy across projects, identity-mapped - the five triage roles (`needs-triage`, `needs-info`, `ready-for-agent`, `needs-human`, `wontfix`), the `wayfinder:*` set and `batch` on the project tracker, and the lead's `lead:iteration`, `lead:input` and `lead:round` on the driving brain's tracker.
+  - Must-read list: `convex/_generated/ai/guidelines.md` and the `convex-authz` checklist when touching Convex code; `convex-reviewer` before a Convex diff goes into a pull request; `convex-migrate` when a change touches the schema of a populated table; `web-design-guidelines` when a change touches a screen; `vercel-react-best-practices` when a change renders or fetches data in React; `find-docs` for a library API.
+  - `docs/agents/dev-loop.md`: `agent-browser` and `next-dev-loop` under "Running the app", with the check "`get_errors` returns nothing for the routes exercised"; the design-system lint and the impeccable scanner under "Design system".
+- **Tracker labels**: one taxonomy across projects - `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human` and `wontfix` on every project tracker, `run` on the brain's.
   Per-project freedom is topical labels only.
-  `docs/agents/issue-tracker.md` and `triage-labels.md` stay per project but are template-owned generated surfaces, always generic `<owner>/<repo>`; a project's file diverges only to declare an actual deviation.
-  Every bug ticket carries its origin spec, the spec whose change introduced the bug; the bug issue template has the field.
-- **One flow**: every piece of work enters as a ticket, a batch, a spec or a map through the lead's triage, and every landing passes the same floor.
-  The path is judgment, not deviation.
-- **Where review runs**: `code-review` inside Build; Review on each landing's gated diff by the other model family, with the project's lenses, unless the diff is prose only; one exploratory QA pass per landing that touches a surface path; a two-family Audit of the whole codebase when the client starts one.
-  Scanners feed the health check rows; a Review or QA finding blocks only as a correctness defect, a spec gap, a breach of a written standard, or a defect with a failing repro test.
 
 ## Learning propagation
 
 - **Route at the moment of observation**: a lesson about a shared asset files on that asset's home tracker when it is made (skill and approach lessons on this repo's tracker, machine lessons on the operator's fleet repo).
   Project trackers keep only project-local observations.
-  Retro routes the lessons of an iteration the same way.
+  Inside a project, retro is pstack's: `/reflect` at the end of a run, `/correct` for a repeated mistake.
   From a machine whose identity cannot write the destination tracker, the lesson files on the project tracker with an `[upstream:<home>]` title marker - the operator's cross-project board sweep picks those up; the marker makes local pooling protocol, not a miss.
 - **Boards get periodic cross-project triage**: the operator sweeps every project's board as one set at their own cadence - closing what reality has already resolved, triaging the `needs-triage` pool per the label taxonomy, reframing issues whose right solution changed, deduplicating within and across projects (the best-framed issue survives and absorbs the rest), and refiling shared-asset issues, including `[upstream:<home>]`-marked ones, on their home trackers.
   The sweep is what keeps every board accurate between sessions without per-project ceremony.
@@ -254,13 +231,13 @@ The golden path is this repo's [`setup-web-product`](../setup/setup-web-product/
 
 1. Name + repo home (GitHub org).
 2. Audience class (public / team-internal / personal); if internal, one sub-input: the co-location host.
-3. Data need (knowledge-base content / needs-a-database / none); a database flips the convex pack trigger.
+3. Data need (knowledge-base content / needs-a-database / none); a database means Convex and the catalog's Convex branch.
 4. Machine for self-hosted (usually implied by co-location).
 
-Defaults applied without asking: Next latest stable per the channel rule, Tailwind v4 on, the full toolchain standard, the gate composition, base skill set plus triggered packs, port block auto-allocated as the next free block on the target machine, canonical label taxonomy seeded.
+Defaults applied without asking: Next latest stable per the channel rule, Tailwind v4 on, the full toolchain standard, the check composition, the catalog entries the stack setup picks, port block auto-allocated as the next free block on the target machine, the tracker labels seeded.
 Cache Components defaults on for greenfield.
 
-**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), brain (setup-brain: the card, the flow config entry, the ledger directory), project (setup-project: folder trust, pinned skills, `AGENTS.md`, `docs/agents/dev-loop.md` and `CODING_STANDARDS.md` from the templates, the journey tests, the worktree setup script and the seed), hosting (per audience class), first ship (check command green, prod-parity proof, registration finalized).
+**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), brain (setup-brain: the `operate` skill, the `run` label and request template, the operating section in the brain's `AGENTS.md`), project (setup-project: the pstack plugin at project scope, the stack pins, CI, `AGENTS.md`, `docs/agents/dev-loop.md` and `PRODUCT.md` from the templates, the verification skill; through setup-web-stack the journey tests, the worktree setup script and the seed), hosting (per audience class), first ship (check command green, prod-parity proof, registration finalized).
 
 **Two-phase registration**: claim at step 2 (ports, membership), finalize at first ship (public URL, live fields); observation tolerates claimed-but-not-yet-live in between.
 
@@ -270,6 +247,6 @@ Bootstrap is not "repo created"; it is "conformant and live".
 ## Conformance
 
 Observation observes; this document prescribes.
-The consumer's observation surface asserts per project: framework version and agentic-baseline drift, toolchain canonical-set drift against the registry's pins, skill delta (missing / retired-but-present / unrecorded extras / hash drift), the three project docs present with headings matching the templates, ports agreeing with the registry.
+The consumer's observation surface asserts per project: framework version and agentic-baseline drift, toolchain canonical-set drift against the registry's pins, skill delta (missing / unrecorded extras / hash drift), `AGENTS.md` and `docs/agents/dev-loop.md` present with headings matching the templates, ports agreeing with the registry.
 Zero delta across the columns is conformant; any non-zero delta is the standing manual trigger for a sweep or refresh pass.
 No calendar cadence anywhere.

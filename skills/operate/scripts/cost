@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# cost <session id> | cost latest <checkout>
+# Prints what one Claude Code session used, as JSON: tokens per model read from its transcript and
+# the transcripts of its subagents, priced at API list prices from prices.json beside this script.
+# `latest <checkout>` takes the newest transcript of that checkout.
+# Exit 3 when the host holds no transcript for the session.
+set -euo pipefail
+die() { echo "cost: $*" >&2; exit "${COST_EXIT:-1}"; }
+command -v jq >/dev/null 2>&1 || die "jq is not on PATH"
+here=$(cd "$(dirname "$0")" && pwd)
+prices="$here/prices.json"
+root="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+
+case ${1:-} in
+  "") die "usage: cost <session id> | cost latest <checkout>" ;;
+  latest)
+    dir=${2:?latest needs a checkout path}
+    [ -d "$dir" ] || die "not a directory: $dir"
+    enc=$(cd "$dir" && pwd -P | tr '/' '-')
+    main=$(ls -t "$root/$enc"/*.jsonl 2>/dev/null | head -1) || true
+    [ -n "$main" ] || COST_EXIT=3 die "no transcript for $dir under $root"
+    sid=$(basename "$main" .jsonl) ;;
+  *)
+    sid=$1
+    case $sid in *[!A-Za-z0-9-]*) die "not a session id: $sid" ;; esac
+    main=$(find "$root" -mindepth 2 -maxdepth 2 -type f -name "$sid.jsonl" 2>/dev/null | head -1) || true
+    [ -n "$main" ] || COST_EXIT=3 die "no transcript for session $sid on this host" ;;
+esac
+
+# Transcript: <projects>/<project>/<session>.jsonl, subagents under <session>/.
+# A response is written once per content block with the same usage, so rows are counted per message id.
+{
+  awk 1 "$main"
+  [ ! -d "${main%.jsonl}" ] || find "${main%.jsonl}" -type f -name '*.jsonl' -exec awk 1 {} +
+} | jq -R -n -L "$here" --slurpfile prices "$prices" --arg sid "$sid" '
+  include "cost";
+  reduce (inputs | fromjson? | select(type == "object" and (.timestamp | type) == "string")) as $r
+    ({start: null, end: null, version: null, messages: {}};
+     .start = (if .start == null or $r.timestamp < .start then $r.timestamp else .start end)
+     | .end = (if .end == null or $r.timestamp > .end then $r.timestamp else .end end)
+     | .version = (.version // $r.version)
+     | if $r.type == "assistant" and ($r.message.usage | type) == "object" and $r.message.model != "<synthetic>"
+       then $r.message.usage as $u
+         | .messages[$r.message.id // $r.uuid] = {
+             model: ($r.message.model + (if $u.speed == "fast" then ":fast" else "" end)),
+             input: ($u.input_tokens // 0),
+             cache_write_5m: (if $u.cache_creation then $u.cache_creation.ephemeral_5m_input_tokens // 0
+                              else $u.cache_creation_input_tokens // 0 end),
+             cache_write_1h: ($u.cache_creation.ephemeral_1h_input_tokens? // 0),
+             cache_read: ($u.cache_read_input_tokens // 0),
+             output: ($u.output_tokens // 0)}
+       else . end)
+  | . as $s
+  | ([$s.messages[]] | group_by(.model)
+     | map({key: .[0].model, value: (reduce .[] as $m
+         ({input: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0};
+          .input += $m.input | .cache_write_5m += $m.cache_write_5m | .cache_write_1h += $m.cache_write_1h
+          | .cache_read += $m.cache_read | .output += $m.output))})
+     | from_entries | priced($prices[0]))
+  + {session: $sid, harness_version: $s.version, start: $s.start, end: $s.end,
+     wall_s: (if $s.start == null then null else ($s.end | epoch) - ($s.start | epoch) end)}'

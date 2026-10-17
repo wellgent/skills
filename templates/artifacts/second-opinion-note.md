@@ -1,1 +1,0 @@
-Second opinion on the <design record | design note> at <link>. Audit report: <path | none>. Check every contract example against the three cases and every hard-to-reverse call; report each sentence you would change with its new wording.

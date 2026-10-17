@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Equip a target project with the web-stack skills and tooling that actually fit it. [catalog.md](./catalog.md) is the directory - community skills, quality tooling, deployment configs, and earned recipes, grouped by concern. Your job is judgment, not coverage: read the project, pick the relevant entries, propose, install.
 
-The stack setup for a web product: [`setup-project`](../setup-project/SKILL.md) brings a project onto the flow and calls this skill for everything stack-specific. Run from a checkout of this repo; the argument is the path to the target project (ask if missing). Idempotent - re-running revisits the selection against the project's current state.
+The stack setup for a web product: [`setup-project`](../setup-project/SKILL.md) brings a project onto pstack and calls this skill for everything stack-specific. Run from a checkout of this repo; the argument is the path to the target project (ask if missing). Idempotent - re-running revisits the selection against the project's current state.
 
 ## Two routes
 
@@ -33,10 +33,10 @@ Read [catalog.md](./catalog.md) and select what serves this project. A Next.js a
 Community skills, from the target project root:
 
 ```bash
-npx skills add "<source>#$(flow sources pin <source>)" --agent codex --copy -y --skill <name> [--skill <name> ...]
+npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill <name> ...]
 ```
 
-- The pin is the commit the source log names for that source; the CLI records it as `ref` in `skills-lock.json`. A source the log lacks gets a section there first
+- The sha is the commit the project already pins for that source when every skill of the source sits on it, otherwise the source's current `main` (`gh api repos/<source>/commits/main --jq .sha`); the CLI records it as `ref` in `skills-lock.json`
 - `--agent codex` writes real directories into `.agents/skills/`; `--copy` keeps the files in the project instead of symlinking a package cache
 - Skip skills already locked at that `ref`; re-pin with `npx skills remove <name> -y` and a fresh `add`, never `npx skills update`
 - Normalize afterwards: real dirs under `.agents/skills/`, relative symlinks `.claude/skills/<name>` → `../../.agents/skills/<name>` (create missing ones; move any stray real dirs the CLI wrote into `.claude/` or `agent/`)
@@ -46,22 +46,26 @@ Tooling and configs (quality gate devDeps, scripts, `vercel.json`, etc.) go in a
 
 A project with a `convex/` directory also takes the [Convex branch](./convex.md).
 
-### 4. Journey tests
+### 4. CI
 
-For each critical journey the client approved (the "Critical journeys" section of `docs/agents/dev-loop.md`): one plain Playwright test under `e2e/journeys/`, with its own `playwright.config.ts` there that starts the app per "Running the app" and signs in as a seeded test identity.
-The `test:journeys` script runs them, and the "Journey tests" gate line names it.
+Copy [`check.yml`](./check.yml) to `.github/workflows/check.yml`, with the node version file and the build-time secrets the project's check command reads. Secrets go in as repository secrets (`gh secret set`), each named in the report when only the owner holds its value.
+
+### 5. Journey tests
+
+For each critical journey the owner approved (the "Critical journeys" section of `docs/agents/dev-loop.md`): one plain Playwright test under `e2e/journeys/`, with its own `playwright.config.ts` there that starts the app per "Running the app" and signs in as a seeded test identity.
+The `test:journeys` script runs them, and the "Journey tests" line names it; the project's verification skill runs them before a pull request opens.
 With no approved journeys, scaffold nothing.
 
-### 5. Record in the project docs
+### 6. Record in the project docs
 
-The stack's facts go where the flow reads them, per the Methodology section of [`standards/web-products.md`](../../standards/web-products.md) ("What this stack puts in those files"):
+The stack's facts go where a session reads them, per the Methodology section of [`standards/web-products.md`](../../standards/web-products.md):
 
-- `AGENTS.md`: the check command in "Rules for every session", and one must-read entry per pinned skill or file an implementer reads, each with its trigger.
-- `docs/agents/dev-loop.md`: the gate lines with the surface and prose paths, worktrees, running the app, Review lenses, QA tools with their named checks, Audit lenses, the scanner pass commands, the design-system commands, and each deviation from the doctrine with its reason.
+- `AGENTS.md`: the check command in "Rules for every session", and one must-read entry per pinned skill or file a session reads before writing code, each with its trigger.
+- `docs/agents/dev-loop.md`: the check command and CI, running the app, worktrees, the journey tests, the design-system commands, and each deviation from the doctrine with its reason.
 
 Every skill pinned in step 3 is named on one of those lines; one that no line names is removed.
 
-### 6. Verify
+### 7. Verify
 
 Verify what you installed, nothing more:
 
@@ -73,4 +77,4 @@ Report anything only the user can fix by hand: auth, tokens, deployment-protecti
 
 ## Report
 
-End with: what was installed and why, what was skipped and why, tooling and script changes, the lines written to the project docs, verification results, and any manual follow-ups.
+End with: what was installed and why, what was skipped and why, tooling and script changes, the CI workflow and its secrets, the lines written to the project docs, verification results, and any manual follow-ups.

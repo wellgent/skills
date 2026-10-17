@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# start <owner>/<repo> <issue> <prompt file>
+# Starts one pstack run as its own herdr session in the project's checkout at ~/repos/<repo>:
+# a tab in the workspace <repo>-operate, Claude Code in it, /pstack:poteto-mode pointed at the
+# prompt file as the start prompt. Prints the session name and pane.
+# Exit 0 started, 4 stopped at a startup prompt to answer in the pane, 1 failed.
+set -euo pipefail
+die() { echo "start: $*" >&2; exit 1; }
+for tool in herdr jq claude; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+
+repo=${1:?usage: start <owner>/<repo> <issue> <prompt file>}
+issue=${2:?usage: start <owner>/<repo> <issue> <prompt file>}
+prompt_file=${3:?usage: start <owner>/<repo> <issue> <prompt file>}
+case $repo in */*) ;; *) die "repo must be <owner>/<repo>, got: $repo" ;; esac
+case $issue in *[!0-9]*|"") die "issue must be a number, got: $issue" ;; esac
+name=${repo##*/}
+cwd="$HOME/repos/$name"
+[ -d "$cwd/.git" ] || die "no checkout at $cwd"
+[ -f "$prompt_file" ] || die "no prompt file at $prompt_file"
+
+# herdr caps an agent name at 32 characters.
+session="op-${name:0:$((28 - ${#issue}))}-$issue"
+label="$name-operate"
+ws=$(herdr workspace list | jq -r --arg l "$label" '.. | objects | select(.label? == $l) | .workspace_id' | head -1)
+[ -n "$ws" ] || ws=$(herdr workspace create --cwd "$cwd" --label "$label" --no-focus | jq -r '.result.workspace.workspace_id')
+out=$(herdr tab create --workspace "$ws" --cwd "$cwd" --label "$session" --no-focus)
+pane=$(jq -r '.result.root_pane.pane_id // (.. | objects | .pane_id? // empty)' <<<"$out" | head -1)
+[ -n "$pane" ] || die "herdr created no pane in workspace $ws"
+
+# herdr types the start command into the pane's shell and a terminal line holds 1024 bytes,
+# so the command carries a pointer to the prompt file, and the run reads the rest from it.
+prompt="/pstack:poteto-mode The run request is in $prompt_file: read it and run it as written, including its run lines."
+for attempt in 1 2 3 4; do
+  if out=$(herdr agent start "$session" --kind claude --pane "$pane" --timeout 120000 -- \
+      --permission-mode bypassPermissions -n "$session" "$prompt" 2>&1); then
+    echo "$session started in pane $pane"
+    exit 0
+  fi
+  case $out in
+    *agent_not_ready*)
+      echo "$session stopped at a startup prompt in pane $pane: answer it there (herdr agent read $session --source visible)"
+      exit 4 ;;
+    *agent_pane_busy*) sleep 3 ;;
+    *'"timeout"'*|*agent_name_not_found*)
+      # A session that went straight to work on its start prompt runs past herdr's readiness wait.
+      # It is up when the pane holds claude: name it and carry on.
+      waited=0
+      while [ "$waited" -le 90 ]; do
+        if [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.agent // empty')" = claude ]; then
+          [ "$(herdr agent get "$pane" 2>/dev/null | jq -r '.result.agent.name // empty')" = "$session" ] ||
+            herdr agent rename "$pane" "$session" >/dev/null 2>&1 || true
+          echo "$session started in pane $pane"
+          exit 0
+        fi
+        sleep 5; waited=$((waited + 5))
+      done
+      die "no agent in pane $pane 90 s after the wait: $(echo "$out" | head -1)" ;;
+    *) die "could not start claude in pane $pane: $(echo "$out" | head -3)" ;;
+  esac
+done
+die "pane $pane stayed busy"
