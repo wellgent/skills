@@ -14,12 +14,12 @@ pstack owns everything inside the run; this skill writes the prompt, starts the 
 ## The request
 
 One open issue on the brain's tracker labelled `run`, in the shape of [`request.md`](request.md): the repo as `<owner>/<repo>`, then Goal, Done check, Proof, Known and Constraints.
-The requester writes it and `/operate` shapes nothing: a request missing a section gets one comment naming the missing sections, and no run starts.
+A request missing a section gets one comment naming the missing sections, and no run starts.
 
 ## 1. Read the request
 
 `gh issue view <n> --json title,body,author,url,labels,comments` on the brain's tracker (`git remote get-url origin` in the brain).
-Every section present, the label `run` present (add it when missing), and no comment starting `run:` already on the issue, which means an earlier start owns it.
+Every section present, the label `run` present (add it when missing), and no comment starting `run:` on the issue, which marks a run already started.
 
 ## 2. Check the project
 
@@ -28,8 +28,8 @@ Anything missing stops the run with its fix; a project not set up gets `setup-pr
 
 ## 3. Write the prompt
 
-Fill [`prompt.md`](prompt.md) with the request's URL, its five sections copied as written, and the requester's login, and save it as `~/.local/state/operate/<repo>-<n>.md`.
-The run lines at its end are fixed text: the fresh worktree, the decision log, landing authority, where a stop is answered, the stuck exit and the closing note.
+Fill [`prompt.md`](prompt.md) with the request's URL, its five sections copied as written and the requester's login; save it as `~/.local/state/operate/<repo>-<n>.md`.
+Its run lines stay as the template has them.
 
 ## 4. Start the run
 
@@ -42,17 +42,16 @@ A start that stops at a startup prompt (folder trust, a login) is answered in th
 
 ## 5. Record and stop
 
-Comment on the request: `run: <session> started on <hostname> at <UTC time>`.
-Then end the turn.
+Comment on the request: `run: <session> started on <hostname> at <UTC time>`, then end the turn.
 The run posts its note on the request and assigns the requester when it is done; nothing here waits for it.
 
 ## Cost
 
-`/operate cost <session id>` prices one finished session from its transcript on this host, tokens per model and USD at API list prices from [`scripts/prices.json`](scripts/prices.json):
+`/operate cost <session id>` prices one finished session from its transcript on this host: tokens per model and USD at the API list prices in [`scripts/prices.json`](scripts/prices.json).
 
 ```bash
 bash <this skill's directory>/scripts/cost <session id>
 bash <this skill's directory>/scripts/cost latest ~/repos/<repo>
 ```
 
-`latest` takes the newest transcript of that checkout, which is the run that ended last there.
+`latest` takes the checkout's newest transcript.

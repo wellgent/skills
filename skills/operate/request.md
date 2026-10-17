@@ -20,7 +20,7 @@ labels: run
 
 ## Known
 
-<What is already known: the files, records, decisions and earlier findings the run starts from.>
+<What is already known: the files, records, decisions and findings the run starts from.>
 
 ## Constraints
 
