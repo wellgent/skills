@@ -1,0 +1,31 @@
+{
+  "brain": "{{name}}",
+  "github_repo": "{{github_repo}}",
+  "branch": "main",
+  "published_repo": "{{host_home}}/{{name}}",
+  "source_id": "{{source_id}}",
+  "unit": "{{name}}-reconciler.service",
+  "state_dir": "{{host_home}}/.gbrain/reconciler",
+  "sync_lock": "{{host_home}}/.gbrain/sync.lock",
+  "gbrain_bin": "{{host_home}}/.local/bin/gbrain",
+  "bun_bin": "{{host_home}}/.bun/bin/bun",
+  "gbrain_src": "{{host_home}}/.bun/install/global/node_modules/gbrain/src",
+  "python_bin": "/usr/bin/python3",
+  "env_file": "{{host_home}}/.openclaw/.env",
+  "path": "{{host_path}}",
+  "alert": {
+    "openclaw_bin": "{{host_home}}/.npm-global/bin/openclaw",
+    "account": "{{alert_account}}",
+    "channel": "{{ops_alerts_channel}}"
+  },
+  "needs_attention": {
+    "assignee": "{{owner_github}}",
+    "labels": ["needs-attention", "workflow:health"]
+  },
+  "rescue_author": {
+    "name": "{{reconciler_author}}",
+    "email": "{{reconciler_email}}"
+  },
+  "timing": {},
+  "deadman": []
+}
