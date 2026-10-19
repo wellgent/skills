@@ -86,7 +86,14 @@ def load(path):
 
 
 def save(path, data):
-    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+    """Write JSON; a set keeps one case per line, so a promotion diffs as the lines it adds."""
+    if 'queries' not in data:
+        Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+        return
+    head = {k: v for k, v in data.items() if k != 'queries'}
+    lines = [f'  {json.dumps(k)}: {json.dumps(v, ensure_ascii=False)},' for k, v in head.items()]
+    cases = ',\n'.join('    ' + json.dumps(c, ensure_ascii=False) for c in data['queries'])
+    Path(path).write_text('{\n' + '\n'.join(lines) + '\n  "queries": [\n' + cases + '\n  ]\n}\n')
 
 
 def commit_push(cfg, meta, subject, body):
