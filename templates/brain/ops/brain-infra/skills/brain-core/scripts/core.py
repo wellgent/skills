@@ -21,6 +21,7 @@ A target's base commit is recorded in the brain whenever the whole target matche
 """
 import argparse
 import bisect
+import collections
 import copy
 import difflib
 import json
@@ -509,6 +510,26 @@ class Aligner:
                 return sha, core_text, doc_values(self.cc, rel, core_text, text)
         return None
 
+    def unremoved(self, rel, text, head):
+        """A core removal the target has not taken, as a behind hit at the base, or None.
+
+        A line the core drops next to a local slot still matches the head as a local line. When
+        the target also matches its base version, and reading it against the head finds local
+        lines that the base reading finds as core lines, those lines left the core since the base.
+        """
+        old = self.core.show(self.base, rel) if self.base else None
+        if old is None or old == head or not matches(self.cc, rel, old, text):
+            return None
+
+        def local_lines(values):
+            groups = values.values() if sectioned(self.cc, rel) else [values]
+            return collections.Counter(line for group in groups for name, value in group.items()
+                                       if name.startswith('local__') for line in value.splitlines() if line.strip())
+        at_base = doc_values(self.cc, rel, old, text)
+        if local_lines(doc_values(self.cc, rel, head, text)) - local_lines(at_base):
+            return self.base, old, at_base
+        return None
+
     def merge(self, rel, text, old, values, favor=None):
         """Bring the core change from old to head into the brain text; (clean, merged)."""
         head = self.core.show(self.core.head, rel)
@@ -547,9 +568,12 @@ class Aligner:
         for rel in sorted(set(head_files) | base_files):
             head = self.core.show(self.core.head, rel)
             text = self.co.text(rel)
+            hit = None
             if head is not None and matches(self.cc, rel, head, text):
-                ok += 1
-                continue
+                hit = self.unremoved(rel, text, head)
+                if not hit:
+                    ok += 1
+                    continue
             if not self.settled(rel):
                 settling.append(rel)
                 continue
@@ -569,7 +593,7 @@ class Aligner:
                 except Unfilled as missing:
                     findings.append(self.unfilled(rel, str(missing)))
                 continue
-            hit = self.behind(rel, text, self.core.versions(rel, self.base)[1:])
+            hit = hit or self.behind(rel, text, self.core.versions(rel, self.base)[1:])
             if not hit:
                 findings.append(self.departure(rel, text))
                 continue
@@ -578,7 +602,9 @@ class Aligner:
             except Unfilled as missing:
                 findings.append(self.unfilled(rel, str(missing)))
                 continue
-            if clean:
+            if clean and merged == text:
+                ok += 1
+            elif clean:
                 changes.append({'path': rel, 'text': merged, 'what': f'core change since {hit[0][:7]} brought in'})
             else:
                 findings.append(self.conflict(rel, text, hit[0]))

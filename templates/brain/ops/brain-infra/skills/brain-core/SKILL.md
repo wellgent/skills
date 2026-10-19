@@ -22,6 +22,7 @@ It runs on the `brain-routines` framework and reports to the `core` workflow cha
 - **Behind**: the file matches an older core version. The core change since that version is merged in with the target's values and the lines it adds at the core's local slots. All such changes land as one maintenance commit per target and run.
   - A core file the target lacks is added, filled with the values its other files agree on. The workspace also takes values from the brain.
   - A file the core dropped is removed when the target's copy still matches its last core text, and stays as a local file otherwise.
+  - A line the core drops next to a local slot still matches the head as a local line. The file is behind when it also matches its base version and the base reading holds that line as a core line, so the removal flows out.
 - **Departed**: the file matches no core version since the target's base commit, or the target lost a core file. Needs attention.
 - **Conflict**: the file is behind, but the core change collides with local lines. Needs attention.
 - **Unfilled**: a new core file needs a placeholder value no file carries. Needs attention.
