@@ -139,6 +139,15 @@ def page_slice(name):
     return [] if name in (None, '') or '/' not in name else [p.strip() for p in name.split(',') if p.strip()]
 
 
+def slice_label(name):
+    """A slice's name for the brief and the run update: a long page slice reads as its count and common directory."""
+    pages = page_slice(name)
+    if len(pages) <= 3:
+        return name
+    common = os.path.commonpath(pages)
+    return f'{len(pages)} pages' + (f' under {common}/' if common else '')
+
+
 # the brain as data
 
 class Brain:
@@ -463,11 +472,11 @@ def build_packet(cfg, rc, meta, slice_name, brain=None, issues=None):
 
 
 def brief(packet):
-    groups = [('slice', f'Slice `{packet["slice"]}`: review candidates'), ('inbox', 'Inbox items past the window'),
+    groups = [('slice', f'Slice `{slice_label(packet["slice"])}`: review candidates'), ('inbox', 'Inbox items past the window'),
               ('research', 'Research records past retention or superseded'), ('restore', 'Archived pages with new interaction'),
               ('drift', 'Drift sample: unchanged pages with time-sensitive statements')]
     lines = [f'# Relevance packet {packet["run_id"]}', '',
-             f'Slice `{packet["slice"]}`: {packet["slice_pages"]} reviewable pages; {len(packet["pages"])} pages to judge in all. '
+             f'Slice `{slice_label(packet["slice"])}`: {packet["slice_pages"]} reviewable pages; {len(packet["pages"])} pages to judge in all. '
              f'Today is {packet["today"]}. Brain at {packet["brain_head"][:12]}.']
     if packet['waiting_on_owner']:
         lines.append('Skipped, waiting on an open needs-attention issue: ' + ', '.join(packet['waiting_on_owner']))
@@ -713,7 +722,7 @@ def cmd_finish(cfg, rc, meta):
              ('rejected', 'rejected by the guards'),
              ('not judged', 'not judged')]
     done = ', '.join(f'{label} {tally[k]}' for k, label in verbs if tally[k])
-    summary = (f'slice {packet["slice"]}: {groups["slice"]} of {packet["slice_pages"]} pages up for review'
+    summary = (f'slice {slice_label(packet["slice"])}: {groups["slice"]} of {packet["slice_pages"]} pages up for review'
                + (f'; inbox {groups["inbox"]}' if groups['inbox'] else '') + (f'; research {groups["research"]}' if groups['research'] else '')
                + (f'; restore checks {groups["restore"]}' if groups['restore'] else '') + f'; drift sample {groups["drift"]}'
                + (f'. {done}.' if done else '.'))
