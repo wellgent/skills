@@ -8,4 +8,6 @@
 
 {{agent_write_flow}}
 
+Planted core-flow test line: {{owner}} sees it in the workspace until the core reverts it.
+
 {{local}}
