@@ -3,7 +3,8 @@
 # Run from the brain's checkout. Waits for the next comment on the run request after the given
 # comment (default: the newest one now), then prints every newer comment and exits 0, so the
 # operator session that started it in the background reads what the run posted.
-# Exit 3 when the run's herdr session is gone with no new comment, 1 on an error.
+# Exit 3 when the run's herdr session is gone with no new comment, 1 on a usage error;
+# a failed GitHub call while waiting is retried.
 set -euo pipefail
 die() { echo "watch: $*" >&2; exit 1; }
 for tool in gh jq herdr; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
@@ -23,7 +24,9 @@ name=${repo##*/}
 session="op-${name:0:$((28 - ${#issue}))}-$issue"
 
 while :; do
-  new=$(comments | jq --argjson after "$after" '[.[] | select(.id > $after)]')
+  # A failed GitHub call (a 5xx, a dropped connection) is retried on the next round.
+  if ! all=$(comments 2>/dev/null); then sleep "$interval"; continue; fi
+  new=$(jq --argjson after "$after" '[.[] | select(.id > $after)]' <<<"$all")
   if [ "$(jq length <<<"$new")" -gt 0 ]; then
     jq -r '.[] | "=== comment \(.id) by \(.author) at \(.at) \(.url)\n\(.body)\n"' <<<"$new"
     exit 0
