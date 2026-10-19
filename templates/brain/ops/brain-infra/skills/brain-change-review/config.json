@@ -1,0 +1,22 @@
+{
+  "routine": "review-daily",
+  "areas": {
+    "editable": {{review_editable}},
+    "records": {{review_records}},
+    "context": {{review_context}}
+  },
+  "batch_size": 5,
+  "budget_seconds": 3600,
+  "cooldown_days": 3,
+  "first_run_hours": 24,
+  "max_attempts": 3,
+  "semantic_hits": 10,
+  "neighbour_cap": 30,
+  "diff_chars": 10000,
+  "lint_ignore": ["type-undeclared", "huge-page"],
+  "judge_miss": {
+    "window_days": 14,
+    "lookback_days": 28,
+    "threshold": 0.1
+  }
+}
