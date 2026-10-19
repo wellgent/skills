@@ -8,7 +8,7 @@ Nothing installs it and nothing links to it at runtime. Each brain keeps its own
 
 - **Planning layer**: the tracker docs under `docs/agents/`, and the "Planning workflow" and "Operating projects" sections of `AGENTS.md`.
 - **Brain-ops layer**: the core behavior skills under `skills/` (`brain-ops`, `query`, `capture`, `signal-detector`, `brain-taxonomist`, `repo-architecture`) with their routing evals, the shared conventions under `skills/conventions/`, `skills/_output-rules.md`, `skills/README.md`, `brain-transport` under `ops/brain-infra/skills/`, and the other shared `AGENTS.md` sections.
-- **Brain-infra reference copies**: each brain-infra skill that every brain runs has its reference copy under `ops/brain-infra/skills/`: `gbrain-host-reconciler`, the `brain-routines` framework and the `brain-change-review` workflow; the concrete copy and its scripts live in each brain.
+- **Brain-infra reference copies**: each brain-infra skill that every brain runs has its reference copy under `ops/brain-infra/skills/`: `gbrain-host-reconciler`, the `brain-routines` framework, the `brain-change-review` workflow and the `brain-core` workflow; the concrete copy and its scripts live in each brain.
 
 [`templates/workspace/AGENTS.md`](../workspace/AGENTS.md) is the brain section of the `AGENTS.md` of an agent runtime workspace bound to a brain on its host.
 
@@ -50,3 +50,4 @@ The index:
 `AGENTS.md` is checked by section, and blank lines are ignored.
 
 A deviation is settled one of three ways: promote the brain's change to the core, turn the differing text into a placeholder, or revert the brain's copy.
+Each brain runs this cross-check daily in its `brain-core` workflow: core changes flow into the brain with its values, and a departure becomes a needs-attention issue offering those settlements.
