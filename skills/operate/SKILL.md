@@ -1,6 +1,6 @@
 ---
 name: operate
-description: Run a brain request on a project through pstack - read the request issue, write the run prompt, start the run in herdr with landing authority, then watch the request, answer the run's stops or bring them to the requester, and check its note. Use for /operate <issue>, and /operate cost <session> to price a finished run.
+description: Run a brain request on a project through pstack - read the request issue, write the run prompt, start the run in herdr with landing authority, then watch the request, answer the run's plan and stops or bring them to the requester, pause the run near the weekly usage limit, and check its note. Use for /operate <issue>, which also resumes a paused run, and /operate cost <session> to price a finished run.
 argument-hint: "<request issue> | cost <session id | latest <checkout>>"
 disable-model-invocation: true
 ---
@@ -9,26 +9,30 @@ disable-model-invocation: true
 
 The operator between a brain and pstack: a **run request** on the brain's tracker goes in, a pstack run on the project comes out, and the run's note comes back to the request.
 Run from the brain's checkout on any host that holds the project at `~/repos/<repo>`.
-pstack owns everything inside the run; this skill writes the prompt, starts the session, and stays the run's operator until its note is handled: every stop the run posts reaches this session first, and the requester hears only the calls that are theirs.
+pstack owns everything inside the run, under the rules in the project's own files; this skill writes the prompt, starts the session, and stays the run's operator until its note is handled: every stop the run posts reaches this session first, and the requester hears only the calls that are theirs.
+The operator's answers, `scope:` comments and catch-ups hold only calls about this one run; a rule every run should follow belongs in host setup or the project template, and goes to the requester as that proposal.
 
 ## The request
 
 One open issue on the brain's tracker labelled `run`, in the shape of [`request.md`](request.md): the repo as `<owner>/<repo>`, then Goal, Done check, Proof, Known and Constraints.
 A request missing a section gets one comment naming the missing sections, and no run starts.
+The body is frozen once a run starts: every change, from the operator or the requester, is a comment starting `scope:` (see Scope changes).
 
 ## 1. Read the request
 
 `gh issue view <n> --json title,body,author,url,labels,comments` on the brain's tracker (`git remote get-url origin` in the brain).
 Every section present, the label `run` present (add it when missing), and no comment starting `run:` on the issue, which marks a run already started.
+The one exception is a paused run: when the newest `run:` comment is followed by a comment from the run headed `Hand-back`, this is its resume (see Resume).
 
 ## 2. Check the project
 
-In `~/repos/<repo>`: `git fetch`, a clean tree on the main branch at its remote head, `pstack@pstack-claude` enabled in `.claude/settings.json`, and `gh auth status` green.
+In `~/repos/<repo>`: `git fetch`, a clean tree on the main branch at its remote head, `pstack@pstack-claude` enabled in `.claude/settings.json`, `scripts/land` present, and `gh auth status` green.
 Anything missing stops the run with its fix; a project not set up gets `setup-project`.
 
 ## 3. Write the prompt
 
 Fill [`prompt.md`](prompt.md) with the request's URL, and its five sections copied as written; save it as `~/.local/state/operate/<repo>-<n>.md`.
+On a resume, the resume line takes the URL of the first `Hand-back` comment; otherwise it goes.
 Its run lines stay as the template has them.
 
 ## 4. Start the run
@@ -42,16 +46,38 @@ A start that stops at a startup prompt (folder trust, a login) is answered in th
 
 ## 5. Record and watch
 
-Comment on the request: `run: <session> started on <hostname> at <UTC time>`.
+Comment on the request: `run: <session> started on <hostname> at <UTC time>`, or on a resume `run: <session> resumed on <hostname> at <UTC time> from <hand-back URL>`.
 Start the watch in the background, then end the turn:
 
 ```bash
 bash <this skill's directory>/scripts/watch <n> [<comment id>]
 ```
 
-It returns with every comment newer than the given one (default: the newest now) and exits 0, or exits 3 when the run's session is gone with no new comment.
+It returns with one reason, printed:
+
+- **Exit 0**: every comment newer than the given one (default: the newest now). Handle each: the plan, a stop, a confirmation, the hand-back or the note.
+- **Exit 3**: the run's session is gone with no new comment (see The note).
+- **Exit 4**: this host's weekly usage is at 90% or above: pause the run (see Pause).
+- **Exit 5**: the run's session has done nothing for 30 minutes with no new comment. Read its pane (`herdr agent read <session> --source visible`) and act on what holds it: a five-hour usage limit waits for its reset, then the run is told in its pane to carry on; anything else is handled like a stop.
+
 Restart it after each return, from the newest comment id it printed or that this session posted, until the note is handled.
 This session stays open for the run's whole length; a closed operator leaves the run's stops unread.
+
+## Talking to the run
+
+The run reads the request only while it waits on a stop, so every message to it goes to its pane, which is `herdr agent get <session>`'s `.result.agent.pane_id`:
+
+```bash
+herdr pane send-text <pane> "<message>"
+herdr pane send-keys <pane> Enter
+```
+
+## The plan
+
+The run's first stop is its plan, posted before any implementer starts.
+Check it against the request: every item serves the done check within the constraints.
+Answer in one comment with a go, or with a cut naming what leaves the plan, then tell the run as for a stop.
+Only an out-of-scope ask in the plan reaches the requester, escalated as in Stops.
 
 ## Stops
 
@@ -65,12 +91,32 @@ To escalate, catch the requester up in this session in `/ketchup`'s voice: how m
 Assign the requester on the request, so the call shows in their open `run` issues, and wait for their answer.
 
 Answer the stop in one comment on the request covering every question, the requester's calls in their substance, and remove the assignee.
-Then tell the run, so it reads the answer before its next poll: the pane is `herdr agent get <session>`'s `.result.agent.pane_id`.
+Then tell the run: "Your stop on <request URL> is answered: read it now."
 
-```bash
-herdr pane send-text <pane> "Your stop on <request URL> is answered: read it now."
-herdr pane send-keys <pane> Enter
-```
+## Scope changes
+
+A change to what the run does, from the requester or the operator's own reading, is one comment on the request starting `scope:`, stating the change; the body stays as it was.
+The run treats it as an answered stop; tell it: "A `scope:` comment on <request URL> changes the run: read it now."
+A `scope:` comment the requester posts gets the same message.
+
+## Partial stop
+
+To stop part of the run (a track, a review, a set of agents), name it in the run's pane: "Stop <what> now, leaves first, and confirm on <request URL>."
+The run's confirmation comes back through the watch; a part still running after it gets named again.
+
+## Pause
+
+At watch exit 4 the run pauses through pstack's Pause safely; a five-hour limit never pauses a run.
+
+1. Tell the run: "Weekly usage is at <percent>%: pause the run now and post the hand-back on <request URL>." Restart the watch with `WATCH_WEEKLY_LIMIT=off` until the hand-back is in.
+2. Check the request holds everything a resume needs, with paths relative to `$HOME`: the decision log, the `Hand-back` comment with the resume note and the run's working files, and every branch it names on the remote. Ask the run in its pane for whatever is missing; nothing a resume needs stays only on this host.
+3. End the run's session with `/exit` in its pane.
+4. Catch the requester up in `/ketchup`'s voice: the run is paused, what it landed and what is open, and a recommended host and time to resume, from the weekly reset that `bash <this skill's directory>/scripts/usage` prints and any other host holding the project with usage to spare. Assign the requester on the request.
+
+## Resume
+
+The requester picks the host and time.
+`/operate <issue>` on that host finds the hand-back at step 1 and starts a new run from it, under the same request, done check and `scope:` comments, through the same steps; the watch and everything after it run as for any run.
 
 ## The note
 
