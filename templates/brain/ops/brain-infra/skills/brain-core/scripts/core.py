@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-"""The core workflow: keep the brain aligned with the shared core, and the main agent's crons with the routine manifest.
+"""The core workflow: keep the brain and its workspace aligned with the shared core, and the main agent's crons with the routine manifest.
 
   core.py align --run <run_id>                    cross-check, bring core changes in, list what needs judgment
   core.py flag --run <run_id> <verdicts.json>     file a needs-attention issue for each judged finding
 
 Needs-attention option actions (run by the reply loop from this skill directory):
 
-  core.py revert <path>                take the core text for one file, with the brain's values
-  core.py promote <path>               make the brain's text of one file the core text
-  core.py add <path> <values json>     write a new core file with the given placeholder values
-  core.py crons                        make the crons match the manifest
+  core.py revert <path> [--target T]             take the core text for one file, with the target's values
+  core.py promote <path> [--target T]            make the target's text of one file the core text
+  core.py add <path> <values json> [--target T]  write a new core file with the given placeholder values
+  core.py crons                                  make the crons match the manifest
 
-The brain is aligned when every core file matches the core at its head commit. A file that
-matches an older core version is behind: the core change since that version is merged in with
-the brain's values and committed. A file that matches no core version since the recorded base
-commit has departed from the core and becomes a finding. The base commit is recorded in the
-brain whenever the whole brain matches a new core head.
+There are two targets, each with its own core root: the brain, written from its maintenance
+clone, and the main agent's workspace, written from the workspace's maintenance clone and
+fast-forwarded into the live workspace. A target is aligned when every core file matches the core
+at its head commit. A file that matches an older core version is behind: the core change since
+that version is merged in with the target's values and committed. A file that matches no core
+version since the target's recorded base commit has departed from the core and becomes a finding.
+A target's base commit is recorded in the brain whenever the whole target matches a new core head.
 """
 import argparse
 import bisect
+import copy
 import difflib
 import json
 import os
@@ -36,6 +39,7 @@ import routinelib as lib  # noqa: E402
 from routinelib import Failed  # noqa: E402
 
 ROUTINE = 'core-check'
+TARGETS = ('brain', 'workspace')
 DIFF_LINES = 120
 
 
@@ -59,7 +63,8 @@ def load_config():
 class Core:
     def __init__(self, cfg, fetch=True):
         c = cfg['core']
-        self.root, self.branch = c['root'], c['branch']
+        self.roots, self.branch = c['targets'], c['branch']
+        self.root = self.roots['brain']
         self.dir = Path(c.get('clone') or lib.state_dir(cfg) / 'core' / Path(c['repo']).stem)
         self.web = c['web']
         if not (self.dir / '.git').exists():
@@ -72,6 +77,12 @@ class Core:
 
     def git(self, *args, timeout=120, check=True, input=None):
         return lib.run(['git', '-C', self.dir, *args], timeout=timeout, check=check, input=input)
+
+    def at(self, target):
+        """The same clone, read at the core root of one target."""
+        view = copy.copy(self)
+        view.root = self.roots[target]
+        return view
 
     def checker(self):
         """The core's own cross-check rules (setup/setup-brain/core-check at the head commit)."""
@@ -124,15 +135,85 @@ class Core:
         return f'{self.web}/blob/{sha}/{self.path(rel)}' if rel else f'{self.web}/commit/{sha}'
 
 
-# the brain: its maintenance clone
+# a target: the brain or the workspace, each written from its own maintenance clone
 
-class Brain:
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.dir = Path(cfg['maintenance_repo'])
+class Checkout:
+    def __init__(self, cfg, target='brain'):
+        self.target, self.live = target, None
+        if target == 'brain':
+            self.cfg, self.name = cfg, cfg['brain']
+        else:
+            # The main agent's workspace, whose skills directory brain-routines links into. Its
+            # maintenance clone sits next to it, so the agent's own working tree is never written
+            # except by a fast-forward.
+            self.live = Path(cfg['openclaw']['workspace_skills']).parent
+            self.name = self.live.name
+            url = lib.run(['git', '-C', self.live, 'remote', 'get-url', 'origin'])
+            slug = re.search(r'github\.com[:/](.+?)(?:\.git)?/?$', url)
+            if not slug:
+                raise Failed(f'the workspace origin {url} is not a GitHub repository')
+            branch = lib.run(['git', '-C', self.live, 'symbolic-ref', '--short', 'HEAD'])
+            self.cfg = {**cfg, 'maintenance_repo': f'{self.live}-maintenance', 'branch': branch, 'github_repo': slug.group(1)}
+            clone = Path(self.cfg['maintenance_repo'])
+            if not (clone / '.git').exists():
+                lib.run(['git', 'clone', '--quiet', '--branch', branch, url, clone], timeout=300)
+                for key in ('user.name', 'user.email'):
+                    lib.run(['git', '-C', clone, 'config', key, lib.clone_git(cfg, 'config', key)])
+        self.dir = Path(self.cfg['maintenance_repo'])
 
     def git(self, *args, **kw):
         return lib.clone_git(self.cfg, *args, **kw)
+
+    def label(self, rel):
+        return rel if self.target == 'brain' else f'{self.name}/{rel}'
+
+    def reset(self):
+        return lib.reset_clone(self.cfg)
+
+    def commit_push(self, subject, body):
+        self.git('commit', '--quiet', '-m', subject, '-m', body)
+        lib.push_clone(self.cfg)
+        return self.git('rev-parse', 'HEAD')
+
+    def commit_url(self, sha):
+        return lib.commit_url(self.cfg, sha)
+
+    def revert_hint(self, sha):
+        return f'git revert {sha[:12]}' + ('' if self.target == 'brain' else f' (in {self.cfg["github_repo"]})')
+
+    def deliver(self, rels):
+        """Fast-forward the live workspace when it lags its origin in a core file; a note when it cannot."""
+        if self.live is None:
+            return None
+        branch = self.cfg['branch']
+
+        def live(*args, **kw):
+            return lib.run(['git', '-C', self.live, *args], **kw)
+
+        def blob(repo, ref, rel):
+            code, out, _ = lib.run(['git', '-C', repo, 'rev-parse', f'{ref}:{rel}'], check=False)
+            return out.strip() if code == 0 else None
+        if all(blob(self.live, 'HEAD', rel) == blob(self.dir, f'origin/{branch}', rel) for rel in rels):
+            return None
+        code, _, err = live('fetch', '--quiet', 'origin', branch, timeout=180, check=False)
+        dirty = live('status', '--porcelain=v1', '--untracked-files=no', check=False)[1].strip()
+        on = live('symbolic-ref', '--short', 'HEAD', check=False)[1].strip()
+        behind = live('merge-base', '--is-ancestor', 'HEAD', f'origin/{branch}', check=False)[0] == 0
+        if code:
+            why = f'its fetch failed ({err.strip()[-200:]})'
+        elif dirty:
+            why = 'it has uncommitted changes'
+        elif on != branch:
+            why = f'it is not on {branch}'
+        elif not behind:
+            why = 'it holds commits its origin lacks'
+        else:
+            code, _, err = live('merge', '--ff-only', '--quiet', f'origin/{branch}', check=False)
+            if code == 0:
+                return f'Fast-forwarded the live `{self.live}` to {branch}.'
+            why = f'the fast-forward failed ({err.strip()[-200:]})'
+        return (f'The live `{self.live}` lags {self.cfg["github_repo"]} in a core file, and {why}: '
+                'it takes the change at its next pull, and the next run tries again.')
 
     def text(self, rel):
         path = self.dir / rel
@@ -234,17 +315,41 @@ def values_of(cc, template, target):
         starts.append(pos)
         pos += len(lines[i].rstrip()) + 1
     blocks = {b.group(1) for line in tl if (b := cc.BLOCK.fullmatch(line.strip()))}
+
+    def span_lines(s, e):
+        first, last = bisect.bisect_right(starts, s) - 1, bisect.bisect_right(starts, e - 1) - 1
+        return lines[idx[first]:idx[last] + 1]
     values = {}
     for name in m.re.groupindex:
         s, e = m.span(name)
         if name in blocks or name.startswith('local__'):
-            if s == e:
-                values[name] = ''
-            else:
-                first, last = bisect.bisect_right(starts, s) - 1, bisect.bisect_right(starts, e - 1) - 1
-                values[name] = '\n'.join(lines[idx[first]:idx[last] + 1]) + '\n'
+            values[name] = '' if s == e else '\n'.join(span_lines(s, e)) + '\n'
         else:
             values[name] = m.group(name)
+    # A block right before a local block gets no lines from the lazy pattern. Give it the target's
+    # first paragraph there and leave the rest to the local block, so a core line added between the
+    # two lands between them.
+    slots, local = [], 0
+    for line in tl:
+        b = cc.BLOCK.fullmatch(line.strip())
+        if b and b.group(1) == 'local':
+            local += 1
+            slots.append(f'local__{local}')
+        else:
+            slots.append(b.group(1) if b and template.count(braced(b.group(1))) == 1 else None)
+    for block, after in zip(slots, slots[1:]):
+        if not block or block.startswith('local__') or not (after or '').startswith('local__'):
+            continue
+        s, e = m.span(block)[0], m.span(after)[1]
+        if s == e:
+            continue
+        seg = span_lines(s, e)
+        k = next((j for j, line in enumerate(seg) if not line.strip()), len(seg))
+        rest = seg[k:]
+        while rest and not rest[0].strip():
+            rest = rest[1:]
+        values[block] = '\n'.join(seg[:k]) + '\n'
+        values[after] = '\n'.join(rest) + '\n' if rest else ''
     return values
 
 
@@ -271,8 +376,12 @@ def local_slots(template):
 
 def render(cc, template, values, locals_=False):
     """The template with values filled in; local blocks stay empty unless locals_ fills them in order."""
-    out, local = [], 0
+    out, local, empty = [], 0, False
     for line in template.splitlines():
+        if empty and not line.strip() and (not out or not out[-1].strip()):
+            empty = False  # an empty block leaves one blank line, not two
+            continue
+        empty = False
         block = cc.BLOCK.fullmatch(line.strip())
         if block:
             name = block.group(1)
@@ -285,6 +394,8 @@ def render(cc, template, values, locals_=False):
                 raise Unfilled(name)
             if value:
                 out.append(value.rstrip('\n'))
+            else:
+                empty = True
             continue
 
         def fill(m):
@@ -303,11 +414,12 @@ def project(cc, rel, template, target, values, drop=(), locals_=False):
     wanted = dict(sections)
     flag = (lambda h: locals_.get(h, False)) if isinstance(locals_, dict) else (lambda h: locals_)
     rendered = {h: render(cc, raw, {**values.get('*', {}), **values.get(h, {})}, flag(h)) for h, raw in sections}
-    out, placed = [], set()
+    out, placed = [], {}
     for heading, raw in raw_sections(target or ''):
         if heading in wanted:
-            out.append(rendered[heading])
-            placed.add(heading)
+            # the section keeps the blank lines that close it in the target
+            placed[heading] = rendered[heading].rstrip('\n') + '\n' + '\n' * (len(raw) - len(raw.rstrip('\n')) - 1)
+            out.append(placed[heading])
         elif heading not in drop:
             out.append(raw)
     for i, (heading, _) in enumerate(sections):
@@ -316,10 +428,9 @@ def project(cc, rel, template, target, values, drop=(), locals_=False):
         before = [h for h, _ in sections[:i] if h in placed]
         at = len(out)
         if before:
-            anchor = rendered[before[-1]]
-            at = next(k for k, part in enumerate(out) if part is anchor) + 1
+            at = next(k for k, part in enumerate(out) if part is placed[before[-1]]) + 1
+        placed[heading] = rendered[heading]
         out.insert(at, rendered[heading])
-        placed.add(heading)
     return ''.join(part if part.endswith('\n') else part + '\n' for part in out)
 
 
@@ -346,11 +457,24 @@ def diff(a, b, label_a, label_b):
 
 # the alignment
 
+def read_base(cfg, brain, target):
+    """The core commit the target last fully matched, from the base file in the brain."""
+    return ((lib.read_json(brain.dir / cfg['core']['base_file'], {}) or {}).get(target) or {}).get('commit')
+
+
+def aligner_for(cfg, core, brain, target, parent=None):
+    """The aligner of one target; the workspace falls back on the brain's values for new core text."""
+    if target == 'brain':
+        return Aligner(cfg, core.at('brain'), brain, read_base(cfg, brain, 'brain'))
+    parent = parent or aligner_for(cfg, core, brain, 'brain')
+    return Aligner(cfg, core.at(target), Checkout(cfg, target), read_base(cfg, brain, target), parent)
+
+
 class Aligner:
-    def __init__(self, cfg, core, brain):
-        self.cfg, self.core, self.brain, self.cc = cfg, core, brain, core.cc
-        base = lib.read_json(brain.dir / cfg['core']['base_file'], {}) or {}
-        self.base = base.get('commit')
+    def __init__(self, cfg, core, checkout, base, parent=None):
+        self.cfg, self.core, self.co, self.cc, self.parent = cfg, core, checkout, core.cc, parent
+        self.target = checkout.target
+        self.base = base
         if self.base and self.core.git('cat-file', '-e', self.base + '^{commit}', check=False)[0]:
             self.base = None  # not in the core history: search it all
         self.shared = None
@@ -358,21 +482,24 @@ class Aligner:
 
     def settled(self, rel):
         window = self.cfg['core'].get('settle_minutes', 30) * 60
-        latest = max(self.core.changed_at(rel), self.brain.changed_at(rel))
+        latest = max(self.core.changed_at(rel), self.co.changed_at(rel))
         return time.time() - latest >= window
 
     def shared_values(self):
-        """Placeholder values every aligned file agrees on, for core files the brain lacks."""
+        """Placeholder values every aligned file agrees on, for core text the target lacks."""
         if self.shared is None:
             seen = {}
             for rel in self.core.files(self.core.head):
-                text = self.brain.text(rel)
-                if sectioned(self.cc, rel) or not matches(self.cc, rel, self.core.show(self.core.head, rel), text):
+                head, text = self.core.show(self.core.head, rel), self.co.text(rel)
+                if not matches(self.cc, rel, head, text):
                     continue
-                for name, value in (values_of(self.cc, self.core.show(self.core.head, rel), text) or {}).items():
-                    if not name.startswith('local__'):
-                        seen.setdefault(name, set()).add(value)
-            self.shared = {k: next(iter(v)) for k, v in seen.items() if len(v) == 1}
+                found = doc_values(self.cc, rel, head, text) or {}
+                for group in (found.values() if sectioned(self.cc, rel) else [found]):
+                    for name, value in group.items():
+                        if not name.startswith('local__'):
+                            seen.setdefault(name, set()).add(value)
+            own = {k: next(iter(v)) for k, v in seen.items() if len(v) == 1}
+            self.shared = {**(self.parent.shared_values() if self.parent else {}), **own}
         return self.shared
 
     def behind(self, rel, text, versions):
@@ -404,7 +531,7 @@ class Aligner:
     def restored(self, rel):
         """The brain file with the core text restored: its newest aligned version, brought to the core head."""
         versions = self.core.versions(rel)
-        for _, text in self.brain.history(rel):
+        for _, text in self.co.history(rel):
             hit = self.behind(rel, text, versions)
             if hit:
                 ok, merged = self.merge(rel, text, hit[1], hit[2], favor='theirs')
@@ -419,7 +546,7 @@ class Aligner:
         changes, findings, settling, ok = [], [], [], 0
         for rel in sorted(set(head_files) | base_files):
             head = self.core.show(self.core.head, rel)
-            text = self.brain.text(rel)
+            text = self.co.text(rel)
             if head is not None and matches(self.cc, rel, head, text):
                 ok += 1
                 continue
@@ -430,7 +557,7 @@ class Aligner:
                 if text is not None and self.behind(rel, text, self.core.versions(rel, self.base)):
                     changes.append({'path': rel, 'text': None, 'what': 'removed, as in the core'})
                 elif text is not None:
-                    lib.journal(self.cfg, self.run_id, 'note', text=f'`{rel}` left the core; the brain keeps its own copy.')
+                    lib.journal(self.cfg, self.run_id, 'note', text=f'`{self.co.label(rel)}` left the core; {self.who} keeps its own copy.')
                 continue
             if text is None:
                 if rel in base_files:
@@ -459,8 +586,18 @@ class Aligner:
 
     # findings
 
+    @property
+    def who(self):
+        return 'the brain' if self.target == 'brain' else f'the {self.co.name} workspace'
+
+    def argv(self, *args):
+        """An option action of this skill, aimed at this target."""
+        return ['scripts/core.py', *args] + ([] if self.target == 'brain' else ['--target', self.target])
+
     def finding(self, kind, rel, title, finding, why, evidence, options, recommended, question):
-        return {'id': f'{kind}:{rel}', 'type': kind, 'path': rel, 'fingerprint': f'{ROUTINE}:file:{rel}',
+        brain = self.target == 'brain'
+        return {'id': f'{kind}:{rel}' if brain else f'{kind}:{self.target}:{rel}', 'type': kind, 'target': self.target, 'path': rel,
+                'fingerprint': f'{ROUTINE}:file:{rel}' if brain else f'{ROUTINE}:{self.target}:{rel}',
                 'title': f'{self.cfg["brain"]} core: {title}', 'finding': finding, 'why': why, 'evidence': evidence,
                 'options': options, 'recommended': recommended, 'question': question}
 
@@ -468,57 +605,59 @@ class Aligner:
         restored = self.restored(rel)
         head = self.core.show(self.core.head, rel)
         link = self.core.link(self.core.head, rel)
+        name, mine = self.co.label(rel), f'{self.co.name}/{rel}'
         if text is None:
-            title = f'`{rel}` is missing, the core still carries it'
-            finding = f'The brain no longer has `{rel}`, which the shared core still carries ([core text]({link})).'
+            title = f'`{name}` is missing, the core still carries it'
+            finding = f'{self.who.capitalize()} no longer has `{rel}`, which the shared core still carries ([core text]({link})).'
         else:
-            title = f'`{rel}` departs from the shared core'
-            finding = f'`{rel}` matches no version of its [core text]({link}) since the core commit the brain last synced to.'
-        shown = diff(text, restored, f'brain/{rel}', f'core/{rel}') if restored else diff(head, text, f'core template/{rel}', f'brain/{rel}')
+            title = f'`{name}` departs from the shared core'
+            finding = f'`{name}` matches no version of its [core text]({link}) since the core commit {self.who} last synced to.'
+        shown = diff(text, restored, mine, f'core/{rel}') if restored else diff(head, text, f'core template/{rel}', mine)
         options = []
         if restored:
-            options.append({'label': 'Revert the brain to the core text', 'detail': 'restores the core lines with the brain\'s values (the diff above)',
-                            'action': {'type': 'command', 'argv': ['scripts/core.py', 'revert', rel]}})
+            options.append({'label': f'Revert {self.who} to the core text', 'detail': f'restores the core lines with the values of {self.who} (the diff above)',
+                            'action': {'type': 'command', 'argv': self.argv('revert', rel)}})
         if text is not None and restored:
-            options.append({'label': 'Promote the brain\'s text to the core', 'detail': 'commits it to the core repository, from where every brain takes it',
-                            'action': {'type': 'command', 'argv': ['scripts/core.py', 'promote', rel]}})
+            options.append({'label': f'Promote the text of {self.who} to the core', 'detail': 'commits it to the core repository, from where every brain takes it',
+                            'action': {'type': 'command', 'argv': self.argv('promote', rel)}})
         options.append({'label': 'Settle it by hand', 'detail': 'for example a new placeholder in the core; closes this issue, and the next run files it again if the file still departs',
                         'action': {'type': 'close'}})
         return self.finding('departure', rel, title, finding,
-                            'A brain change to a core file is either a core improvement or a local mistake, and only the owner decides which.',
+                            f'A change to a core file in {self.who} is either a core improvement or a local mistake, and only the owner decides which.',
                             [f'Core head: [{self.core.head[:7]}]({self.core.link(self.core.head)})', f'Diff:\n\n```diff\n{shown}\n```'],
-                            options, 1, 'Is the brain\'s change an improvement every brain should carry (promote) or a slip to undo (revert)?')
+                            options, 1, f'Is the change in {self.who} an improvement every brain should carry (promote) or a slip to undo (revert)?')
 
     def conflict(self, rel, text, since):
         restored = self.restored(rel)
         link = self.core.link(self.core.head, rel)
+        name, mine = self.co.label(rel), f'{self.co.name}/{rel}'
         changed = diff(self.core.show(since, rel), self.core.show(self.core.head, rel), f'core@{since[:7]}/{rel}', f'core@{self.core.head[:7]}/{rel}')
         evidence = [f'Core change: [{since[:7]}..{self.core.head[:7]}]({self.core.web}/compare/{since[:12]}...{self.core.head[:12]})',
                     f'Core change to the template:\n\n```diff\n{changed}\n```']
         if restored:
-            evidence.append(f'Taking the core text changes the brain file like this:\n\n```diff\n{diff(text, restored, "brain/" + rel, "core/" + rel)}\n```')
+            evidence.append(f'Taking the core text changes `{name}` like this:\n\n```diff\n{diff(text, restored, mine, "core/" + rel)}\n```')
         options = []
         if restored:
-            options.append({'label': 'Take the core text', 'detail': 'the brain lines that collide with the core change give way (the last diff)',
-                            'action': {'type': 'command', 'argv': ['scripts/core.py', 'revert', rel]}})
+            options.append({'label': 'Take the core text', 'detail': f'the lines of {self.who} that collide with the core change give way (the last diff)',
+                            'action': {'type': 'command', 'argv': self.argv('revert', rel)}})
         options.append({'label': 'Merge it by hand', 'detail': 'closes this issue; the next run files it again if the file still lags the core',
                         'action': {'type': 'close'}})
-        return self.finding('conflict', rel, f'the core change to `{rel}` does not merge cleanly',
-                            f'The [core text]({link}) of `{rel}` changed, and the change collides with brain-local lines.',
-                            'The core change and the brain\'s own lines touch the same place, so a merge would drop one of them.',
-                            evidence, options, 1, 'Do the colliding brain lines matter enough to merge by hand?')
+        return self.finding('conflict', rel, f'the core change to `{name}` does not merge cleanly',
+                            f'The [core text]({link}) of `{rel}` changed, and the change collides with local lines of {self.who}.',
+                            f'The core change and the own lines of {self.who} touch the same place, so a merge would drop one of them.',
+                            evidence, options, 1, 'Do the colliding local lines matter enough to merge by hand?')
 
     def unfilled(self, rel, name):
         link = self.core.link(self.core.head, rel)
         options = [{'label': 'Write it with the proposed values', 'detail': 'the values in the recommendation',
-                    'action': {'type': 'command', 'argv': ['scripts/core.py', 'add', rel, '{}']}},
+                    'action': {'type': 'command', 'argv': self.argv('add', rel, '{}')}},
                    {'label': 'Write it by hand', 'detail': 'closes this issue; the next run files it again while the file is missing or unfilled',
                     'action': {'type': 'close'}}]
-        return self.finding('unfilled', rel, f'`{rel}` needs a value for `{braced(name)}`',
-                            f'The [core text]({link}) of `{rel}` uses `{braced(name)}`, which no file of the brain carries a value for.',
+        return self.finding('unfilled', rel, f'`{self.co.label(rel)}` needs a value for `{braced(name)}`',
+                            f'The [core text]({link}) of `{rel}` uses `{braced(name)}`, for which no file of {self.who} or the brain carries a value.',
                             'A placeholder value is a brain fact the routine cannot derive from the core.',
                             [f'Core head: [{self.core.head[:7]}]({self.core.link(self.core.head)})',
-                             f'Placeholder index: {self.core.web}/blob/{self.core.head}/{self.core.root}/README.md'],
+                             f'Placeholder index: {self.core.web}/blob/{self.core.head}/{self.core.roots["brain"]}/README.md'],
                             options, 1, f'Propose the value of every placeholder `{rel}` needs, read from the brain, in "values".')
 
 
@@ -551,35 +690,53 @@ def drift_finding(cfg, drift):
 
 # commands
 
-def commit_push(cfg, brain, subject, body):
-    brain.git('commit', '--quiet', '-m', subject, '-m', body)
-    lib.push_clone(cfg)
-    return brain.git('rev-parse', 'HEAD')
-
-
 def cmd_align(cfg, run_id):
     meta = lib.current_run(cfg, run_id)
     lib.reset_clone(cfg)
-    core, brain = Core(cfg), Brain(cfg)
-    aligner = Aligner(cfg, core, brain)
-    aligner.run_id = meta['run_id']
-    changes, findings, settling, ok = aligner.align()
-    applied = None
+    core, brain = Core(cfg), Checkout(cfg)
+    results, findings, settling, applied = {}, [], [], []
+    for target in TARGETS:
+        aligner = aligner_for(cfg, core, brain, target, results.get('brain', {}).get('aligner'))
+        aligner.run_id = meta['run_id']
+        if target != 'brain':
+            wiped = aligner.co.reset()
+            if wiped:
+                lib.journal(cfg, meta['run_id'], 'note', text=f'Wiped leftovers in `{aligner.co.dir}`: ' + ', '.join(wiped) + '.')
+        changes, found, waiting, ok = aligner.align()
+        results[target] = {'aligner': aligner, 'changes': changes, 'ok': ok, 'files': len(aligner.core.files(core.head)),
+                           'complete': not found and not waiting}
+        findings += found
+        settling += [aligner.co.label(rel) for rel in waiting]
+
+    # The workspace commits from its own clone first; the brain commit then records every target's new base.
+    for target in TARGETS[1:]:
+        r = results[target]
+        co = r['aligner'].co
+        if r['changes']:
+            for c in r['changes']:
+                co.write(c['path'], c['text'], c.get('mode'))
+            sha = co.commit_push(f'brain: the shared {target} core at {core.head[:7]} flows into {len(r["changes"])} file(s)', align_body(meta, core, r['changes']))
+            applied.append(co.commit_url(sha))
+            lib.journal(cfg, meta['run_id'], 'change', text=f'Core {core.head[:7]} brought into ' + ', '.join(f'`{co.label(c["path"])}`' for c in r['changes']),
+                        url=co.commit_url(sha), revert=co.revert_hint(sha))
+        note = co.deliver(r['aligner'].core.files(core.head))
+        if note:
+            lib.journal(cfg, meta['run_id'], 'note', text=note)
+    advanced = [t for t in TARGETS if results[t]['complete']
+                and (results[t]['changes'] or core.at(t).tree(results[t]['aligner'].base) != core.at(t).tree(core.head))]
+    if advanced:
+        write_base(cfg, brain, core, advanced)
+    changes = results['brain']['changes']
     for c in changes:
         brain.write(c['path'], c['text'], c.get('mode'))
     if changes:
-        listing = '\n'.join(f'- {c["path"]}: {c["what"]}' for c in changes)
-        if not findings and not settling:
-            write_base(cfg, brain, core)
-        sha = commit_push(cfg, brain, f'setup: the shared core at {core.head[:7]} flows into {len(changes)} file(s)',
-                          f'Routine: {ROUTINE} ({meta["run_id"]})\nCore: {core.link(core.head)}\n\n{listing}')
-        applied = sha
+        sha = brain.commit_push(f'setup: the shared core at {core.head[:7]} flows into {len(changes)} file(s)', align_body(meta, core, changes))
+        applied.append(brain.commit_url(sha))
         lib.journal(cfg, meta['run_id'], 'change', text=f'Core {core.head[:7]} brought into ' + ', '.join(f'`{c["path"]}`' for c in changes),
-                    url=lib.commit_url(cfg, sha), revert=f'git revert {sha[:12]}')
-    elif not findings and not settling and core.tree(aligner.base) != core.tree(core.head):
-        write_base(cfg, brain, core)
-        commit_push(cfg, brain, f'setup: the brain matches the shared core at {core.head[:7]}',
-                    f'Routine: {ROUTINE} ({meta["run_id"]})\nCore: {core.link(core.head)}')
+                    url=brain.commit_url(sha), revert=brain.revert_hint(sha))
+    elif advanced:
+        names = ' and '.join(f'the {t}' for t in advanced)
+        brain.commit_push(f'setup: {names} {"match" if len(advanced) > 1 else "matches"} the shared core at {core.head[:7]}', align_body(meta, core, []))
     manifest_age = time.time() - int(lib.run(['git', '-C', cfg['published_repo'], 'log', '-1', '--format=%ct', '--', cfg['manifest']]) or 0)
     drift = cron_drift(cfg)
     if drift and manifest_age < cfg['core'].get('settle_minutes', 30) * 60:
@@ -589,23 +746,25 @@ def cmd_align(cfg, run_id):
     if settling:
         lib.journal(cfg, meta['run_id'], 'note', text='Changed in the last '
                     f'{cfg["core"].get("settle_minutes", 30)} minutes, checked next run: ' + ', '.join(f'`{s}`' for s in settling) + '.')
-    close_resolved(cfg, meta, {f['fingerprint'] for f in findings}, settling)
+    close_resolved(cfg, meta, {f['fingerprint'] for f in findings}, settling, {t: r['aligner'].co.label for t, r in results.items()})
     lib.atomic(lib.run_dir(cfg, meta['run_id']) / 'core-packet.json', {'core': core.head, 'findings': findings})
-    parts = [f'{ok} of {len(core.files(core.head))} core files match the core at {core.head[:7]}']
-    if changes:
-        parts.append(f'{len(changes)} brought in from the core')
+    b, w = results['brain'], results['workspace']
+    parts = [f'{b["ok"]} of {b["files"]} brain and {w["ok"]} of {w["files"]} {w["aligner"].co.name} workspace core files match the core at {core.head[:7]}']
+    brought = sum(len(r['changes']) for r in results.values())
+    if brought:
+        parts.append(f'{brought} brought in from the core')
     if findings:
         parts.append(f'{len(findings)} need attention')
     parts.append('crons match the manifest' if not drift else f'{len(drift)} cron drift(s)')
     summary = '; '.join(parts)
     routine = SKILL_DIR.parent / 'brain-routines' / 'scripts' / 'routine.py'
-    counts = {'core files ok': ok}
+    counts = {'core files ok': b['ok'], 'workspace core files ok': w['ok']}
     end = f'{cfg["python_bin"]} {routine} end {meta["run_id"]} --status ok --summary {json.dumps(summary)} --counts {json.dumps(json.dumps(counts))}'
     print(json.dumps({
         'differs': bool(findings),
         'summary': summary,
-        'applied': lib.commit_url(cfg, applied) if applied else None,
-        'findings': [{k: f[k] for k in ('id', 'type', 'path', 'title', 'question', 'options', 'recommended', 'evidence')} for f in findings],
+        'applied': applied,
+        'findings': [{k: f.get(k) for k in ('id', 'type', 'target', 'path', 'title', 'question', 'options', 'recommended', 'evidence')} for f in findings],
         'next': (f'Judge each finding, write [{{"id", "recommended", "reason"}}] to {lib.run_dir(cfg, meta["run_id"])}/verdicts.json, '
                  f'run `{cfg["python_bin"]} {Path(__file__).resolve()} flag --run {meta["run_id"]} {lib.run_dir(cfg, meta["run_id"])}/verdicts.json`, then end.'
                  if findings else 'Nothing needs judgment: end the run.'),
@@ -614,19 +773,33 @@ def cmd_align(cfg, run_id):
     return 0
 
 
-def write_base(cfg, brain, core):
+def align_body(meta, core, changes):
+    listing = ''.join(f'\n- {c["path"]}: {c["what"]}' for c in changes)
+    return f'Routine: {ROUTINE} ({meta["run_id"]})\nCore: {core.link(core.head)}' + (f'\n{listing}' if listing else '')
+
+
+def write_base(cfg, brain, core, targets):
+    """Record the core head as the base of each target, keeping the other targets' records."""
     rel = cfg['core']['base_file']
-    record = {'repo': cfg['core']['repo'], 'root': core.root, 'commit': core.head}
-    brain.write(rel, json.dumps(record, indent=2) + '\n')
+    record = {'repo': cfg['core']['repo'], **{t: v for t, v in (lib.read_json(brain.dir / rel, {}) or {}).items() if t in TARGETS}}
+    for t in targets:
+        record[t] = {'root': core.roots[t], 'commit': core.head}
+    brain.write(rel, json.dumps({k: record[k] for k in ('repo', *TARGETS) if k in record}, indent=2) + '\n')
 
 
-def close_resolved(cfg, meta, live, settling):
+def close_resolved(cfg, meta, live, settling, labels):
     """Close this routine's open file and cron issues whose finding is gone."""
     for issue in lib.open_attention(cfg, 'core'):
         fingerprint = lib._parse_comment('fingerprint', issue['body'])
         if not isinstance(fingerprint, str) or not fingerprint.startswith(f'{ROUTINE}:') or fingerprint in live:
             continue
-        rel = fingerprint.split(':file:', 1)[1] if ':file:' in fingerprint else cfg['manifest']
+        kind, _, rel = fingerprint[len(ROUTINE) + 1:].partition(':')
+        if kind == 'crons':
+            rel = cfg['manifest']
+        elif kind in labels and kind != 'file':
+            rel = labels[kind](rel)
+        elif kind != 'file':
+            continue
         if rel in settling:
             continue
         lib.gh(cfg, 'issue', 'comment', str(issue['number']), '--repo', cfg['github_repo'], '--body-file', '-',
@@ -652,7 +825,7 @@ def cmd_flag(cfg, run_id, verdicts_path):
         if f['type'] == 'unfilled':
             values = v.get('values') or {}
             if values:
-                options[0]['action']['argv'][-1] = json.dumps(values, ensure_ascii=False)
+                options[0]['action']['argv'][3] = json.dumps(values, ensure_ascii=False)  # scripts/core.py add <path> <values>
                 options[0]['detail'] = 'with ' + ', '.join(f'`{braced(k)}` = `{val}`' for k, val in values.items())
             else:
                 options = options[1:]
@@ -664,39 +837,51 @@ def cmd_flag(cfg, run_id, verdicts_path):
     return 0
 
 
-def action_result(cfg, meta, brain, rel, subject, what):
-    sha = commit_push(cfg, brain, subject, f'Routine: {ROUTINE} ({meta["run_id"]})\nIssue: {os.environ.get("ATTENTION_ISSUE", "")}')
-    url = lib.commit_url(cfg, sha)
-    lib.journal(cfg, meta['run_id'], 'change', text=f'{what} `{rel}`', url=url, revert=f'git revert {sha[:12]}')
-    print(json.dumps({'note': f'{what} `{rel}`.', 'commits': [url]}))
+def action_aligner(cfg, target):
+    """The aligner an option action works with, its target clone reset to origin."""
+    aligner = aligner_for(cfg, Core(cfg), Checkout(cfg), target)
+    if target != 'brain':  # the run start resets the brain clone
+        aligner.co.reset()
+    return aligner
 
 
-def cmd_revert(cfg, rel):
+def action_result(cfg, meta, co, rel, subject, what):
+    sha = co.commit_push(f'{"setup" if co.target == "brain" else "brain"}: {subject}',
+                         f'Routine: {ROUTINE} ({meta["run_id"]})\nIssue: {os.environ.get("ATTENTION_ISSUE", "")}')
+    url = co.commit_url(sha)
+    lib.journal(cfg, meta['run_id'], 'change', text=f'{what} `{co.label(rel)}`', url=url, revert=co.revert_hint(sha))
+    note = co.deliver([rel])
+    if note:
+        lib.journal(cfg, meta['run_id'], 'note', text=note)
+    print(json.dumps({'note': f'{what} `{co.label(rel)}`.' + (f' {note}' if note else ''), 'commits': [url]}))
+
+
+def cmd_revert(cfg, rel, target):
     meta = lib.current_run(cfg)
-    core, brain = Core(cfg), Brain(cfg)
-    aligner = Aligner(cfg, core, brain)
+    aligner = action_aligner(cfg, target)
+    core, co = aligner.core, aligner.co
     restored = aligner.restored(rel)
     if restored is None:
         raise Failed(f'no aligned version of {rel} to restore the core text from')
-    brain.write(rel, restored, core.mode(core.head, rel) if brain.text(rel) is None else None)
-    action_result(cfg, meta, brain, rel, f'setup: {rel} takes the shared core text at {core.head[:7]}', 'Restored the core text of')
+    co.write(rel, restored, core.mode(core.head, rel) if co.text(rel) is None else None)
+    action_result(cfg, meta, co, rel, f'{rel} takes the shared {target} core text at {core.head[:7]}', 'Restored the core text of')
     return 0
 
 
-def cmd_add(cfg, rel, values):
+def cmd_add(cfg, rel, values, target):
     meta = lib.current_run(cfg)
-    core, brain = Core(cfg), Brain(cfg)
-    aligner = Aligner(cfg, core, brain)
+    aligner = action_aligner(cfg, target)
+    core, co = aligner.core, aligner.co
     head = core.show(core.head, rel)
     if head is None:
         raise Failed(f'{rel} is not a core file')
     values = {**aligner.shared_values(), **json.loads(values)}
     try:
-        text = project(core.cc, rel, head, brain.text(rel), {'*': values} if sectioned(core.cc, rel) else values)
+        text = project(core.cc, rel, head, co.text(rel), {'*': values} if sectioned(core.cc, rel) else values)
     except Unfilled as missing:
         raise Failed(f'{rel} still needs a value for {braced(str(missing))}')
-    brain.write(rel, text, core.mode(core.head, rel))
-    action_result(cfg, meta, brain, rel, f'setup: {rel} comes from the shared core at {core.head[:7]}', 'Added from the core')
+    co.write(rel, text, core.mode(core.head, rel))
+    action_result(cfg, meta, co, rel, f'{rel} comes from the shared {target} core at {core.head[:7]}', 'Added from the core')
     return 0
 
 
@@ -763,9 +948,9 @@ def lift(cc, template, values, text):
 
 
 def promoted(aligner, rel):
-    """The core template carrying the brain's text of rel."""
+    """The core template carrying the target's text of rel."""
     core, cc = aligner.core, aligner.cc
-    template, text = core.show(core.head, rel), aligner.brain.text(rel)
+    template, text = core.show(core.head, rel), aligner.co.text(rel)
     restored = aligner.restored(rel)
     if template is None or text is None or restored is None:
         raise Failed(f'{rel} has no aligned version to promote from')
@@ -784,17 +969,18 @@ def promoted(aligner, rel):
                 parts.append(lift(cc, raw, values[heading], found[heading]))
         new = ''.join(parts)
     if not matches(cc, rel, new, text):
-        raise Failed(f'the promoted core text of {rel} would not match the brain; settle it by hand')
+        raise Failed(f'the promoted core text of {rel} would not match {aligner.who}; settle it by hand')
     return new
 
 
-def cmd_promote(cfg, rel):
+def cmd_promote(cfg, rel, target):
     meta = lib.current_run(cfg)
-    core, brain = Core(cfg), Brain(cfg)
-    aligner = Aligner(cfg, core, brain)
+    aligner = action_aligner(cfg, target)
+    core = aligner.core
     new = promoted(aligner, rel)
-    name = brain.git('config', 'user.name')
-    email = brain.git('config', 'user.email')
+    name = lib.clone_git(cfg, 'config', 'user.name')
+    email = lib.clone_git(cfg, 'config', 'user.email')
+    label = aligner.co.label(rel)
     issue = os.environ.get('ATTENTION_ISSUE', '')
     ref = f'{cfg["github_repo"]}#{issue.rsplit("/", 1)[-1]}' if issue else cfg['github_repo']
     for attempt in range(3):
@@ -804,7 +990,7 @@ def cmd_promote(cfg, rel):
         path.write_text(new)
         core.git('add', '--', core.path(rel))
         core.git('-c', f'user.name={name}', '-c', f'user.email={email}', 'commit', '--quiet', '-m',
-                 f'setup: the {cfg["brain"]} text of {rel} becomes the brain core ({ref})',
+                 f'setup: the {cfg["brain"]} text of {label} becomes the {target} core ({ref})',
                  '-m', f'Routine: {ROUTINE} ({meta["run_id"]})\nIssue: {issue}')
         code, _, err = core.git('push', '--quiet', 'origin', f'HEAD:{core.branch}', check=False, timeout=120)
         if code == 0:
@@ -815,9 +1001,9 @@ def cmd_promote(cfg, rel):
         raise Failed(f'push to the core failed: {err.strip()[-200:]}')
     sha = core.git('rev-parse', 'HEAD')
     url = core.link(sha)
-    lib.journal(cfg, meta['run_id'], 'change', text=f'Promoted the brain text of `{rel}` to the shared core', url=url,
+    lib.journal(cfg, meta['run_id'], 'change', text=f'Promoted the text of `{label}` to the shared core', url=url,
                 revert=f'git -C <core clone> revert {sha[:12]}')
-    print(json.dumps({'note': f'Promoted the brain text of `{rel}` to the shared core.', 'commits': [url]}))
+    print(json.dumps({'note': f'Promoted the text of `{label}` to the shared core.', 'commits': [url]}))
     return 0
 
 
@@ -835,18 +1021,21 @@ def cmd_crons(cfg):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='command', required=True)
-    c = sub.add_parser('align', help='cross-check the brain and the crons, bring core changes in')
+    c = sub.add_parser('align', help='cross-check the brain, the workspace and the crons, bring core changes in')
     c.add_argument('--run', required=True)
     c = sub.add_parser('flag', help='file needs-attention issues for the judged findings')
     c.add_argument('--run', required=True)
     c.add_argument('verdicts')
     c = sub.add_parser('revert', help='option action: take the core text for one file')
     c.add_argument('path')
-    c = sub.add_parser('promote', help='option action: make the brain text of one file the core text')
+    c.add_argument('--target', choices=TARGETS, default='brain')
+    c = sub.add_parser('promote', help='option action: make the target text of one file the core text')
     c.add_argument('path')
+    c.add_argument('--target', choices=TARGETS, default='brain')
     c = sub.add_parser('add', help='option action: write a new core file with placeholder values')
     c.add_argument('path')
     c.add_argument('values')
+    c.add_argument('--target', choices=TARGETS, default='brain')
     sub.add_parser('crons', help='option action: sync the crons to the manifest')
     args = p.parse_args()
     cfg = load_config()
@@ -855,11 +1044,11 @@ def main():
     if args.command == 'flag':
         return cmd_flag(cfg, args.run, args.verdicts)
     if args.command == 'revert':
-        return cmd_revert(cfg, args.path)
+        return cmd_revert(cfg, args.path, args.target)
     if args.command == 'promote':
-        return cmd_promote(cfg, args.path)
+        return cmd_promote(cfg, args.path, args.target)
     if args.command == 'add':
-        return cmd_add(cfg, args.path, args.values)
+        return cmd_add(cfg, args.path, args.values, args.target)
     return cmd_crons(cfg)
 
 

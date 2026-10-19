@@ -2,7 +2,10 @@
   "repo": "git@github.com:wellgent/skills.git",
   "web": "https://github.com/wellgent/skills",
   "branch": "main",
-  "root": "templates/brain",
+  "targets": {
+    "brain": "templates/brain",
+    "workspace": "templates/workspace"
+  },
   "base_file": "ops/brain-infra/core-sync.json",
   "settle_minutes": 30
 }

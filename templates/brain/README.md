@@ -53,4 +53,4 @@ The index:
 `AGENTS.md` is checked by section, and blank lines are ignored.
 
 A deviation is settled one of three ways: promote the brain's change to the core, turn the differing text into a placeholder, or revert the brain's copy.
-Each brain runs this cross-check daily in its `brain-core` workflow: core changes flow into the brain with its values, and a departure becomes a needs-attention issue offering those settlements.
+Each brain runs this cross-check daily in its `brain-core` workflow, for the brain and for its main agent's workspace: core changes flow into each with its values, and a departure becomes a needs-attention issue offering those settlements.
