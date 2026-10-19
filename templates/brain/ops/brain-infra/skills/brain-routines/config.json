@@ -26,5 +26,6 @@
     "summary": "{{summary_channel}}"
   },
   "tripwire_share": 0.2,
+  "active_lists": {{active_lists}},
   "timing": {}
 }

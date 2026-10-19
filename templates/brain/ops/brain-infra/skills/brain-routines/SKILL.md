@@ -78,6 +78,8 @@ Guards, each rejecting the verdict with its reason:
 - the **tripwire**: when page deletions and archive moves would take more than `tripwire_share` of an area in one run, that area's are held and a needs-attention issue offers to apply them.
 
 A MOVE (archive or restore, with `status`) and a page DELETE repair every inbound link in the same commit: a move repoints them, a delete unlinks them.
+An archive move drops the page from the frontmatter lists that hold live subjects only, which `active_lists` in `config.json` names per top-level directory.
+Every other link and path value is repointed to `archive/`.
 
 ## Needs attention
 

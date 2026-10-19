@@ -15,6 +15,7 @@ Input is a JSON list of verdicts (or {"verdicts": [...]}) on stdin or in a file.
 evidence is [{"path": "<brain path>", "quote": "<exact text in that file>"}].
 A MOVE or page DELETE repairs inbound links in the same commit, frontmatter path values included:
 a MOVE and a DELETE with "into" repoint them, a plain DELETE unlinks them.
+A MOVE into archive/ instead drops the page from the frontmatter lists config "active_lists" names.
 A page whose only change since the packet is such a repair, earlier in the same batch, still passes the hash guard.
 Prints {"applied", "rejected", "flagged", "noop"}; every applied verdict is one pushed commit.
 """
@@ -100,18 +101,21 @@ def ref_form(target, at, like):
     return new if like.endswith('.md') else new[:-3]
 
 
-def rewrite_refs(text, src, fn, at=None):
+def rewrite_refs(text, src, fn, at=None, drop=()):
     """Rewrite the path values in page src's frontmatter, with fn as in rewrite_links. Unlinking drops a
     list item, takes the value out of a flow list, or sets a scalar to null; a repointed list item that
-    repeats one already in its list is dropped."""
+    repeats one already in its list is dropped. Values under a key in drop are unlinked, not repointed."""
     if not text.startswith('---\n'):
         return text
     close = text.find('\n---', 4)
     if close < 0:
         return text
     at = at or src
-    lines, items = [], {}
+    lines, items, key = [], {}, None
     for line in text[:close].split('\n'):
+        field = re.match(r'^([A-Za-z_][\w-]*):', line)
+        if field:
+            key = field.group(1)
         item = re.match(r'^\s*-\s', line)
         if not item:
             items = {}
@@ -124,7 +128,7 @@ def rewrite_refs(text, src, fn, at=None):
             new = fn(ref_target(src, m.group('p')))
             if new is None:
                 return m.group(0)
-            if new == '':
+            if new == '' or key in drop:
                 gone.append(m.group(0))
                 return m.group(0)
             return m.group('q') + ref_form(new, at, m.group('p')) + m.group('q')
@@ -152,8 +156,8 @@ def unquote(value):
     return value[1:-1] if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'' else value
 
 
-def rewrite_paths(text, src, fn, at=None):
-    return rewrite_refs(rewrite_links(text, src, fn, at), src, fn, at)
+def rewrite_paths(text, src, fn, at=None, drop=()):
+    return rewrite_refs(rewrite_links(text, src, fn, at), src, fn, at, drop)
 
 
 def set_field(text, key, value):
@@ -282,13 +286,14 @@ class Applier:
 
     def repair(self, old, new):
         """Point every inbound link and frontmatter path value at the new path, or unlink it when the page
-        goes away; return the pages fixed."""
+        goes away; an archived page leaves the active lists of its linking pages. Return the pages fixed."""
+        active = self.cfg.get('active_lists', {}) if (new or '').startswith('archive/') else {}
         touched = 0
         for rel in self.pages():
             if rel == old:
                 continue
             text = (self.repo / rel).read_text()
-            fixed = rewrite_paths(text, rel, lambda r: None if r != old else (new or ''))
+            fixed = rewrite_paths(text, rel, lambda r: None if r != old else (new or ''), drop=active.get(rel.split('/', 1)[0], ()))
             if fixed != text:
                 before = self.repaired.get(rel, (lib.sha256(self.repo / rel),))[0]
                 self.write(rel, fixed)
