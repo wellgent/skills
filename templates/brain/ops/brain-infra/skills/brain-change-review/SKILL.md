@@ -25,7 +25,10 @@ Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain
    2. Read the packet and judge every target under the rubric, reading full pages from the packet's `repo`, the maintenance clone.
    3. Write the verdict list to the packet's `verdicts_file` as `{"verdicts": [...]}`; the formats are below.
    4. Run the packet's `apply` command and read its output. The batch is done when that command has run, whatever it applied or refused.
-5. **Finish.** `review.py finish --run <run_id>` checks judge misses, measures the load, and runs `routine.py end`, which posts the run update. Pass `--status failed --summary "<what broke>"` when a step failed and the run cannot finish its batches.
+      Its commit links are the receipt: the reconciler indexes every push, so the batch needs no further verification.
+5. **Finish.** `review.py finish --run <run_id>` checks judge misses, measures the load, and runs `routine.py end`, which posts the run update.
+   The status is `ok` by default: refused verdicts, flags and pages left in the queue are normal outcomes the run update reports.
+   Pass `--status failed --summary "<what broke>"` only when a command failed and the run could not finish its batches.
 6. End the turn with `NO_REPLY`; the run update is the only output.
 
 Verdict shapes (the full contract is the `apply.py` docstring in `brain-routines`):

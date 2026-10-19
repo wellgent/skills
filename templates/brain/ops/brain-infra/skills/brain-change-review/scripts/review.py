@@ -592,22 +592,35 @@ def usage_snapshot(cfg):
 
 
 def session_usage(cfg, since):
-    """Token use of this run's cron session so far, and of the previous finished run."""
+    """Token use of this run's cron session so far, and of the previous finished run; each None when OpenClaw cannot say."""
     o = cfg['openclaw']
+
+    def cli(*args):
+        out = lib.run([o['bin'], *args], timeout=90)
+        return json.loads(out[out.find('{'):])
+
     try:
-        jobs = json.loads(lib.run([o['bin'], 'cron', 'list', '--all', '--json'], timeout=90)).get('jobs', [])
-        job = next((j for j in jobs if j.get('declarationKey') == f'{cfg["brain"]}-routine-{RID}'), None)
-        if not job:
-            return None, None
-        sessions = json.loads(lib.run([o['bin'], 'sessions', '--json', '--agent', o['agent'], '--limit', '200'], timeout=90)).get('sessions', [])
-        current = next((s for s in sessions if s.get('key') == f'agent:{o["agent"]}:cron:{job["id"]}'
-                        and (s.get('sessionStartedAt') or 0) / 1000 >= since - 600), None)
-        runs = json.loads(lib.run([o['bin'], 'cron', 'runs', '--id', job['id'], '--limit', '1', '--json'], timeout=90)).get('entries', [])
+        job = next((j for j in cli('cron', 'list', '--all', '--json').get('jobs', [])
+                    if j.get('declarationKey') == f'{cfg["brain"]}-routine-{RID}'), None)
     except (Failed, OSError, ValueError):
         return None, None
-    now_use = {'input': current.get('inputTokens'), 'output': current.get('outputTokens')} if current else None
-    prev = runs[0] if runs else None
-    prev_use = {**(prev.get('usage') or {}), 'seconds': round((prev.get('durationMs') or 0) / 1000), 'at': prev.get('runAtIso')} if prev else None
+    if not job:
+        return None, None
+    now_use = prev_use = None
+    try:
+        current = next((s for s in cli('sessions', '--json', '--agent', o['agent'], '--limit', '200').get('sessions', [])
+                        if s.get('key') == f'agent:{o["agent"]}:cron:{job["id"]}' and (s.get('sessionStartedAt') or 0) / 1000 >= since - 600), None)
+        if current:
+            now_use = {'input': current.get('inputTokens'), 'output': current.get('outputTokens')}
+    except (Failed, OSError, ValueError):
+        pass
+    try:
+        runs = cli('cron', 'runs', '--id', job['id'], '--limit', '1', '--json').get('entries', [])
+        prev = runs[0] if runs else None
+        if prev:
+            prev_use = {**(prev.get('usage') or {}), 'seconds': round((prev.get('durationMs') or 0) / 1000), 'at': prev.get('runAtIso')}
+    except (Failed, OSError, ValueError):
+        pass
     return now_use, prev_use
 
 

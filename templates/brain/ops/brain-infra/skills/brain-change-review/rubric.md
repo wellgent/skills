@@ -46,6 +46,7 @@ Pages marked `"editable": false` in the packet are context.
 - `old` and `after` are exact text copied from the file, unique in it; a sentence or a full bullet is the usual unit.
 - `new` states current truth in the page's own style, with a `[Source: ...]` citation carried over from the evidence.
 - `evidence` quotes the exact text that justifies the edit, with its page path; every number and date in `new` appears in a quote or in `old`.
+- Quote text no other verdict in the batch changes: `apply.py` checks each quote after the batch's earlier verdicts have landed.
 - `summary` is the commit subject after the area scope `apply.py` puts in front: what is now true, in a few words.
 - `reason` is one sentence naming the evidence.
 - Lint repairs cite the page itself: a missing `title` from its H1, a placeholder date from a dated row, an empty section removed.
