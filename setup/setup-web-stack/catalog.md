@@ -22,8 +22,7 @@ Design-system lint, blocking inside `check`:
 Prototype scaffolding, on `main`:
 
 - A variant switcher component for `?variant=` options on the real routes, rendered only when `VERCEL_ENV` is not `production`
-- The prototype copy's read and write functions (Convex section), for the reviewer's own records
-- Only the variant code lives on the `prototype/<slug>` branch; losing options are deleted at the pick
+- Only the variant code lives on the `prototype/<slug>` branch, previewed through `scripts/preview` on seeded data like any pull request; losing options are deleted at the pick
 
 ## Knowledge
 
@@ -83,12 +82,13 @@ Scripts (pnpm shape; adapt the `check` chain for npm):
   "knip": "knip",
   "typecheck": "next typegen && tsc --noEmit",
   "test": "vitest run",
-  "test:journeys": "playwright test --config e2e/journeys/playwright.config.ts",
-  "check": "pnpm typecheck && pnpm lint && pnpm lint:format && pnpm knip && pnpm lint:deps && pnpm test && pnpm build"
+  "test": "scripts/slot vitest run",
+  "test:journeys": "scripts/slot playwright test --config e2e/journeys/playwright.config.ts",
+  "check": "scripts/slot sh -c 'pnpm typecheck && pnpm lint && pnpm lint:format && pnpm knip && pnpm lint:deps && pnpm test && pnpm build'"
 }
 ```
 
-`next typegen` (Next.js projects) rewrites the route types under `.next/types` before `tsc` reads them, so a build directory left by an earlier commit cannot fail the typecheck. `check` is the one command sessions and CI run, and every step in it blocks - the check runs what production runs, so the full test suite and the real production build are inside it. A project with a design system adds its design-system lint to the chain, and a Convex project adds `convex` to the `depcruise` paths. `test:journeys` stays outside `check`: the project's verification skill runs it before a pull request opens, from the "Journey tests" line of `docs/agents/dev-loop.md`, and CI runs it where the stack wires a deployment. Notes:
+`next typegen` (Next.js projects) rewrites the route types under `.next/types` before `tsc` reads them, so a build directory left by an earlier commit cannot fail the typecheck. `check` is the one command every session and `scripts/check` run, and every step in it blocks - the check runs what production runs, so the full test suite and the real production build are inside it. A project with a design system adds its design-system lint to the chain, and a Convex project adds `convex` to the `depcruise` paths. `test:journeys` stays outside `check`, and `scripts/check` runs it after `check` against the worktree's own backend. Every test script runs through `scripts/slot` (from [`templates/project/scripts/slot`](../../templates/project/scripts/slot)), so each test run on the host holds one heavy-run slot and Vitest's workers are capped at the host's cores divided by the slot count (`VITEST_MAX_WORKERS`); a Playwright config that only a package script names goes into knip's `entry` list. Notes:
 
 - Canonical `oxlint.config.ts` (nkzw preset, tsgolint `typeAware`, react/nextjs plugins) and `.oxfmtrc.json` baseline: copy the designated canonical project's files verbatim, per the standard
 - Existing eslint + prettier projects: offer the migration, don't force it; if accepted, run oxc's own `migrate-oxlint` skill (`npx skills add https://github.com/oxc-project/oxc --skill migrate-oxlint`) or `npx @oxlint/migrate` on the flat config, get `check` green, and remove the replaced tooling in the same change. `@nkzw/oxlint-config` 2.x bundles its plugins: only `@nkzw/oxlint-config` and `@nkzw/eslint-plugin` stay in devDependencies, the individual `eslint-plugin-*` packages go
@@ -120,7 +120,7 @@ module.exports = {
 
 - A blocking check that is red on `main` when it is introduced stays out of `check`, listed in the "Pending checks" section of `docs/agents/dev-loop.md` with what gets it green, until a run gets it green
 
-CI - [`check.yml`](check.yml), copied to `.github/workflows/check.yml`: `pnpm run check` on every pull request and on pushes to `main`, one run per ref with the earlier one cancelled, node from the repo's `.node-version`, pnpm from its `packageManager` field. Build-time values the production build reads (`NEXT_PUBLIC_CONVEX_URL` on a Convex project) go in as repository secrets, each named in the setup report when only the owner holds its value.
+Sign-off - [`recipes/check.sh`](recipes/check.sh), copied to `scripts/check` with the dev-server port range filled: on a clean PR branch it runs the frozen install, `check` and the journeys under one slot, and only on a pass pushes the head and posts the `check` commit status on it. [`templates/project/scripts/land`](../../templates/project/scripts/land) lands a pull request only on that status. An agent-run project has no GitHub Actions workflow. [`check.yml`](check.yml) is the job for a project with contributors outside runs: it runs `check` on their pull requests from forks, with build-time values the production build reads (`NEXT_PUBLIC_CONVEX_URL` on a Convex project) as repository secrets.
 
 References: <https://cpojer.net/posts/fastest-frontend-tooling>, <https://github.com/nkzw-tech/oxlint-config>
 
@@ -162,17 +162,14 @@ On an existing codebase the rules start red, so until the cleanup they run from 
 
 Migrations - `@convex-dev/migrations`, installed as a component. Every production migration runs with `dryRun: true` first; the operator puts the dry run's row counts into the production-write approval on the request and runs the migration itself.
 
-Deploy keys - every worktree is scoped to its own deployment:
+Deployments and keys:
 
 - The run host's Convex login is used by the operator and by the worktree setup script; it stays readable on the host
-- Every worktree works through a `CONVEX_DEPLOY_KEY` in its `.env.local`, scoped to that worktree's own dev deployment: `convex deployment token create <name> --save-env`. With the key in scope every `convex` command in that directory reaches that deployment only: the CLI ignores `--prod` and says so
-- Vercel holds the production deploy key in its Production environment and the preview deploy key in its Preview environment, both as `CONVEX_DEPLOY_KEY`
-
-One dev deployment per worktree - [`recipes/worktree-setup.sh`](recipes/worktree-setup.sh), copied to `scripts/worktree-setup.sh` and named on the "Set up" line of `docs/agents/dev-loop.md`. It installs dependencies, creates a cloud dev deployment named after the worktree that expires after 5 days, the longest Convex accepts, mints the scoped key, pushes the functions once and runs the seed. The seed is an idempotent internal function that creates the test identities `docs/agents/dev-loop.md` lists. New dev deployments take their environment variables from the Convex project's default environment variables, so the sign-in keys are set there once. A deployment is removed by its expiry.
-
-Prototype previews - [`recipes/vercel-build.sh`](recipes/vercel-build.sh), copied to `scripts/vercel-build.sh` with `"buildCommand": "bash scripts/vercel-build.sh"` in `vercel.json`. A `prototype/*` branch build runs `convex deploy` with the preview deploy key, which creates a Convex preview deployment named after the branch and seeds it through `--preview-run`. Preview deployments expire (5 days on the free plans, 14 on paid); a prototype that outlives one redeploys and reseeds. Preview sign-in keys come from the project's default environment variables for previews.
-
-Production records in a prototype - [`recipes/prototype-copy.sh`](recipes/prototype-copy.sh), copied to `scripts/prototype-copy.sh`. The operator runs it with the preview deployment's name, the reviewer and the tables of the client-approved allowlist in `PRODUCT.md`. The project supplies the two internal functions it calls: a read that returns one owner's rows of one allowlisted table and refuses any other table, and a write that takes every table in one call, inserts the rows with ids remapped and refuses outside a preview deployment, which it recognises by a marker variable in the project's preview defaults. The script refuses with a deploy key in scope, since `--prod` would then read the key's deployment. Rows that point at stored files are copied without the files.
+- A local deployment per worktree - [`recipes/worktree-setup.sh`](recipes/worktree-setup.sh), copied to `scripts/worktree-setup.sh` and named on the "Set up" line of `docs/agents/dev-loop.md`. It installs dependencies, creates a local deployment (`convex deployment create local --select`), whose backend runs on the host with its state in the worktree's `.convex/`, uses no plan quota and no deployment slot, and takes the Convex project's default environment variables for dev deployments; it sets `CRONS=off`, pushes and runs the seed. One long-running `convex dev` per worktree serves it ([`recipes/dev-server.sh`](recipes/dev-server.sh) `convex-start`), since `convex dev --once` refuses beside a local backend. A local backend takes about 230 MB, which the host's heavy-run slots account for
+- A cloud dev deployment only for work that needs a public URL (an inbound webhook, a cloud agent calling the app): `worktree-setup.sh --cloud` creates one named after the worktree that expires after 5 days, the longest Convex accepts, and saves a `CONVEX_DEPLOY_KEY` scoped to it (`convex deployment token create <name> --save-env`), so every `convex` command in that worktree reaches it only and the CLI ignores `--prod`
+- [`recipes/worktree-teardown.sh`](recipes/worktree-teardown.sh), copied to `scripts/worktree-teardown.sh`, stops the worktree's `next dev` and `convex dev` with its local backend and removes the tree, before a run posts its note
+- Crons run in production only: `convex/crons.ts` registers none where `CRONS` is `off` (read when functions are pushed), set on the shared dev deployment, as the dev default and by the worktree setup; the seed is an idempotent internal function that creates the test identities `docs/agents/dev-loop.md` lists and stores what the crons would
+- Vercel holds the production deploy key in its Production environment as `CONVEX_DEPLOY_KEY`; [`recipes/vercel-build.sh`](recipes/vercel-build.sh), copied to `scripts/vercel-build.sh` with `"buildCommand": "bash scripts/vercel-build.sh"` in `vercel.json`, runs `convex deploy` on production builds only, and every preview builds against the shared dev deployment through the Preview-scoped `NEXT_PUBLIC_CONVEX_URL`. No Convex preview deployments
 
 Situational, pinned when the condition is met, each named by the line shown:
 
@@ -185,43 +182,16 @@ Left out: the `convex` router (it routes to skills outside any pin and recommend
 
 ## Vercel deployment
 
-For projects delivered through Vercel Git integration (branch push → preview, push to main → production).
+For projects delivered through Vercel Git integration: a push to `main` builds production, every other git push is skipped, and a pull request labelled `preview` gets its preview from the Vercel CLI.
 
-- `vercel-cli-with-tokens` from `vercel-labs/agent-skills` - drives the Vercel CLI via `VERCEL_TOKEN` (plus `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID` instead of `vercel link`) where interactive `vercel login` isn't possible; named on the "Prototype branches" line of `docs/agents/dev-loop.md` and by the post-ship deploy-status check
+- `vercel-cli-with-tokens` from `vercel-labs/agent-skills` - drives the Vercel CLI via `VERCEL_TOKEN` (plus `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID` instead of `vercel link`) where interactive `vercel login` isn't possible; named on the "Previews" line of `docs/agents/dev-loop.md` and by the post-ship deploy-status check
 - Machine tools: `gh` and `vercel`, both authenticated; brew-install both (`vercel-cli`), never `npm i -g`
 
-Skip builds for markdown-only commits - `vercel.json`:
+Builds - [`recipes/vercel-ignore.sh`](recipes/vercel-ignore.sh), copied to `scripts/vercel-ignore.sh` with `"ignoreCommand": "bash scripts/vercel-ignore.sh"` in `vercel.json`: it builds production and skips every other git push, so no branch builds a preview nobody opens.
 
-```json
-{
-  "ignoreCommand": "bash scripts/vercel-ignore-docs.sh"
-}
-```
+Previews - [`recipes/preview.sh`](recipes/preview.sh), copied to `scripts/preview` with the Vercel team and project ids from `.vercel/project.json`: it labels the pull request `preview`, deploys its head from a clean tree with the Vercel CLI (the ignored build step does not run for a CLI deployment) and comments the URL on the pull request. A run labels an interaction-changing pull request this way for the owner's review, and `scripts/check` redeploys a labelled pull request's new head after each sign-off. Needs the host's Vercel CLI login.
 
-`scripts/vercel-ignore-docs.sh`:
-
-```bash
-#!/usr/bin/env bash
-# Skip Vercel builds when only markdown files changed.
-set -euo pipefail
-
-current_sha="${VERCEL_GIT_COMMIT_SHA:-HEAD}"
-prev_sha="${VERCEL_GIT_PREVIOUS_SHA:-}"
-
-if [ -n "$prev_sha" ] && git cat-file -e "$prev_sha^{commit}" 2>/dev/null; then
-  files="$(git diff --name-only "$prev_sha" "$current_sha")"
-else
-  files="$(git show --name-only --pretty=format: "$current_sha")"
-fi
-
-if echo "$files" | grep -qvE '(^$|.*\.md$)'; then
-  exit 1  # non-markdown changed -> build
-else
-  exit 0  # only markdown -> skip
-fi
-```
-
-Protected previews (Deployment Protection): configure Protection Bypass for Automation before feature work, store the secret as `VERCEL_AUTOMATION_BYPASS_SECRET`, and keep it out of commits and messages. This is HTTP-layer access to the deployed URL - `VERCEL_TOKEN` auth (`vercel-cli-with-tokens`) authenticates the CLI to the API and does not get requests past protection. For browser review, agent-browser's own `protected-vercel-deployments` skill (`agent-browser skills get protected-vercel-deployments`) is the preferred path: a short-lived OIDC token from `vercel project token` (CLI 53.3+) sent as `x-vercel-trusted-oidc-idp-token`, no long-lived secret in the session. The bypass secret stays for `vercel curl` and CI. A reviewer outside the team opens a prototype through a Vercel Shareable Link.
+Protected previews (Deployment Protection): configure Protection Bypass for Automation before feature work, store the secret as `VERCEL_AUTOMATION_BYPASS_SECRET`, and keep it out of commits and messages. This is HTTP-layer access to the deployed URL - `VERCEL_TOKEN` auth (`vercel-cli-with-tokens`) authenticates the CLI to the API and does not get requests past protection. For browser review, agent-browser's own `protected-vercel-deployments` skill (`agent-browser skills get protected-vercel-deployments`) is the preferred path: a short-lived OIDC token from `vercel project token` (CLI 53.3+) sent as `x-vercel-trusted-oidc-idp-token`, no long-lived secret in the session. The bypass secret stays for `vercel curl`. A reviewer outside the team opens a preview through a Vercel Shareable Link.
 
 ```bash
 # needs a recent vercel CLI (the protection subcommand is not in older majors);

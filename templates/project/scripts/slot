@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Runs one test command (pnpm test, the full check, the journeys, a Playwright suite) while it
+# holds one of the host's heavy-run slots, and waits for a free slot first. The package scripts
+# run their tests through it, so every test run on the host takes a slot.
+# The cap is HEAVY_RUN_SLOTS (default 2); the slots are directories under
+# ${XDG_STATE_HOME:-$HOME/.local/state}/heavy-runs, taken with mkdir and shared by every project
+# on the host. A slot whose holder pid is gone is reclaimed. A command run under a held slot
+# (HEAVY_RUN_HELD set) runs at once, so a check holds one slot through the test runs inside it.
+# It exports VITEST_MAX_WORKERS, the host's cores divided by the cap, which Vitest reads for
+# maxWorkers in every project, so the slots bound the workers too.
+# Exit: the command's own status, or 2 when no slot can be taken (an unwritable slot dir).
+set -euo pipefail
+
+[ $# -gt 0 ] || { echo "usage: scripts/slot <command> [args...]" >&2; exit 2; }
+[ -z "${HEAVY_RUN_HELD:-}" ] || exec "$@"
+
+cap="${HEAVY_RUN_SLOTS:-2}"
+[[ $cap =~ ^[1-9][0-9]*$ ]] || { echo "slot: HEAVY_RUN_SLOTS must be a positive number, got '$cap'" >&2; exit 2; }
+dir="${XDG_STATE_HOME:-$HOME/.local/state}/heavy-runs"
+if ! mkdir -p "$dir" 2>/dev/null || [ ! -w "$dir" ]; then
+  echo "slot: the slot dir $dir is not writable" >&2
+  exit 2
+fi
+
+held=""
+child=""
+free_slot() { rm -f "${1:?}/pid" "${1:?}/what"; rmdir "${1:?}" 2>/dev/null || true; }
+release() {
+  if [ -n "$child" ]; then kill "$child" 2>/dev/null || true; fi
+  if [ -n "$held" ]; then free_slot "$held"; fi
+}
+trap release EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+said=""
+while [ -z "$held" ]; do
+  for n in $(seq 1 "$cap"); do
+    slot="$dir/$n"
+    pid=$(cat "$slot/pid" 2>/dev/null || true)
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null && [ "$(cat "$slot/pid" 2>/dev/null)" = "$pid" ]; then
+      free_slot "$slot"
+    elif [ -z "$pid" ] && [ -n "$(find "$slot" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+      # A holder that died between mkdir and writing its pid.
+      free_slot "$slot"
+    fi
+    if mkdir "$slot" 2>/dev/null; then
+      echo $$ >"$slot/pid"
+      echo "$PWD $*" >"$slot/what"
+      held=$slot
+      break
+    fi
+  done
+  if [ -z "$held" ]; then
+    [ -n "$said" ] || { echo "slot: all $cap slots are taken; waiting for one" >&2; said=1; }
+    sleep 5
+  fi
+done
+
+echo "slot: holding slot $(basename "$held") of $cap" >&2
+cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)
+export HEAVY_RUN_HELD="$held"
+export VITEST_MAX_WORKERS=$((cores / cap > 0 ? cores / cap : 1))
+"$@" &
+child=$!
+status=0
+wait "$child" || status=$?
+child=""
+exit "$status"

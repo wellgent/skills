@@ -46,14 +46,16 @@ Tooling and configs (quality gate devDeps, scripts, `vercel.json`, etc.) go in a
 
 A project with a `convex/` directory also takes the [Convex branch](./convex.md).
 
-### 4. CI
+### 4. Sign-off, previews and CI
 
-Copy [`check.yml`](./check.yml) to `.github/workflows/check.yml`, with the node version file and the build-time secrets the project's check command reads. Secrets go in as repository secrets (`gh secret set`), each named in the report when only the owner holds its value.
+Copy [`recipes/check.sh`](recipes/check.sh) to `scripts/check`, and on a Vercel project [`recipes/vercel-ignore.sh`](recipes/vercel-ignore.sh) and [`recipes/preview.sh`](recipes/preview.sh), filled as the catalog describes; route every test script through `scripts/slot`.
+An agent-run project gets no GitHub Actions workflow, and an existing `.github/workflows/check.yml` is deleted.
+Only a project with contributors outside runs gets [`check.yml`](./check.yml), with the build-time secrets its check reads as repository secrets (`gh secret set`), each named in the report when only the owner holds its value.
 
 ### 5. Journey tests
 
 For each critical journey the owner approved (the "Critical journeys" section of `docs/agents/dev-loop.md`): one plain Playwright test under `e2e/journeys/`, with its own `playwright.config.ts` there that starts the app per "Running the app" and signs in as a seeded test identity.
-The `test:journeys` script runs them, and the "Journey tests" line names it; the project's verification skill runs them before a pull request opens.
+The `test:journeys` script runs them through `scripts/slot`, the "Journey tests" line names it, and `scripts/check` runs it against the worktree's own backend.
 With no approved journeys, scaffold nothing.
 
 ### 6. Record in the project docs
@@ -61,7 +63,7 @@ With no approved journeys, scaffold nothing.
 The stack's facts go where a session reads them, per the Methodology section of [`standards/web-products.md`](../../standards/web-products.md):
 
 - `AGENTS.md`: the check command in "Rules for every session", and one must-read entry per pinned skill or file a session reads before writing code, each with its trigger.
-- `docs/agents/dev-loop.md`: the check command and CI, running the app, worktrees, the journey tests, the design-system commands, and each deviation from the doctrine with its reason.
+- `docs/agents/dev-loop.md`: the check command, the sign-off and landing scripts, previews, running the app, worktrees, the journey tests, the design-system commands, and each deviation from the doctrine with its reason.
 
 Every skill pinned in step 3 is named on one of those lines; one that no line names is removed.
 
@@ -70,11 +72,11 @@ Every skill pinned in step 3 is named on one of those lines; one that no line na
 Verify what you installed, nothing more:
 
 - Skills discoverable: real dirs in `.agents/skills/`, working symlinks in `.claude/skills/`
-- If the quality gate went in: its `check` script passes
+- If the quality gate went in: its `check` script passes, and `scripts/check` on a scratch branch posts a `check` status
 - Any CLIs a selected entry depends on respond and are authenticated (`agent-browser` + Chromium, `gh`, `vercel`, `ctx7` - per the catalog notes)
 
 Report anything only the user can fix by hand: auth, tokens, deployment-protection secrets.
 
 ## Report
 
-End with: what was installed and why, what was skipped and why, tooling and script changes, the CI workflow and its secrets, the lines written to the project docs, verification results, and any manual follow-ups.
+End with: what was installed and why, what was skipped and why, tooling and script changes, the sign-off scripts and any workflow with its secrets, the lines written to the project docs, verification results, and any manual follow-ups.

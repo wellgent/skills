@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Lands one PR: squash-merges it onto main only when its exact head SHA carries a passing `check`
+# status from scripts/check, under --match-head-commit, then reads the merge back from origin.
+# The PR need not be up to date with main, and landing never waits on a production deploy.
+# Exit: 0 merged, 1 refused (not open, base not main, head moved, merge failed), 3 no passing
+# `check` on the head.
+set -euo pipefail
+
+[ $# -eq 1 ] && [[ $1 =~ ^[0-9]+$ ]] || { echo "usage: scripts/land <pr number>" >&2; exit 1; }
+pr=$1
+
+cd "$(git rev-parse --show-toplevel)"
+repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+
+read -r head base state < <(gh pr view "$pr" --repo "$repo" --json headRefOid,baseRefName,state \
+  --jq '[.headRefOid, .baseRefName, .state] | @tsv')
+[ "$state" = OPEN ] || { echo "land: PR $pr is $state, not open" >&2; exit 1; }
+[ "$base" = main ] || { echo "land: PR $pr targets $base, not main" >&2; exit 1; }
+
+check=$(gh api "repos/$repo/commits/$head/status" \
+  --jq '[.statuses[] | select(.context == "check")][0].state // "none"')
+[ "$check" = success ] || { echo "land: PR $pr head $head has no passing check status ($check); run scripts/check on it" >&2; exit 3; }
+
+gh pr merge "$pr" --repo "$repo" --squash --match-head-commit "$head" \
+  || { echo "land: merging PR $pr failed (a moved head refuses)" >&2; exit 1; }
+
+merged=""
+for _ in $(seq 1 10); do
+  read -r state base merged < <(gh pr view "$pr" --repo "$repo" --json state,baseRefName,mergeCommit \
+    --jq '[.state, .baseRefName, (.mergeCommit.oid // "")] | @tsv')
+  [ "$state" = MERGED ] && [ -n "$merged" ] && break
+  sleep 2
+done
+[ "$state" = MERGED ] && [ "$base" = main ] || { echo "land: PR $pr reads back $state on $base" >&2; exit 1; }
+git fetch -q origin main
+git merge-base --is-ancestor "$merged" origin/main \
+  || { echo "land: merge commit $merged is not on origin/main" >&2; exit 1; }
+echo "land: PR $pr merged as $merged on origin/main (head $head)"

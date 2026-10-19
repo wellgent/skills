@@ -1,15 +1,16 @@
-# The check command on every pull request and on main. Copied to .github/workflows/check.yml by
-# setup-web-stack; the node version comes from the repo's own pin, pnpm from the packageManager field.
+# The check command on pull requests from contributors outside runs, whose heads no scripts/check
+# signs off. Copied to .github/workflows/check.yml by setup-web-stack only for a project that takes
+# such contributions; an agent-run project has no workflow. The node version comes from the repo's
+# own pin, pnpm from the packageManager field.
 name: check
 on:
   pull_request:
-  push:
-    branches: [main]
 concurrency:
   group: check-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   check:
+    if: github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

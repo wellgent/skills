@@ -96,13 +96,15 @@ Preference and familiarity do not qualify.
   With the file manager off nothing refreshes `convex/_generated/ai/guidelines.md`, so every toolchain sweep replaces it with the current upstream `convex_rules.txt`.
 - Migrations run through `@convex-dev/migrations`.
   A production migration is dry-run first (`dryRun: true`), and its row counts are part of the production-write approval.
-- **Scoped keys guard production.** The run host's Convex login is used by the operator and by the worktree setup script.
-  Every worktree's `.env.local` carries a `CONVEX_DEPLOY_KEY` scoped to that worktree's own dev deployment (`convex deployment token create`), so every `convex` command a session runs there reaches that deployment and no other.
-  The login stays readable on the host: the key stops a stray production command, and the `AGENTS.md` rule that a production read or write is a stop pstack raises to the request covers the rest.
-  Build pipelines hold keys scoped the same way: the production deploy key in the production build environment, the preview deploy key in the preview one.
-- **One dev deployment per worktree.** The worktree setup script creates an expiring cloud dev deployment (`convex deployment create dev/<worktree> --type dev --select --expiration`), mints its scoped key, pushes once (`convex dev --once`) and runs the seed, so parallel sessions share no schema or data and every runtime check runs against the worktree's own code.
-  The seed lives in the repo as an idempotent function and creates the test identities `docs/agents/dev-loop.md` names.
-- `convex deploy` runs on production builds and on `prototype/*` preview builds only (see Design); "codegen touches the deployment" is a standing caution.
+- **A local deployment per worktree.** The worktree setup script creates a local deployment (`convex deployment create local --select`), served by one long-running `convex dev` per worktree, sets `CRONS=off`, pushes and runs the seed, so parallel sessions share no schema or data, use no plan quota or deployment slot, and every runtime check runs against the worktree's own code.
+  The teardown stops that `convex dev` and its backend and removes the tree.
+  A cloud dev deployment (`--cloud`, expiring, with a `CONVEX_DEPLOY_KEY` scoped to it in `.env.local`) is only for work that needs a public URL.
+  The seed lives in the repo as an idempotent function: it creates the test identities `docs/agents/dev-loop.md` names and stores what the crons would.
+- **Crons run in production only**: `convex/crons.ts` registers none where the deployment's `CRONS` is `off`, which the shared dev deployment, the project's dev default and every worktree set; production leaves it unset.
+- **Guarding production.** The run host's Convex login is used by the operator and by the worktree setup script, and stays readable on the host.
+  A local worktree holds no deploy key, so the `AGENTS.md` rule that a production read or write is a stop pstack raises to the request is what keeps a session off production; a cloud worktree's scoped key also makes the CLI ignore `--prod`.
+  The production build environment holds the production deploy key.
+- **Previews share the dev deployment**: `convex deploy` runs on production builds only, every preview builds against the shared dev deployment, and there are no Convex preview deployments; "codegen touches the deployment" is a standing caution.
 - `defineApp` env declaration is required.
 - Auth is the hosting standard's territory - see above, not restated here.
 
@@ -114,11 +116,13 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
 - **One check command, everywhere**: `check` = typecheck + lint (oxlint + tsgolint, with the stack's lint plugins) + format check (oxfmt) + design-system lint + unused-code scan (knip) + dependency rules (dependency-cruiser) + full test suite + real production build (`next build`).
   Every step blocks, and tests outside `check` is drift by definition.
   Governing principle: the check runs what production runs.
-- **Where it runs**: locally on the branch tip before a session reports, and in CI on every pull request and on pushes to `main` (`.github/workflows/check.yml`, from [`setup-web-stack/check.yml`](../setup/setup-web-stack/check.yml)).
-  Build-time values the production build reads are repository secrets.
+- **Where it runs: one CI, local, with a sign-off.** `scripts/check` (from [`setup-web-stack/recipes/check.sh`](../setup/setup-web-stack/recipes/check.sh)) refuses a dirty worktree, runs a frozen install, `check` and the journey tests under one of the host's heavy-run slots, and only on a pass pushes the commit and posts a `check` commit status on that exact SHA.
+  The implementer runs it on the exact commit before review; the verifier reruns no suite and takes the status as given.
+  An agent-run project has no GitHub Actions CI; a GitHub job stays only for contributors outside runs or for work that needs a clean runner, such as publishing ([`setup-web-stack/check.yml`](../setup/setup-web-stack/check.yml) is that job's template).
+- **Every test run holds a heavy-run slot**: the test scripts, `check` and every browser suite run through `scripts/slot` (from [`templates/project/scripts/slot`](../templates/project/scripts/slot)), capped per host by `HEAVY_RUN_SLOTS`, with the test runner's workers capped at the host's cores divided by the slots; tests run only through the package scripts.
 - **Dependency rules**: no cycles, plus one rule per module boundary the project sets; each rule's message carries the fix.
 - **Journey tests**: each project names at most five client-approved critical journeys, one plain Playwright test each.
-  The project's verification skill runs them before a pull request opens, and CI runs them where the stack wires a deployment for it.
+  `scripts/check` runs them against the worktree's own backend.
   They are the only browser-level suite; the tests inside `check` are the regression net.
 - **Code quality judgment is pstack's**: its review (interrogate, thermos, no-comments, deslop) and its principle skills judge a diff, and `/correct` turns a repeated mistake into a lint rule, a type or a test.
   A project rule a lint can enforce is a lint rule.
@@ -144,21 +148,21 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
 - **Environment**: `DO_NOT_TRACK=1` is set on every run host, and `OPENAI_API_KEY` stays unset, which keeps impeccable on its code-led path.
 - **Design-system lint** blocks inside `check`: arbitrary radius, font-size, colour, spacing and size values fail; the theme resets the framework's default palette so only design tokens exist; raw controls in app code fail through oxlint `react/forbid-elements`, so screens compose kit components.
 - **Client choices are made on coded prototypes**: two or three options on a `prototype/<slug>` branch, switched by a variant switcher that lives on `main` and is hidden in production by a `VERCEL_ENV` gate.
-  An idempotent seed and unseed for the reviewer's records also lives on `main`; only the variant code lives on the branch.
-- **Where prototypes run**:
-  - Vercel-hosted Convex projects: one Convex preview deployment per `prototype/*` branch.
-    The build script runs `convex deploy` with the preview deploy key only for those branches and seeds through `--preview-run`; sign-in env comes from the Convex project's default environment variables for previews.
-    Every other preview build points at the project's default dev deployment.
+  Only the variant code lives on the branch, and the prototype runs on seeded synthetic identities, never production records.
+- **Where previews run**:
+  - Vercel-hosted projects: Vercel builds `main` only; a pull request, prototypes included, gets its preview from `scripts/preview`, which labels it `preview` and deploys its head with the Vercel CLI against the shared dev deployment.
+    A run labels an interaction-changing pull request this way for the owner's review.
   - Self-hosted projects: a scratch dev deployment with an expiry, and a dev server on a tailnet port.
-- **Production records in a prototype**: the product's owner approves, once per project, an allowlist of tables keyed to the reviewer's own user that reference no other user; the allowlist is a rule in `PRODUCT.md`.
-  One scripted read, run by the operator, copies those records from production into the prototype's preview deployment and nowhere else; credentials and tokens are never on the allowlist.
-  Surfaces that involve other users run on seeded synthetic identities.
 
 ## Version control
 
 - **Linear history on `main`**: every commit on the default branch is one pull request, squash-merged.
   A merge commit carries no content, so the default branch never gets one.
-- **Work lands through pull requests**: a run works on a branch in its own worktree, opens a pull request once `check` is green and the verification skill passes, and pstack squash-merges it under the landing authority the run's prompt grants.
+- **Work lands through pull requests**: a run works on a branch in its own worktree, opens a pull request, and lands it under the landing authority its prompt grants once its independent verifier passes.
+- **One gate**: `scripts/land <pr>` (from [`templates/project/scripts/land`](../templates/project/scripts/land)) merges only on a passing `check` status on the exact head, `gh pr merge --squash --match-head-commit`, and reads the merge back.
+  A pull request need not be up to date with `main`; it restacks only on a real conflict, and there is no CI run on `main`, so the production deploy is the only build `main` gets.
+  Where the plan allows required status checks, the repository ruleset requires `check` too, with no up-to-date requirement; no plan is upgraded for it.
+  When `scripts/check` cannot run, landing pauses and the run notifies the owner; building and verifying go on.
   Never a merge-commit button, never a `git pull` that merges.
 - **Repo settings**: squash and rebase merging on, merge commits off, head branches deleted on merge.
 
@@ -196,7 +200,7 @@ Project rules an agent consults are in `AGENTS.md`, `PRODUCT.md` and `docs/agent
   pstack names no stack; this document carries every stack rule.
 - **A project's own surface**, scaffolded from [`templates/project/`](../templates/project/) and then project-owned:
   - `AGENTS.md`, loaded by every session: the rules for every session, the must-read list, where things live, and the rule table `/correct` keeps.
-  - `docs/agents/dev-loop.md`, the stack facts: the check command and CI, the critical journeys, worktrees, running the app, the design-system commands, pending checks, deviations.
+  - `docs/agents/dev-loop.md`, the stack facts: the check command, the sign-off and landing scripts, previews, the critical journeys, worktrees, running the app, the design-system commands, pending checks, deviations.
   - `PRODUCT.md`: what the product does, for whom, and the product rules a change must keep.
   - `DESIGN.md`, where there are screens: the design system and the kit map.
   - `.agents/playbooks/`, optional: project playbooks that extend pstack's bundled ones with After, Before and In lines, never Replace.
@@ -237,7 +241,7 @@ The golden path is this repo's [`setup-web-product`](../setup/setup-web-product/
 Defaults applied without asking: Next latest stable per the channel rule, Tailwind v4 on, the full toolchain standard, the check composition, the catalog entries the stack setup picks, port block auto-allocated as the next free block on the target machine, the tracker labels seeded.
 Cache Components defaults on for greenfield.
 
-**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), brain (setup-brain: the `operate` skill, the `run` label and request template, the operating section in the brain's `AGENTS.md`), project (setup-project: the pstack plugin at project scope, the stack pins, CI, `AGENTS.md`, `docs/agents/dev-loop.md` and `PRODUCT.md` from the templates, the verification skill; through setup-web-stack the journey tests, the worktree setup script and the seed), hosting (per audience class), first ship (check command green, prod-parity proof, registration finalized).
+**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), brain (setup-brain: the `operate` skill, the `run` label and request template, the operating section in the brain's `AGENTS.md`), project (setup-project: the pstack plugin at project scope, the stack pins, the sign-off and landing scripts, `AGENTS.md`, `docs/agents/dev-loop.md` and `PRODUCT.md` from the templates, the verification skill; through setup-web-stack the journey tests, the worktree setup and teardown, the dev server and the seed), hosting (per audience class), first ship (check command green, prod-parity proof, registration finalized).
 
 **Two-phase registration**: claim at step 2 (ports, membership), finalize at first ship (public URL, live fields); observation tolerates claimed-but-not-yet-live in between.
 
