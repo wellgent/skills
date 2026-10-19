@@ -13,7 +13,7 @@ The check command blocks on every step it runs: <the steps, in order>.
   A test run inside a run that already holds a slot, such as the tests inside the check command, uses that slot.
   The cap is `HEAVY_RUN_SLOTS` from the environment, 2 when unset.
   The slots live in `${XDG_STATE_HOME:-$HOME/.local/state}/heavy-runs/`, shared by every project on the host.
-  `scripts/slot` also exports `VITEST_MAX_WORKERS`, the host's cores divided by the cap, which the test runner reads for its worker count.
+  The slots alone bound memory: each run takes the test runner's default worker count.
 - **Tests run only through the package scripts**, never the test runner directly, so every run takes a slot.
 
 ## Sign-off
@@ -47,7 +47,7 @@ No GitHub Actions run for this project.
 ## Verification
 
 - **The verifier reruns no suite.** It drives the app on the changed surface with the verification skill, reads the diff, checks the test changes, and takes the head's `check` status as an input.
-- **Previews.** <What the host builds from git pushes, and how a PR labelled `preview` gets its preview: the command, where the URL is posted, and the backend a preview runs against.>
+- **Previews.** <What the host builds from git pushes, and how a PR labelled `preview` gets its preview: the command, where the URL is posted, and the preview backend it gets with the PR's own functions and the seed.>
   The run labels an interaction-changing PR `preview`, the PR the product's owner reviews.
 
 ## Agents

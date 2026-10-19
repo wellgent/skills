@@ -100,11 +100,11 @@ Preference and familiarity do not qualify.
   The teardown stops that `convex dev` and its backend and removes the tree.
   A cloud dev deployment (`--cloud`, expiring, with a `CONVEX_DEPLOY_KEY` scoped to it in `.env.local`) is only for work that needs a public URL.
   The seed lives in the repo as an idempotent function: it creates the test identities `docs/agents/dev-loop.md` names and stores what the crons would.
-- **Crons run in production only**: `convex/crons.ts` registers none where the deployment's `CRONS` is `off`, which the shared dev deployment, the project's dev default and every worktree set; production leaves it unset.
-- **Guarding production.** The run host's Convex login is used by the operator and by the worktree setup script, and stays readable on the host.
-  A local worktree holds no deploy key, so the `AGENTS.md` rule that a production read or write is a stop pstack raises to the request is what keeps a session off production; a cloud worktree's scoped key also makes the CLI ignore `--prod`.
-  The production build environment holds the production deploy key.
-- **Previews share the dev deployment**: `convex deploy` runs on production builds only, every preview builds against the shared dev deployment, and there are no Convex preview deployments; "codegen touches the deployment" is a standing caution.
+- **Crons run in production only**: `convex/crons.ts` registers none where the deployment's `CRONS` is `off`, which the shared dev deployment, the project's dev and preview defaults and every worktree set; production leaves it unset.
+- **A worktree reaches only its own backend.** The run host's Convex login is used by the operator and by the worktree setup script, and stays readable on the host.
+  Once a local worktree's backend runs, its `.env.local` holds the Convex CLI to that backend alone (`CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY` and a `CONVEX_OVERRIDE_ACCESS_TOKEN` Convex rejects), so `--prod` and the other deployment flags are refused before any network call and the login is never used from the worktree; a cloud worktree's scoped key does the same for its deployment.
+  The production build environment holds the production deploy key, the preview build environment the preview deploy key.
+- **Previews get their own backend**: a pull request labelled `preview` builds with the preview deploy key into a fresh Convex preview deployment with its own functions and the seed (`--preview-create`, `--preview-run`), recreated on each new head and removed by Convex after 14 days on Professional; `convex deploy` otherwise runs on production builds only, and "codegen touches the deployment" is a standing caution.
 - `defineApp` env declaration is required.
 - Auth is the hosting standard's territory - see above, not restated here.
 
@@ -119,7 +119,7 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
 - **Where it runs: one CI, local, with a sign-off.** `scripts/check` (from [`setup-web-stack/recipes/check.sh`](../setup/setup-web-stack/recipes/check.sh)) refuses a dirty worktree, runs a frozen install, `check` and the journey tests under one of the host's heavy-run slots, and only on a pass pushes the commit and posts a `check` commit status on that exact SHA.
   The implementer runs it on the exact commit before review; the verifier reruns no suite and takes the status as given.
   An agent-run project has no GitHub Actions CI; a GitHub job stays only for contributors outside runs or for work that needs a clean runner, such as publishing ([`setup-web-stack/check.yml`](../setup/setup-web-stack/check.yml) is that job's template).
-- **Every test run holds a heavy-run slot**: the test scripts, `check` and every browser suite run through `scripts/slot` (from [`templates/project/scripts/slot`](../templates/project/scripts/slot)), capped per host by `HEAVY_RUN_SLOTS`, with the test runner's workers capped at the host's cores divided by the slots; tests run only through the package scripts.
+- **Every test run holds a heavy-run slot**: the test scripts, `check` and every browser suite run through `scripts/slot` (from [`templates/project/scripts/slot`](../templates/project/scripts/slot)), capped per host by `HEAVY_RUN_SLOTS`; the slots alone bound memory, each run at the test runner's default worker count; tests run only through the package scripts.
 - **Dependency rules**: no cycles, plus one rule per module boundary the project sets; each rule's message carries the fix.
 - **Journey tests**: each project names at most five client-approved critical journeys, one plain Playwright test each.
   `scripts/check` runs them against the worktree's own backend.
@@ -150,7 +150,7 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
 - **Client choices are made on coded prototypes**: two or three options on a `prototype/<slug>` branch, switched by a variant switcher that lives on `main` and is hidden in production by a `VERCEL_ENV` gate.
   Only the variant code lives on the branch, and the prototype runs on seeded synthetic identities, never production records.
 - **Where previews run**:
-  - Vercel-hosted projects: Vercel builds `main` only; a pull request, prototypes included, gets its preview from `scripts/preview`, which labels it `preview` and deploys its head with the Vercel CLI against the shared dev deployment.
+  - Vercel-hosted projects: Vercel builds `main` only; a pull request, prototypes included, gets its preview from `scripts/preview`, which labels it `preview` and deploys its head with the Vercel CLI onto its own Convex preview deployment.
     A run labels an interaction-changing pull request this way for the owner's review.
   - Self-hosted projects: a scratch dev deployment with an expiry, and a dev server on a tailnet port.
 

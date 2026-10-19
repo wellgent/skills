@@ -6,9 +6,14 @@
 # One server per checkout at a time - concurrent `next dev` processes share .next and corrupt it.
 # .next is also mode-contaminated across build/dev: `next dev` over a production build's .next
 # 500s at runtime, and `next start` over a dev .next crashes - so `start` clears .next first.
-# A checkout whose .env.local names a local deployment (CONVEX_DEPLOYMENT=local:...) is served by
-# one long-running `convex dev`, which owns the local backend and pushes on every change;
+# A checkout with a local deployment (.convex/local/default/config.json) is served by one
+# long-running `convex dev`, which owns the local backend and pushes on every change;
 # `convex dev --once` refuses beside it. A checkout on a cloud deployment pushes once per start.
+# On a local deployment .env.local holds the Convex CLI to that backend alone: the self-hosted
+# variables name its URL and admin key, and CONVEX_OVERRIDE_ACCESS_TOKEN replaces the host's
+# Convex login with a token that authenticates nowhere, so `--prod`, `deploy` and every other
+# command from the checkout reach only the local backend. Only this script's `convex dev`, which
+# needs the login to run the backend, gets CONVEX_DEPLOYMENT and the login on its command line.
 set -euo pipefail
 
 PROJECT="<project name>"
@@ -34,7 +39,11 @@ checkout_dev_pid() {
   [[ $pid =~ ^[0-9]+$ ]] && lsof -a -p "$pid" -t -- "$lock" >/dev/null 2>&1 && echo "$pid"
 }
 
-local_deployment() { grep -q '^CONVEX_DEPLOYMENT=local:' "$REPO_ROOT/.env.local" 2>/dev/null; }
+LOCAL_CONFIG="$REPO_ROOT/.convex/local/default/config.json"
+# Stands in for the host's Convex login in a local checkout's .env.local; Convex refuses it.
+NO_LOGIN_TOKEN="checkout-holds-no-convex-login"
+
+local_deployment() { [[ -f "$LOCAL_CONFIG" ]]; }
 
 local_url() { sed -nE 's/^NEXT_PUBLIC_CONVEX_URL=([^ #]+).*/\1/p' "$REPO_ROOT/.env.local"; }
 
@@ -43,6 +52,23 @@ convex_dev_pid() {
   local pid
   pid=$(cat "$CONVEX_PIDFILE" 2>/dev/null) || return 1
   [[ $pid =~ ^[0-9]+$ ]] && ps -o command= -p "$pid" 2>/dev/null | grep -q 'convex/bin/main.js dev' && echo "$pid"
+}
+
+# Rewrites .env.local so the Convex CLI reaches only the local backend: drops CONVEX_DEPLOYMENT,
+# which `convex dev` writes at its start, and names the backend's URL and admin key and the
+# token that replaces the login.
+hold_cli_env() {
+  local env="$REPO_ROOT/.env.local" tmp
+  tmp=$(mktemp "$REPO_ROOT/.convex/env-local.XXXXXX")
+  grep -v -E '^(# Deployment used by `npx convex dev`|# The Convex CLI of this checkout|CONVEX_DEPLOYMENT=|CONVEX_SELF_HOSTED_URL=|CONVEX_SELF_HOSTED_ADMIN_KEY=|CONVEX_OVERRIDE_ACCESS_TOKEN=)' \
+    "$env" 2>/dev/null | sed '/^$/d' >"$tmp" || true
+  {
+    echo "# The Convex CLI of this checkout reaches only its local backend (scripts/dev-server.sh)."
+    echo "CONVEX_SELF_HOSTED_URL=$(local_url)"
+    echo "CONVEX_SELF_HOSTED_ADMIN_KEY=$(jq -r .adminKey "$LOCAL_CONFIG")"
+    echo "CONVEX_OVERRIDE_ACCESS_TOKEN=$NO_LOGIN_TOKEN"
+  } >>"$tmp"
+  mv "$tmp" "$env"
 }
 
 # Pids of local backends that serve this checkout's .convex state, with or without a convex dev.
@@ -64,29 +90,37 @@ convex_stop() {
   return 1
 }
 
-# Starts the checkout's long-running convex dev when none runs, and waits for its first push.
+# Starts the checkout's long-running convex dev when none runs, waits for its first push, and
+# holds .env.local to the local backend in every outcome.
 # Exit 1 when the push fails (the functions do not deploy), 2 when the local backend never
 # answers.
 convex_start() {
   local pid url
   if pid=$(convex_dev_pid); then
+    hold_cli_env
     echo "convex dev already serves this checkout (pid $pid, log $CONVEX_LOGFILE)"
     return 0
   fi
   convex_stop >/dev/null
   mkdir -p "$REPO_ROOT/.convex"
   cd "$REPO_ROOT"
-  nohup node_modules/.bin/convex dev --typecheck disable --tail-logs disable >"$CONVEX_LOGFILE" 2>&1 &
+  # The empty variables keep .env.local's values out, since the CLI's dotenv load never
+  # replaces a variable the process already has.
+  CONVEX_DEPLOYMENT="local:$(jq -r .deploymentName "$LOCAL_CONFIG")" \
+    CONVEX_SELF_HOSTED_URL="" CONVEX_SELF_HOSTED_ADMIN_KEY="" CONVEX_OVERRIDE_ACCESS_TOKEN="" \
+    nohup node_modules/.bin/convex dev --typecheck disable --tail-logs disable >"$CONVEX_LOGFILE" 2>&1 &
   echo $! >"$CONVEX_PIDFILE"
-  url=$(local_url)
   for _ in $(seq 1 "$CONVEX_READY_TIMEOUT"); do
     if grep -q 'Convex functions ready!' "$CONVEX_LOGFILE"; then
-      echo "convex dev serves $url (pid $(cat "$CONVEX_PIDFILE"), log $CONVEX_LOGFILE)"
+      hold_cli_env
+      echo "convex dev serves $(local_url) (pid $(cat "$CONVEX_PIDFILE"), log $CONVEX_LOGFILE)"
       return 0
     fi
     kill -0 "$(cat "$CONVEX_PIDFILE")" 2>/dev/null || break
     sleep 1
   done
+  hold_cli_env
+  url=$(local_url)
   if curl -sf -o /dev/null "$url/instance_name"; then
     echo "convex dev did not push the functions - see $CONVEX_LOGFILE" >&2
     convex_stop >/dev/null || true

@@ -4,7 +4,8 @@
 # push that is not main (scripts/vercel-ignore.sh), and its ignored build step does not run for
 # a CLI deployment, so a preview exists only through this script; scripts/check reruns it for
 # a labelled PR's new head.
-# The preview builds against the Preview-scoped NEXT_PUBLIC_CONVEX_URL, the shared dev deployment.
+# The build (scripts/vercel-build.sh) gives the preview its own Convex preview deployment pr-<pr>,
+# recreated with the seed for each new head, so an earlier head's preview URL may stop working.
 # Needs the host's Vercel CLI login with access to the project.
 set -euo pipefail
 
@@ -29,7 +30,8 @@ trap cleanup EXIT
 git worktree add -q --detach "$tree" "$head"
 
 echo "preview: deploying PR $pr head $head"
-url=$(vercel deploy "$tree" --yes --format json --meta "pr=$pr" --meta "sha=$head" | jq -r '.deployment.url')
+url=$(vercel deploy "$tree" --yes --format json --build-env "PREVIEW_NAME=pr-$pr" \
+  --meta "pr=$pr" --meta "sha=$head" | jq -r '.deployment.url')
 [[ $url == https://* ]] || { echo "preview: the Vercel CLI printed no deployment URL" >&2; exit 1; }
 gh pr comment "$pr" --repo "$repo" --body "Preview of $head: $url" >/dev/null
 echo "preview: $url"

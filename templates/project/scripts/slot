@@ -6,8 +6,8 @@
 # ${XDG_STATE_HOME:-$HOME/.local/state}/heavy-runs, taken with mkdir and shared by every project
 # on the host. A slot whose holder pid is gone is reclaimed. A command run under a held slot
 # (HEAVY_RUN_HELD set) runs at once, so a check holds one slot through the test runs inside it.
-# It exports VITEST_MAX_WORKERS, the host's cores divided by the cap, which Vitest reads for
-# maxWorkers in every project, so the slots bound the workers too.
+# The slots alone bound memory: each run takes Vitest's default worker count, which a memory test
+# of the cap's runs at once showed every run host holds.
 # Exit: the command's own status, or 2 when no slot can be taken (an unwritable slot dir).
 set -euo pipefail
 
@@ -58,9 +58,7 @@ while [ -z "$held" ]; do
 done
 
 echo "slot: holding slot $(basename "$held") of $cap" >&2
-cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)
 export HEAVY_RUN_HELD="$held"
-export VITEST_MAX_WORKERS=$((cores / cap > 0 ? cores / cap : 1))
 "$@" &
 child=$!
 status=0

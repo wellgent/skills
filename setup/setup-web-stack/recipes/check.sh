@@ -22,7 +22,7 @@ cannot() { echo "check: could not run: $*" >&2; exit 2; }
 branch=$(git symbolic-ref --quiet --short HEAD) || refuse "HEAD is detached; a sign-off is for a PR branch head"
 [ "$branch" != main ] || refuse "the branch is main; a sign-off is for a PR branch head"
 [ -z "$(git status --porcelain)" ] || refuse "the worktree has uncommitted or untracked files (git status)"
-grep -q '^CONVEX_DEPLOYMENT=local:' .env.local 2>/dev/null \
+[ -f .convex/local/default/config.json ] \
   || refuse "this worktree has no local Convex deployment; run: bash scripts/worktree-setup.sh"
 if lsof -t -- .next/dev/lock >/dev/null 2>&1; then
   refuse "a next dev of this worktree runs; stop it first: scripts/dev-server.sh stop <port>"
