@@ -445,7 +445,7 @@ def _run_action(cfg, meta, action, skill, issue, option, reply):
         return _rescue(cfg, meta, action['branch'], kind == 'rescue-land')
     if kind == 'command':
         argv = list(action['argv'])
-        base = (SKILLS_DIR / skill).resolve()
+        base = (SKILLS_DIR / action.get('skill', skill)).resolve()
         script = (base / argv[0]).resolve()
         if not script.is_relative_to(base):
             raise Failed(f'action script {argv[0]} is outside the {skill} skill')

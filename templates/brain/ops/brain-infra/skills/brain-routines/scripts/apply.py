@@ -8,10 +8,14 @@ Input is a JSON list of verdicts (or {"verdicts": [...]}) on stdin or in a file.
   {"op": "ADD", "path", "sha256", "after", "new", "evidence", "summary", "reason"}
   {"op": "DELETE", "path", "sha256", "old", "evidence", "summary", "reason"}   a span
   {"op": "DELETE", "path", "sha256", "summary", "reason"}                       the whole page
-  {"op": "MOVE", "path", "sha256", "to", "status", "summary", "reason"}         archive or restore
+  {"op": "DELETE", "path", "sha256", "into", "summary", "reason"}               a page merged into another
+  {"op": "MOVE", "path", "sha256", "to", "status", "summary", "reason"}         archive, restore or file; optional "type"
   {"op": "FLAG", "fingerprint", "title", "finding", "why", "evidence", "options", "recommended", "recommended_reason"}
 
 evidence is [{"path": "<brain path>", "quote": "<exact text in that file>"}].
+A MOVE or page DELETE repairs inbound links in the same commit, frontmatter path values included:
+a MOVE and a DELETE with "into" repoint them, a plain DELETE unlinks them.
+A page whose only change since the packet is such a repair, earlier in the same batch, still passes the hash guard.
 Prints {"applied", "rejected", "flagged", "noop"}; every applied verdict is one pushed commit.
 """
 import argparse
@@ -27,6 +31,9 @@ from routinelib import Failed
 
 NUMBER = re.compile(r'\d+(?:[.,:/-]\d+)*')
 LINK = re.compile(r'(?<!!)\[([^\]\n]*)\]\(([^)\s]+)((?:\s+"[^"]*")?)\)')
+REF = re.compile(r'(?P<q>["\']?)(?P<p>(?:\.{1,2}/)*[A-Za-z0-9_][A-Za-z0-9_.\-]*(?:/[A-Za-z0-9_.\-]+)+)(?P=q)')
+FLOW = re.compile(r'^(\s*[A-Za-z_][\w-]*:\s*)\[(.*)\](\s*)$')
+SCALAR = re.compile(r'^(\s*[A-Za-z_][\w-]*:\s*)\S.*$')
 
 
 class Rejected(Exception):
@@ -58,8 +65,11 @@ def safe_path(rel):
     return path
 
 
-def rewrite_links(text, src, fn):
-    """Rewrite each link in a file: fn(resolved) returns a new target, '' to unlink, or None to keep."""
+def rewrite_links(text, src, fn, at=None):
+    """Rewrite each relative link in page src: fn(brain path) returns the new brain path, '' to unlink,
+    or None to keep. New links are relative to `at`, where the page will live (default src)."""
+    at = at or src
+
     def sub(m):
         resolved, anchor = link_target(src, m.group(2))
         if resolved is None:
@@ -69,21 +79,94 @@ def rewrite_links(text, src, fn):
             return m.group(0)
         if new == '':
             return m.group(1)
-        return f'[{m.group(1)}]({new}{anchor}{m.group(3)})'
+        target = relpath(new, at)
+        if m.group(2).startswith('./') and not target.startswith('.'):
+            target = './' + target
+        return f'[{m.group(1)}]({target}{anchor}{m.group(3)})'
     return LINK.sub(sub, text)
 
 
-def set_status(text, status):
+def ref_target(src, ref):
+    """The brain page a frontmatter path value names: relative when it starts with a dot, else from the brain root."""
+    path = os.path.normpath(os.path.join(os.path.dirname(src), ref) if ref.startswith('.') else ref)
+    return path if path.endswith('.md') else path + '.md'
+
+
+def ref_form(target, at, like):
+    """Brain path target written the way the value `like` was: relative or from the root, with or without .md."""
+    new = relpath(target, at) if like.startswith('.') else target
+    if like.startswith('./') and not new.startswith('.'):
+        new = './' + new
+    return new if like.endswith('.md') else new[:-3]
+
+
+def rewrite_refs(text, src, fn, at=None):
+    """Rewrite the path values in page src's frontmatter, with fn as in rewrite_links. Unlinking drops a
+    list item, takes the value out of a flow list, or sets a scalar to null; a repointed list item that
+    repeats one already in its list is dropped."""
     if not text.startswith('---\n'):
-        raise Rejected('page has no frontmatter to carry its status')
+        return text
+    close = text.find('\n---', 4)
+    if close < 0:
+        return text
+    at = at or src
+    lines, items = [], {}
+    for line in text[:close].split('\n'):
+        item = re.match(r'^\s*-\s', line)
+        if not item:
+            items = {}
+        if '://' in line:
+            lines.append(line)
+            continue
+        gone = []
+
+        def sub(m):
+            new = fn(ref_target(src, m.group('p')))
+            if new is None:
+                return m.group(0)
+            if new == '':
+                gone.append(m.group(0))
+                return m.group(0)
+            return m.group('q') + ref_form(new, at, m.group('p')) + m.group('q')
+        fixed = REF.sub(sub, line)
+        if gone:
+            flow = FLOW.match(line)
+            if item:
+                continue
+            if flow:
+                kept = [i.strip() for i in flow.group(2).split(',') if i.strip() and i.strip() not in gone]
+                fixed = f'{flow.group(1)}[{", ".join(kept)}]{flow.group(3)}'
+            elif SCALAR.match(line):
+                fixed = SCALAR.match(line).group(1) + 'null'
+        if item:
+            value = ref_target(src, unquote(fixed.split('-', 1)[1]))
+            if value in items and (fixed != line or items[value]):
+                continue
+            items[value] = fixed != line
+        lines.append(fixed)
+    return '\n'.join(lines) + text[close:]
+
+
+def unquote(value):
+    value = value.strip()
+    return value[1:-1] if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'' else value
+
+
+def rewrite_paths(text, src, fn, at=None):
+    return rewrite_refs(rewrite_links(text, src, fn, at), src, fn, at)
+
+
+def set_field(text, key, value):
+    if not text.startswith('---\n'):
+        raise Rejected(f'page has no frontmatter to carry its {key}')
     close = text.find('\n---', 4)
     if close < 0:
         raise Rejected('page frontmatter is not closed')
     head, rest = text[:close], text[close:]
-    if re.search(r'^status:.*$', head, re.M):
-        head = re.sub(r'^status:.*$', f'status: {status}', head, count=1, flags=re.M)
+    if re.search(rf'^{key}:.*$', head, re.M):
+        head = re.sub(rf'^{key}:.*$', f'{key}: {value}', head, count=1, flags=re.M)
     else:
-        head += f'\nstatus: {status}'
+        head += f'\n{key}: {value}'
     return head + rest
 
 
@@ -93,6 +176,7 @@ class Applier:
         self.repo = Path(cfg['maintenance_repo'])
         self.run_dir = lib.run_dir(cfg, meta['run_id'])
         self.result = {'applied': [], 'rejected': [], 'flagged': [], 'noop': 0}
+        self.repaired = {}  # page -> (hash before this batch's link repairs, hash after them)
 
     def git(self, *args, **kw):
         return lib.clone_git(self.cfg, *args, **kw)
@@ -109,8 +193,10 @@ class Applier:
     # guards
 
     def check_hash(self, v):
-        if v.get('sha256') != lib.sha256(self.repo / v['path']):
-            raise Rejected('page changed since the work packet was built (content hash differs)')
+        current = lib.sha256(self.repo / v['path'])
+        if v.get('sha256') == current or self.repaired.get(v['path']) == (v.get('sha256'), current):
+            return
+        raise Rejected('page changed since the work packet was built (content hash differs)')
 
     def check_evidence(self, v, required=True):
         evidence = v.get('evidence') or []
@@ -165,7 +251,12 @@ class Applier:
             return {}
         if not v.get('reason'):
             raise Rejected('a page deletion needs a reason')
-        links = self.repair(v['path'], None)
+        into = None
+        if v.get('into'):
+            into = safe_path(v['into'])
+            if into == v['path'] or not (self.repo / into).is_file():
+                raise Rejected(f'merge target {into} is not another existing page')
+        links = self.repair(v['path'], into)
         self.git('rm', '--quiet', '--', v['path'])
         return {'revert': True, 'links': links}
 
@@ -177,11 +268,12 @@ class Applier:
             raise Rejected('a move needs a reason')
         old = v['path']
         text = self.read(old)
-        if v.get('status'):
-            text = set_status(text, v['status'])
+        for key in ('type', 'status'):
+            if v.get(key):
+                text = set_field(text, key, v[key])
         if os.path.dirname(old) != os.path.dirname(to):
-            # the moved page's own relative links now start from its new directory
-            text = rewrite_links(text, old, lambda r: relpath(to if r == old else r, to))
+            # the moved page's own relative links and path values now start from its new directory
+            text = rewrite_paths(text, old, lambda r: to if r == old else r, at=to)
         links = self.repair(old, to)
         (self.repo / to).parent.mkdir(parents=True, exist_ok=True)
         self.git('mv', old, to)
@@ -189,15 +281,18 @@ class Applier:
         return {'revert': True, 'links': links}
 
     def repair(self, old, new):
-        """Point every inbound link at the new path, or unlink it when the page goes away; return the pages fixed."""
+        """Point every inbound link and frontmatter path value at the new path, or unlink it when the page
+        goes away; return the pages fixed."""
         touched = 0
         for rel in self.pages():
             if rel == old:
                 continue
             text = (self.repo / rel).read_text()
-            fixed = rewrite_links(text, rel, lambda r: None if r != old else ('' if new is None else relpath(new, rel)))
+            fixed = rewrite_paths(text, rel, lambda r: None if r != old else (new or ''))
             if fixed != text:
+                before = self.repaired.get(rel, (lib.sha256(self.repo / rel),))[0]
                 self.write(rel, fixed)
+                self.repaired[rel] = (before, lib.sha256(self.repo / rel))
                 touched += 1
         return touched
 
@@ -255,7 +350,7 @@ class Applier:
             [f'`{v["op"]} {v["path"]}`' + (f' to `{v["to"]}`' if v.get('to') else '') + f': {v.get("reason", "")}' for v in items[:30]]
             + ([f'... {len(items) - 30} more'] if len(items) > 30 else []),
             [{'label': 'Apply the held verdicts', 'detail': 'the next run applies them, each still checked against its content hash',
-              'action': {'type': 'command', 'argv': ['scripts/apply.py', '--held', str(path)]}},
+              'action': {'type': 'command', 'skill': 'brain-routines', 'argv': ['scripts/apply.py', '--held', str(path)]}},
              {'label': 'Discard them', 'detail': 'nothing changes; later runs judge these pages again',
               'action': {'type': 'close'}}],
             2, 'a share this large usually means the judge or its packet went wrong')
@@ -270,6 +365,7 @@ class Applier:
         commits = []
         for v in self.trip(verdicts):
             op = v.get('op')
+            repaired = dict(self.repaired)
             try:
                 if op == 'NOOP':
                     self.result['noop'] += 1
@@ -291,6 +387,7 @@ class Applier:
                 self.commit(v)
                 commits.append((v, info))
             except (Rejected, KeyError, Failed) as error:
+                self.repaired = repaired
                 self.git('reset', '--quiet', '--hard', 'HEAD')
                 self.git('clean', '-ffdq')
                 self.result['rejected'].append({'verdict': v, 'reason': f'missing field {error}' if isinstance(error, KeyError) else str(error)})
@@ -311,7 +408,8 @@ class Applier:
                 entry = {'op': v['op'], 'path': v['path'], 'commit': sha, 'url': url}
                 if info.get('revert'):
                     entry['revert'] = f'git revert {sha[:12]}'
-                text = f'{v["op"]} `{v["path"]}`' + (f' to `{v["to"]}`' if v.get('to') else '') + f': {v["summary"]}'
+                text = f'{v["op"]} `{v["path"]}`' + (f' to `{v["to"]}`' if v.get('to') else '') \
+                    + (f' into `{v["into"]}`' if v.get('into') else '') + f': {v["summary"]}'
                 if info.get('links'):
                     text += f' ({info["links"]} linking page(s) repaired)'
                 self.result['applied'].append(entry)

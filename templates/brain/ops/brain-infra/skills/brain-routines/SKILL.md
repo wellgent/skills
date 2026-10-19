@@ -70,7 +70,7 @@ A MOVE (archive or restore, with `status`) and a page DELETE repair every inboun
 
 An item a routine cannot settle becomes one issue on the brain repo, labelled `needs-attention` and `workflow:<workflow>`, assigned to the owner, deduped by a `<!-- fingerprint: <routine>:<key> -->` marker.
 File it with `routinelib.file_attention` or a FLAG verdict: the finding, why the routine could not settle it, the evidence, numbered options each with an action, and the recommended option.
-Actions are `{"type": "close"}` or `{"type": "command", "argv": ["scripts/<x>", ...]}` run from the filing routine's skill directory with `ATTENTION_ISSUE`, `ATTENTION_OPTION` and `ATTENTION_REPLY`; a command may print a last-line JSON `{"note", "commits"}`.
+Actions are `{"type": "close"}` or `{"type": "command", "argv": ["scripts/<x>", ...]}` run from the filing routine's skill directory (or the one an optional `"skill"` names) with `ATTENTION_ISSUE`, `ATTENTION_OPTION` and `ATTENTION_REPLY`; a command may print a last-line JSON `{"note", "commits"}`.
 
 The **reply loop** runs at the start of each run of the workflow.
 It reads the owner's latest reply after the framework's last comment, takes a leading number or "option N", runs that option's action, comments the result with its commits and closes the issue.

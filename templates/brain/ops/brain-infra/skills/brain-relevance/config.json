@@ -1,0 +1,33 @@
+{
+  "routine": "relevance-weekly",
+  "slices": {
+{{relevance_slices}}
+  },
+  "rotation": {{relevance_rotation}},
+  "not_reviewed": {{relevance_not_reviewed}},
+  "archive": "archive/",
+  "ledger": {{relevance_ledger}},
+  "unpruned": {{relevance_unpruned}},
+  "not_live": {{relevance_not_live}},
+  "kinds": {
+{{relevance_kinds}}
+  },
+  "archivable": ["person", "company", "project", "program", "tool", "meeting"],
+  "live_statuses": {
+{{relevance_live_statuses}}
+  },
+  "terminal_statuses": {
+{{relevance_terminal_statuses}}
+  },
+  "relationship_key": "relationship_types",
+  "prospect_types": ["prospect"],
+  "tool_sources": {{relevance_tool_sources}},
+  "meeting_subjects": ["people", "companies", "projects", "programs"],
+  "file_targets": {{relevance_file_targets}},
+  "days": {
+{{relevance_days}}
+  },
+  "drift_sample": 5,
+  "max_options": 4,
+  "eval_set": "ops/brain-infra/skills/brain-health/eval/qrels.json"
+}
