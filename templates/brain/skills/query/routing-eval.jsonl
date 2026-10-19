@@ -1,0 +1,4 @@
+// Routing eval fixtures for skills/query.
+{"intent": "What do we know about {{example_org}} from the brain", "expected_skill": "query"}
+{"intent": "Who is this person and do we already have notes on them", "expected_skill": "query"}
+{"intent": "Show the relationship between {{example_org}} and GBrain using backlinks or timeline", "expected_skill": "query"}

@@ -1,0 +1,3 @@
+// Routing eval fixtures for skills/brain-ops.
+{"intent": "This needs a durable {{brain}} update with citations and sync verification", "expected_skill": "brain-ops"}
+{"intent": "Before answering, check the brain and preserve the markdown source of truth", "expected_skill": "brain-ops"}

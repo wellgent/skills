@@ -1,0 +1,4 @@
+// Routing eval fixtures for skills/repo-architecture.
+{"intent": "Clarify whether generated assets belong in the repo or should stay outside source control", "expected_skill": "repo-architecture"}
+{"intent": "Review the root resolver and schema agreement for this brain repo", "expected_skill": "repo-architecture"}
+{"intent": "Should this support file live under ops/templates or skills?", "expected_skill": "repo-architecture"}

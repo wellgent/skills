@@ -1,0 +1,2 @@
+{"intent": "please recommend path for new brain page before I write it", "expected_skill": "brain-taxonomist"}
+{"intent": "run a taxonomy check before creating this page", "expected_skill": "brain-taxonomist"}

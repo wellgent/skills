@@ -1,6 +1,6 @@
-# Issue tracker: GitHub (<owner>/<repo>)
+# Issue tracker: GitHub ({{tracker}})
 
-Planning issues for this brain live as GitHub issues on `<owner>/<repo>`. Use the `gh` CLI for all operations. The tracker is the working surface for `wayfinder` maps and for run requests to `/operate`; it holds in-flight planning state, not compiled truth. Brain pages remain canonical for decisions, project state and executable operational tasks (see "Handoff rules" below).
+Planning issues for this brain live as GitHub issues on `{{tracker}}`. Use the `gh` CLI for all operations. The tracker is the working surface for `wayfinder` maps and for run requests to `/operate`; it holds in-flight planning state, not compiled truth. Brain pages remain canonical for decisions, project state and executable operational tasks (see "Handoff rules" below).
 
 ## Conventions
 
@@ -45,18 +45,20 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 
 - **Map**: a single issue labelled `wayfinder:map`, holding the Destination / Notes / Decisions-so-far / Not yet specified / Out of scope body. `gh issue create --label wayfinder:map`.
 - **Child ticket**: an issue linked to the map as a GitHub sub-issue (`gh api` on the sub-issues endpoint). Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
-- **Blocking**: GitHub's **native issue dependencies**, the canonical UI-visible representation. Add an edge with `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, not the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
+- **Blocking**: GitHub's **native issue dependencies**, the canonical UI-visible representation. Add an edge with `gh api --method POST repos/{{tracker}}/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/{{tracker}}/issues/<n> --jq .id`, not the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
 - **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
 - **A route that reaches work on a project** ends in run requests, one per run, linked from the map.
-- **Research-ticket findings** land as an immutable run record under the brain's research directory, linked from the resolution comment.
+- **Research-ticket findings** land as an immutable run record at {{research_records}}, linked from the resolution comment.
 
 ## Handoff rules
 
 This repo is a brain, so planning state and compiled truth have different homes. GitHub issues hold the ephemeral working state; brain pages hold what outlives the effort.
 
-- **Research tickets are brain-first.** Before external sources, query the brain's pages and search.
-- **Durable decisions propagate to brain pages.** When a ticket resolution constitutes a durable decision, write it onto the subject's brain page with an inline citation naming the resolving issue. The map's Decisions-so-far stays an index; the brain page holds the compiled truth.
-- **Map completion files to the brain.** A finished map's destination artifact (spec, decision, plan) files on the owning brain page.
-- **Prototype tickets produce throwaway artifacts.** Run the `prototype` skill and let the effort decide the shape. Link it from the ticket, keep it out of `main`, and land only the validated decision in the brain.
+- **Research tickets read subject pages for context.** Before external sources, query the brain (`gbrain search`, `gbrain query`) for the subject pages under {{subject_dirs}}, per `skills/conventions/brain-first.md`. Prior research records supply leads (sources, questions), never inherited verdicts: the ticket re-tests their conclusions against primary sources.
+- **Durable decisions propagate to brain pages.** When a ticket resolution constitutes a durable decision, write it onto the subject's brain page with an inline citation per `schema.md` (cite the resolving issue, for example `[Source: {{tracker}} issue #<n>, YYYY-MM-DD]`), through `skills/brain-ops/SKILL.md`. The map's Decisions-so-far stays an index; the brain page holds the compiled truth.
+- **Map completion files to the brain.** A finished map's destination artifact (spec, decision, plan) files per root `RESOLVER.md`, typically on the owning subject page, or on a new page via `skills/brain-taxonomist/SKILL.md`.
+- **Prototype tickets produce throwaway artifacts.** Run the `prototype` skill and let the effort decide the shape. A dev project gets the skill's own shapes: a single-file HTML state-machine demo, or UI variants on one route. A business or day-to-day effort gets a rough concrete artifact to react to: an outline, a draft doc, a deck skeleton. Link it from the ticket, keep it out of `main`, and land only the validated decision in the brain.
+- **Map Notes point at brain skills.** Every map's `## Notes` block names `skills/brain-ops/SKILL.md` and `skills/query/SKILL.md` as the skills each session consults.
+{{local}}

@@ -1,0 +1,3 @@
+// Routing eval fixtures for skills/signal-detector.
+{"intent": "Run ambient signal capture on this incoming user message without blocking", "expected_skill": "signal-detector"}
+{"intent": "Preserve this original phrasing and any durable project facts in the background", "expected_skill": "signal-detector"}

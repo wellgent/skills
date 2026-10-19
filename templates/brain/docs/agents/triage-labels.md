@@ -1,6 +1,6 @@
 # Triage labels
 
-The label axes of `<owner>/<repo>`: the canonical roles the fleet taxonomy uses and the label strings this tracker carries.
+The label axes of `{{tracker}}`: the canonical roles the fleet taxonomy uses and the label strings this tracker carries.
 
 Every triaged issue carries exactly one category label and one state label.
 
@@ -39,7 +39,9 @@ Wayfinder children are already scoped by the map, so they need triage only when 
 
 ## Brain adaptations
 
-- **Redundancy check** is brain-first: search the brain's pages before concluding an issue is already handled.
-- **Verification** of a `defect` means reproducing it against the brain's source or tooling, not running a test suite.
-- **Rejected enhancements** are recorded on the owning brain page with a citation.
-- **Domain terms** come from the brain's schema and subject pages per `docs/agents/domain.md`.
+- **Redundancy check** is brain-first: `gbrain search` and `gbrain query` against subject pages, plus `log.md` on disk, before concluding an issue is already handled.
+- **Verification** of a `defect` means reproducing it against the markdown source or the `gbrain` CLI, not running a test suite.
+- **Rejected enhancements** are recorded on the owning brain page with a citation per `schema.md`.
+- **Domain terms** come from `schema.md` and subject pages per `docs/agents/domain.md`.
+
+{{local}}

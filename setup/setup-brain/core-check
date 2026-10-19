@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Cross-check a brain or a workspace against the shared core.
+
+  core-check brain <brain checkout> [--values]
+  core-check workspace <workspace checkout> [--values]
+
+Each core file under templates/brain/ (or templates/workspace/) compiles into a
+pattern in which placeholders match anything: an inline {{name}} matches any text
+on its line, a line holding only {{name}} matches any number of lines, and
+{{local}} matches any lines a brain adds there. A repeated name must carry the
+same value. Blank lines and trailing spaces are ignored. AGENTS.md is checked by
+section: every "## " section of the core must exist in the target under the same
+heading; other sections are the target's own.
+
+Prints one line per core file (ok, missing, deviates) and exits 1 on any
+missing or deviating file. --values also prints each placeholder's value.
+"""
+import argparse
+import pathlib
+import re
+import sys
+
+TEMPLATES = pathlib.Path(__file__).resolve().parents[2] / "templates"
+SKIP = {"README.md"}
+SECTIONED = {"AGENTS.md"}
+PLACEHOLDER = re.compile(r"\{\{([a-z_]+)\}\}")
+BLOCK = re.compile(r"\{\{([a-z_]+)\}\}")
+
+
+def content_lines(text):
+    return [line.rstrip() for line in text.splitlines() if line.strip()]
+
+
+def compile_parts(template_lines):
+    seen = set()
+    parts = []
+
+    def group(name, body):
+        if name == "local":
+            return f"(?:{body})"
+        if name in seen:
+            return f"(?P={name})"
+        seen.add(name)
+        return f"(?P<{name}>{body})"
+
+    for line in template_lines:
+        block = BLOCK.fullmatch(line.strip())
+        if block:
+            parts.append(group(block.group(1), r"(?:[^\n]*\n)*?"))
+            continue
+        out, pos = [], 0
+        for m in PLACEHOLDER.finditer(line):
+            out.append(re.escape(line[pos:m.start()]))
+            out.append(group(m.group(1), r"[^\n]*?"))
+            pos = m.end()
+        out.append(re.escape(line[pos:]))
+        parts.append("".join(out) + r"\n")
+    return parts
+
+
+def match(template_lines, target_lines):
+    """Return (values, None) on a match, or (None, first core line that fails)."""
+    parts = compile_parts(template_lines)
+    text = "".join(line + "\n" for line in target_lines)
+    m = re.fullmatch("".join(parts), text)
+    if m:
+        return m.groupdict(), None
+    for k in range(1, len(parts) + 1):
+        if not re.match("".join(parts[:k]), text):
+            return None, template_lines[k - 1]
+    return None, "(the target has lines past the end of the core)"
+
+
+def sections(text):
+    """Map each '## ' heading to its section lines, ignoring headings in code fences."""
+    found, current, fenced = {}, None, False
+    for line in text.splitlines():
+        if line.startswith("```"):
+            fenced = not fenced
+        if not fenced and line.startswith("## "):
+            current = line.rstrip()
+            found[current] = []
+        if current is not None:
+            found[current].append(line)
+    return {heading: content_lines("\n".join(body)) for heading, body in found.items()}
+
+
+def check_file(core, target, rel):
+    if not target.is_file():
+        return [f"missing {rel}"], {}
+    core_text, target_text = core.read_text(), target.read_text()
+    if core.name not in SECTIONED:
+        values, failed = match(content_lines(core_text), content_lines(target_text))
+        if failed is not None:
+            return [f"deviates {rel}: core line not matched: {failed}"], {}
+        return [f"ok {rel}"], values
+    report, values, target_sections = [], {}, sections(target_text)
+    for heading, core_lines in sections(core_text).items():
+        if heading not in target_sections:
+            report.append(f"deviates {rel}: section missing: {heading}")
+            continue
+        got, failed = match(core_lines, target_sections[heading])
+        if failed is not None:
+            report.append(f"deviates {rel} {heading}: core line not matched: {failed}")
+        else:
+            values.update(got)
+    return report or [f"ok {rel}"], values
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("kind", choices=["brain", "workspace"])
+    parser.add_argument("target", type=pathlib.Path)
+    parser.add_argument("--values", action="store_true", help="print each placeholder's value")
+    args = parser.parse_args()
+
+    root = TEMPLATES / args.kind
+    clean = True
+    for core in sorted(p for p in root.rglob("*") if p.is_file() and p.relative_to(root).as_posix() not in SKIP):
+        rel = core.relative_to(root).as_posix()
+        report, values = check_file(core, args.target / rel, rel)
+        for line in report:
+            print(line)
+            clean = clean and line.startswith("ok ")
+        if args.values:
+            for name, value in sorted(values.items()):
+                print(f"  {{{{{name}}}}} = {value.rstrip()!r}")
+    return 0 if clean else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

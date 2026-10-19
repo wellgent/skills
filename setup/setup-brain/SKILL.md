@@ -1,6 +1,6 @@
 ---
 name: setup-brain
-description: Make a brain able to plan with wayfinder and operate projects through pstack - the operate skill and the planning skills pinned by commit, the tracker labels, the tracker docs and the request template, and the planning and operating sections of its AGENTS.md. Idempotent.
+description: Make a brain able to plan with wayfinder, operate projects through pstack, and carry the shared core - the operate skill and the planning skills pinned by commit, the tracker labels and the request template, and every shared-core file, written where missing and cross-checked where present. Idempotent.
 argument-hint: "<path to the brain checkout>"
 disable-model-invocation: true
 ---
@@ -8,7 +8,7 @@ disable-model-invocation: true
 # Setup brain
 
 Converge a **brain**, the repository whose tracker holds maps and run requests, on the state below.
-Run from a checkout of this repo; the argument is the brain's checkout (ask if missing). A re-run changes only what is behind.
+Run from a checkout of this repo; the argument is the brain's checkout (ask if missing). A re-run changes only what is behind, and never overwrites a file the brain already has.
 
 ## 1. Read the brain
 
@@ -34,24 +34,30 @@ npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill 
 
 ## 3. Tracker
 
-- Every label in [`templates/brain/labels.json`](../../templates/brain/labels.json) exists on the tracker with that colour and description: `gh label create <name> --repo <tracker> --color <color> --description <description> --force`.
+- Every label in [`labels.json`](labels.json) exists on the tracker with that colour and description: `gh label create <name> --repo <tracker> --color <color> --description <description> --force`.
 - `.github/ISSUE_TEMPLATE/run.md` in the brain is a copy of [`skills/operate/request.md`](../../skills/operate/request.md), written on every run.
 
-## 4. Docs
+## 4. Shared core
 
-`docs/agents/issue-tracker.md`, `docs/agents/triage-labels.md` and `docs/agents/domain.md` in the brain carry the files of the same name in [`templates/brain/`](../../templates/brain/), with `<owner>/<repo>` filled.
-Template prose is replaced on a re-run; a line that states a fact of this brain (its own handoff rules, its page and citation conventions, its directories) is the brain's and is kept.
+The shared core is [`templates/brain/`](../../templates/brain/): every file all brains carry, at its brain path, with placeholders that [`templates/brain/README.md`](../../templates/brain/README.md) indexes.
+Cross-check the brain against it:
 
-## 5. AGENTS.md
+```bash
+setup/setup-brain/core-check brain <brain checkout> --values
+```
 
-The brain's `AGENTS.md` carries the two sections in [`templates/brain/operating.md`](../../templates/brain/operating.md) with the template's text, wrapped in the brain's own conventions (citations, links); lines the brain adds under them are the brain's and are kept.
-Sections under the same headings are replaced; any other section on planning skills or on running projects is removed and named in the report.
+Each core file comes back `ok`, `missing` or `deviates`; for `AGENTS.md`, each core section does.
 
-## 6. Check
+- **Missing**: write it from the core, every placeholder filled. A value comes from what `--values` prints for the brain's other copies, else from the brain itself (`git remote get-url origin` for `tracker`, `skills/_brain-filing-rules.json` for `writes_to`, `README.md`, `RESOLVER.md` and `schema.md` for the rest), else from the owner. Each `{{local}}` is written as nothing. A missing `AGENTS.md` section goes in under its core heading, unless the brain already covers that subject under another heading; then it counts as a deviation.
+- **Deviates**: leave the file as it is, and name it in the report with the core line it fails. Settling it is the owner's call: promote the brain's text to the core, turn it into a placeholder, or revert the brain's copy.
+
+Re-run `core-check` until every file it reports is `ok` or a deviation named in the report.
+
+## 5. Check
 
 Commit and push the brain by its own rules.
-Done when `.agents/skills/` holds the nine skills with working `.claude/skills/` links and a `ref` each in `skills-lock.json`, every label and the request template exist, the three docs carry the template's sections, and `AGENTS.md` carries both sections.
+Done when `.agents/skills/` holds the nine skills with working `.claude/skills/` links and a `ref` each in `skills-lock.json`, every label and the request template exist, and `core-check` reports each core file `ok` or as a reported deviation.
 
 ## Report
 
-Skills added, re-pinned and removed; labels created or changed; the template and docs written; the `AGENTS.md` sections written and removed.
+Skills added, re-pinned and removed; labels created or changed; the request template written; core files and `AGENTS.md` sections written; every deviation with its failing core line.
