@@ -122,6 +122,7 @@ The requester picks the host and time.
 
 The run ends with its decision log and then its `/ketchup` note on the request.
 Check the note's claims against the project: the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
+Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, and no worktree or scratch tree the run created is left on the host; the project's teardown removes any that remain.
 Then catch the requester up in `/ketchup`'s voice, with what the check found, and assign them on the request; closing it is their acceptance.
 A watch exit 3 means the run ended without a note: read its pane or transcript, tell the requester what is known, and assign them.
 
