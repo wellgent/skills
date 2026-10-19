@@ -14,6 +14,7 @@ Use source labels that name the source person when known:
 - Web content: `[Source: {publication}, {URL}, YYYY-MM-DD]`.
 - Social media: `[Source: X/@handle, YYYY-MM-DD](URL)`.
 - Synthesis: `[Source: compiled from {sources}]`.
+- Core-flow test: a planted line that the {{brain}} core workflow brings in and takes out again with its revert.
 
 Source precedence, highest to lowest:
 
