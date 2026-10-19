@@ -713,7 +713,7 @@ def cmd_finish(cfg, rc, meta):
              ('rejected', 'rejected by the guards'),
              ('not judged', 'not judged')]
     done = ', '.join(f'{label} {tally[k]}' for k, label in verbs if tally[k])
-    summary = (f'slice {packet["slice"]}: {groups["slice"]} of {packet["slice_pages"]} pages reviewed'
+    summary = (f'slice {packet["slice"]}: {groups["slice"]} of {packet["slice_pages"]} pages up for review'
                + (f'; inbox {groups["inbox"]}' if groups['inbox'] else '') + (f'; research {groups["research"]}' if groups['research'] else '')
                + (f'; restore checks {groups["restore"]}' if groups['restore'] else '') + f'; drift sample {groups["drift"]}'
                + (f'. {done}.' if done else '.'))
