@@ -6,13 +6,14 @@
 4. For research that leaves the brain, any question whose answer must rest on cited external sources, follow the external research standard in `skills/conventions/brain-first.md` and route it through {{research_route}}.
 5. Before brain work in this repo, read `skills/RESOLVER.md` and load the skill it routes to.
 6. For how an agent reaches and writes this brain (gbrain CLI access, the checkout write flow, the host and its writers), use the `brain-transport` skill at `ops/brain-infra/skills/brain-transport/SKILL.md`.
-7. Before creating or moving any brain page, read `RESOLVER.md`.
-8. If placement is ambiguous, read the target directory `README.md` resolver.
-9. Follow {{schema_docs}} for page structure, citation format, enrichment rules, templates, and maintenance conventions.
-10. Write {{owner}}'s corrections about people, companies, projects, programs, decisions, or durable facts immediately when safe.
-11. Update existing pages before creating new ones.
-12. Put subject knowledge in the matching directory. Keep root files focused on navigation and conventions.
-13. Append `log.md` for brain-level operational events: schema, resolver and template changes, brain-wide source imports, batch migrations, recurring routine wiring, maintenance and repair passes, and repo-scale workflow changes. Routine signal captures, ordinary subject facts, task movement, and ledger imports belong on subject timelines, task pages, and the ledgers themselves.
+7. On the brain host, `{{published_copy}}` is the published copy: read it and never edit it, whatever directory the session started in. Write from your own writer clone on the `brain-transport` roster; a file left in the published copy pauses publication for every writer until the reconciler moves it to a rescue branch.
+8. Before creating or moving any brain page, read `RESOLVER.md`.
+9. If placement is ambiguous, read the target directory `README.md` resolver.
+10. Follow {{schema_docs}} for page structure, citation format, enrichment rules, templates, and maintenance conventions.
+11. Write {{owner}}'s corrections about people, companies, projects, programs, decisions, or durable facts immediately when safe.
+12. Update existing pages before creating new ones.
+13. Put subject knowledge in the matching directory. Keep root files focused on navigation and conventions.
+14. Append `log.md` for brain-level operational events: schema, resolver and template changes, brain-wide source imports, batch migrations, recurring routine wiring, maintenance and repair passes, and repo-scale workflow changes. Routine signal captures, ordinary subject facts, task movement, and ledger imports belong on subject timelines, task pages, and the ledgers themselves.
 {{local}}
 
 ## Skill homing

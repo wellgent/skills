@@ -37,9 +37,9 @@ The index:
 - `{{external_research}}` - block in `brain-first.md`: the tool route for each class of external research.
 - `{{commit_scopes}}` - block in `AGENTS.md`: the brain's commit scopes as a nested list.
 - `{{read_access}}` - block in `brain-transport`: how the `gbrain` CLI reaches the engine on each kind of machine.
-- `{{host_write_mechanism}}` - block in `durable-write.md` and `brain-transport`: how the brain host turns pushed commits into the index. In `brain-transport` it also holds the writer roster: each writer, the checkout it commits from, and its author name.
+- `{{host_write_mechanism}}` - block in `durable-write.md` and `brain-transport`: how the brain host turns pushed commits into the index. In `brain-transport` it also holds the writer roster: each clone's path, host, author and owner.
 - The host reconciler's `config.json` placeholders are its brain values, each named for what it holds: `{{name}}` (the brain's slug), `{{github_repo}}`, `{{host_home}}`, `{{host_path}}`, `{{source_id}}`, `{{alert_account}}`, `{{ops_alerts_channel}}`, `{{owner_github}}`, `{{reconciler_author}}` and `{{reconciler_email}}`.
-- `{{published_copy}}` - workspace: the host path of the brain checkout the workspace reads.
+- `{{published_copy}}` - in `AGENTS.md` and the workspace: the host path of the published copy, the checkout the reconciler moves and every session reads.
 - `{{agent_write_flow}}` - block in the workspace: where and how the workspace's agent commits and pushes brain writes.
 
 ## Cross-check
