@@ -8,7 +8,7 @@ Nothing installs it and nothing links to it at runtime. Each brain keeps its own
 
 - **Planning layer**: the tracker docs under `docs/agents/`, and the "Planning workflow" and "Operating projects" sections of `AGENTS.md`.
 - **Brain-ops layer**: the core behavior skills under `skills/` (`brain-ops`, `query`, `capture`, `signal-detector`, `brain-taxonomist`, `repo-architecture`) with their routing evals, the shared conventions under `skills/conventions/`, `skills/_output-rules.md`, `skills/README.md`, `brain-transport` under `ops/brain-infra/skills/`, and the other shared `AGENTS.md` sections.
-- **Brain-infra reference copies**: each brain-infra skill that every brain runs has its reference copy under `ops/brain-infra/skills/`, starting with `gbrain-host-reconciler`; the concrete copy and its scripts live in each brain.
+- **Brain-infra reference copies**: each brain-infra skill that every brain runs has its reference copy under `ops/brain-infra/skills/`: `gbrain-host-reconciler` and the `brain-routines` framework; the concrete copy and its scripts live in each brain.
 
 [`templates/workspace/AGENTS.md`](../workspace/AGENTS.md) is the brain section of the `AGENTS.md` of an agent runtime workspace bound to a brain on its host.
 
@@ -39,6 +39,7 @@ The index:
 - `{{read_access}}` - block in `brain-transport`: how the `gbrain` CLI reaches the engine on each kind of machine.
 - `{{host_write_mechanism}}` - block in `durable-write.md` and `brain-transport`: how the brain host turns pushed commits into the index. In `brain-transport` it also holds the writer roster: each clone's path, host, author and owner.
 - The host reconciler's `config.json` placeholders are its brain values, each named for what it holds: `{{name}}` (the brain's slug), `{{github_repo}}`, `{{host_home}}`, `{{host_path}}`, `{{source_id}}`, `{{alert_account}}`, `{{ops_alerts_channel}}`, `{{owner_github}}`, `{{reconciler_author}}` and `{{reconciler_email}}`.
+- The `brain-routines` `config.json` shares those names and adds `{{agent_id}}` (the main agent that runs the routine crons), `{{workspace}}` (that agent's workspace path) and one channel id per workflow: `{{health_channel}}`, `{{review_channel}}`, `{{relevance_channel}}`, `{{core_channel}}` and `{{summary_channel}}`. The maintenance clone is `{{host_home}}/{{name}}-maintenance`.
 - `{{published_copy}}` - in `AGENTS.md` and the workspace: the host path of the published copy, the checkout the reconciler moves and every session reads.
 - `{{agent_write_flow}}` - block in the workspace: where and how the workspace's agent commits and pushes brain writes.
 

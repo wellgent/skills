@@ -1,0 +1,30 @@
+{
+  "brain": "{{name}}",
+  "github_repo": "{{github_repo}}",
+  "branch": "main",
+  "owner_github": "{{owner_github}}",
+  "published_repo": "{{host_home}}/{{name}}",
+  "manifest": "ops/brain-infra/routines.json",
+  "maintenance_repo": "{{host_home}}/{{name}}-maintenance",
+  "state_dir": "{{host_home}}/.gbrain/routines",
+  "maintenance_lock": "{{host_home}}/.gbrain/maintenance.lock",
+  "sync_lock": "{{host_home}}/.gbrain/sync.lock",
+  "python_bin": "/usr/bin/python3",
+  "path": "{{host_path}}",
+  "openclaw": {
+    "bin": "{{host_home}}/.npm-global/bin/openclaw",
+    "agent": "{{agent_id}}",
+    "account": "{{alert_account}}",
+    "workspace_skills": "{{workspace}}/skills"
+  },
+  "channels": {
+    "ops-alerts": "{{ops_alerts_channel}}",
+    "health": "{{health_channel}}",
+    "review": "{{review_channel}}",
+    "relevance": "{{relevance_channel}}",
+    "core": "{{core_channel}}",
+    "summary": "{{summary_channel}}"
+  },
+  "tripwire_share": 0.2,
+  "timing": {}
+}

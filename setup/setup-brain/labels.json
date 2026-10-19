@@ -12,5 +12,11 @@
   { "name": "needs-info", "color": "FBCA04", "description": "Waiting on reporter for more information" },
   { "name": "ready-for-agent", "color": "0E8A16", "description": "Fully specified, ready for an AFK agent" },
   { "name": "ready-for-human", "color": "1D76DB", "description": "Requires human judgment or action" },
-  { "name": "wontfix", "color": "ffffff", "description": "This will not be worked on" }
+  { "name": "wontfix", "color": "ffffff", "description": "This will not be worked on" },
+  { "name": "needs-attention", "color": "B60205", "description": "A maintenance routine needs the owner to pick an option" },
+  { "name": "workflow:health", "color": "C5DEF5", "description": "Raised by the brain health workflow" },
+  { "name": "workflow:review", "color": "C5DEF5", "description": "Raised by the brain review workflow" },
+  { "name": "workflow:relevance", "color": "C5DEF5", "description": "Raised by the brain relevance workflow" },
+  { "name": "workflow:core", "color": "C5DEF5", "description": "Raised by the brain core workflow" },
+  { "name": "workflow:summary", "color": "C5DEF5", "description": "Raised by the weekly brain summary" }
 ]
