@@ -47,5 +47,5 @@ Keep work inline when it is:
 
 ## Related
 
-- `skills/conventions/cron-via-minions.md`
+- `skills/conventions/scheduled-work.md`
 - `skills/gbrain-advisor/SKILL.md`

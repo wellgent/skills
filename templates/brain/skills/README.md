@@ -24,7 +24,7 @@ The shared core is the placeholder-bearing reference copy, in wellgent/skills `t
 
 ## Core support files
 
-- `conventions/` - brain and source routing, brain-first lookup with the external research standard, durable writes, model routing, quality, schema evolution, search modes, salience and recency, bulk safety, and the Minion and subagent rules.
+- `conventions/` - brain and source routing, brain-first lookup with the external research standard, durable writes, model routing, quality, schema evolution, search modes, salience and recency, bulk safety, scheduled work, and subagent routing.
 - `_output-rules.md` - durable markdown output conventions.
 
 Routing lives in each skill's `triggers:` frontmatter and the brain's own `skills/RESOLVER.md`.
