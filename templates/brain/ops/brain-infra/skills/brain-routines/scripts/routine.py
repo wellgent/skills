@@ -68,6 +68,7 @@ def end(cfg, meta, status, summary='', counts=None, detail=''):
                   f'Run update in #brain-{meta["workflow"]}, run `{run_id}`.')
     routine_state(cfg, rid, finished_at=lib.iso(), status=status, seconds=round(took, 1), running=False,
                   heartbeat_at=lib.iso(), update_error=error)
+    lib.atomic(lib.run_dir(cfg, run_id) / 'run.json', {**meta, 'status': status, 'summary': summary, 'finished_at': lib.now()})
     heartbeat = lib.state_dir(cfg) / 'heartbeats' / rid
     heartbeat.parent.mkdir(exist_ok=True)
     heartbeat.write_text(lib.iso() + '\n')

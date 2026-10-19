@@ -81,4 +81,4 @@ Reconciler rescue issues (`reconciler-rescue:<branch>`, workflow health) carry n
 
 - `routine.py status` prints the lease and each routine's last run.
 - Force a run with `openclaw cron run <job id>`; `openclaw cron runs <job id>` shows the history.
-- Run directories live in `<state_dir>/runs/` for 14 days, with `run.json`, `journal.jsonl`, the step's `result.json` and each apply output.
+- Run directories live in `<state_dir>/runs/` for 14 days, with `run.json` (its final `status` and `summary` once the run ends), `journal.jsonl`, the step's `result.json` and each apply output.
