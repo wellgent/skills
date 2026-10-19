@@ -508,7 +508,7 @@ def convert(packet, rc, j, brain_repo, depth=0):
     verdict = j.get('verdict')
     if verdict not in VERDICTS:
         raise Invalid(f'unknown verdict {verdict!r}')
-    if verdict not in e['allowed']:
+    if verdict not in e['allowed'] and not (depth and verdict == 'keep'):  # keep is always an option of a flag
         raise Invalid(f'{verdict} is not allowed for {path} ({e["group"]}): allowed {", ".join(e["allowed"])}')
     if verdict != 'keep' and not j.get('reason'):
         raise Invalid('a verdict other than keep needs a reason')
