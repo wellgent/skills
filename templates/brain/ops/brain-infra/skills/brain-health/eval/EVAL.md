@@ -46,7 +46,7 @@ They come in two ways:
 
 ## The `health-eval` routine
 
-A weekly agentTurn, Sunday 08:00. This session is the fresh session that verifies candidates: it judges each one on the pages themselves, never on the word of whoever queued it.
+A weekly agentTurn, at its slot in the routine manifest. This session is the fresh session that verifies candidates: it judges each one on the pages themselves, never on the word of whoever queued it.
 
 1. `routine.py begin health-eval`; keep the run id.
 2. `python3 eval/scripts/evalset.py packet --run <run_id>` prints the set, the queued candidates and the `eval-candidate` issues.

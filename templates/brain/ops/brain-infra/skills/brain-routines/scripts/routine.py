@@ -304,7 +304,7 @@ def main():
     if args.command == 'sync':
         return cmd_sync(cfg, args.check)
     sd = lib.state_dir(cfg)
-    print(json.dumps({'lease': lib.read_json(sd / 'lease.json'),
+    print(json.dumps({'lease': lib.read_json(sd / 'lease.json'), 'queue': lib.read_json(sd / 'lease-queue.json', {}),
                       'routines': {f.stem: lib.read_json(f) for f in sorted((sd / 'routines').glob('*.json'))}}, indent=2))
     return 0
 

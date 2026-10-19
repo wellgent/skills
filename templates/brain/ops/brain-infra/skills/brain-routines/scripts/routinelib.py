@@ -169,20 +169,32 @@ def _alive(pid):
         return True
 
 
+LEASE_POLL = 10  # seconds between a waiter's lease checks
+
+
 def acquire_lease(cfg, run_id, rid, ttl, pid=None):
-    """Take the brain maintenance lease; return the stale lease it replaced, if any."""
+    """Take the brain maintenance lease in arrival order; return the stale lease it replaced, if any.
+
+    Waiters queue in lease-queue.json and the oldest one takes the lease when it is free. A waiter refreshes
+    its entry on every check, so the entry of a waiter that died drops out after six missed checks."""
     until = now() + cfg['timing']['lease_wait_seconds']
-    path = state_dir(cfg) / 'lease.json'
+    path, queue_path = state_dir(cfg) / 'lease.json', state_dir(cfg) / 'lease-queue.json'
     while True:
         with flock(cfg['maintenance_lock'], 60):
             lease = read_json(path)
             live = lease and lease['expires_at'] > now() and _alive(lease.get('pid'))
-            if not live:
+            queue = {k: w for k, w in read_json(queue_path, {}).items() if w['seen_at'] > now() - 6 * LEASE_POLL}
+            queue.setdefault(run_id, {'routine': rid, 'since': now()})['seen_at'] = now()
+            first = min(queue, key=lambda k: (queue[k]['since'], k))
+            if (not live and first == run_id) or now() >= until:
+                del queue[run_id]
+                atomic(queue_path, queue)
+                if live or first != run_id:
+                    raise Failed(f'maintenance lease held by {lease["run_id"]}' if live else f'maintenance lease queued behind {first}')
                 atomic(path, {'run_id': run_id, 'routine': rid, 'pid': pid, 'acquired_at': now(), 'expires_at': now() + ttl})
                 return lease
-        if now() >= until:
-            raise Failed(f'maintenance lease held by {lease["run_id"]}')
-        time.sleep(10)
+            atomic(queue_path, queue)
+        time.sleep(LEASE_POLL)
 
 
 def holds_lease(cfg, run_id):

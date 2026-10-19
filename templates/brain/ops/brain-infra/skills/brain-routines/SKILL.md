@@ -27,11 +27,24 @@ Sync makes the crons (declaration key `<brain>-routine-<id>`) match the manifest
 `sync --check` reports drift without changing anything and exits 1 on drift.
 A new skill also goes on the main agent's skill allowlist and its workspace link is committed in the runtime repo.
 
+## Scheduling
+
+Every routine takes the one maintenance lease, so the slots are what keeps scheduled runs from waiting on each other.
+Place a slot by these rules:
+
+- **Space by the worst case.** A routine starts no earlier than the previous routine's slot plus that routine's `timeout_seconds` plus 5 minutes (a killed turn's lease lives 300 s past its timeout), minus the lease wait (`timing.lease_wait_seconds`, 30 minutes by default). Then a scheduled run never fails on the lease, even after a predecessor that ran to its timeout. Typical runs are far shorter than their timeouts, so on a normal day no scheduled run waits at all.
+- **Order by data.** The purge runs before the nightly cycle, so the cycle works on the purged index. The change review follows the nightly cycle and the brain's intake crons. Weekly relevance follows the review. The doctor follows them, so its deadman checks the night's heartbeats the same morning. The core check and the weekly eval come last. The weekly summary runs after the week's last review, relevance and eval runs.
+- **Keep out of 02:00-02:59 local time.** Daylight-saving changes skip or repeat that hour.
+- **Count the wait in the timeout.** A routine's wait for the lease runs inside its own cron timeout, so a routine that can wait keeps a timeout covering the wait plus its work.
+
+The deadman reads each routine's due time from its slot, timeout, lease wait and grace, so a slot change needs no deadman change.
+`routine.py status` shows each routine's last run time in seconds; check a slot against those durations and the timeouts.
+
 ## A run
 
 Every run, of either kind, goes through the same lifecycle:
 
-1. **Begin.** Take the brain maintenance lease (one routine at a time; a crashed run's lease is taken over at expiry), reset the maintenance clone to `origin/main` (wiped leftovers are reported), and run the reply loop for the workflow.
+1. **Begin.** Take the brain maintenance lease (one routine at a time, granted in arrival order; a crashed run's lease is taken over at expiry; a run still waiting after `timing.lease_wait_seconds` fails), reset the maintenance clone to `origin/main` (wiped leftovers are reported), and run the reply loop for the workflow.
 2. **Work.** The routine's step runs from the published copy and writes only to its run directory and, through `apply.py`, the maintenance clone; every write into the published copy pauses publication. Steps that run `gbrain sync`, `gbrain embed` or a full doctor hold the sync lock (`routinelib.sync_lock(cfg)`).
 3. **End.** Post the run update to the workflow channel, page `#ops-alerts` for a partial run, write the heartbeat (`<state_dir>/heartbeats/<id>` and `<state_dir>/routines/<id>.json`), release the lease.
 
@@ -79,6 +92,6 @@ Reconciler rescue issues (`reconciler-rescue:<branch>`, workflow health) carry n
 
 ## Operating
 
-- `routine.py status` prints the lease and each routine's last run.
+- `routine.py status` prints the lease, the runs queued for it and each routine's last run.
 - Force a run with `openclaw cron run <job id>`; `openclaw cron runs <job id>` shows the history.
 - Run directories live in `<state_dir>/runs/` for 14 days, with `run.json` (its final `status` and `summary` once the run ends), `journal.jsonl`, the step's `result.json` and each apply output.
