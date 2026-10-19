@@ -27,5 +27,11 @@
     "email": "{{reconciler_email}}"
   },
   "timing": {},
-  "deadman": []
+  "deadman": [
+    {
+      "name": "health-doctor",
+      "path": "{{host_home}}/.gbrain/routines/heartbeats/health-doctor",
+      "max_age_seconds": 108000
+    }
+  ]
 }

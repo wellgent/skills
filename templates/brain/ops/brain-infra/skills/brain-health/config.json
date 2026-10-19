@@ -1,0 +1,16 @@
+{
+  "nightly_phases": ["sync", "extract", "embed", "orphans"],
+  "doctor": {
+    "page": ["git_held_files"],
+    "ignore": ["harness_wiring", "skill_currency"],
+    "env": {
+      "GBRAIN_CYCLE_FRESHNESS_WARN_HOURS": "26",
+      "GBRAIN_CYCLE_FRESHNESS_FAIL_HOURS": "52"
+    }
+  },
+  "entity_lint": "{{entity_lint}}",
+  "timeline_max_rows": 200,
+  "timeline_memory_days": 30,
+  "deadman_grace_seconds": 1800,
+  "reconciler_stale_seconds": 900
+}
