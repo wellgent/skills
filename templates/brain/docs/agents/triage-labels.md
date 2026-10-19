@@ -37,6 +37,8 @@ Both apply to the same issue without conflict: a wayfinder child ticket can carr
 `needs-attention` marks an item a maintenance routine could not settle, assigned to {{owner}} with options and a recommended one; `workflow:<name>` names the workflow that raised it (`health`, `review`, `relevance`, `core`, `summary`).
 {{owner}} replies with an option number, and the workflow's next run applies it and closes the issue (`ops/brain-infra/skills/brain-routines/`).
 
+`eval-candidate` marks an issue about a lookup that missed; the weekly retrieval eval verifies it as a candidate, comments the outcome and removes the label (`ops/brain-infra/skills/brain-health/eval/EVAL.md`).
+
 Triage is the entry path for ad-hoc issues that arrive outside a map.
 Wayfinder children are already scoped by the map, so they need triage only when their state is in question.
 

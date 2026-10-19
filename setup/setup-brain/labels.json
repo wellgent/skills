@@ -18,5 +18,6 @@
   { "name": "workflow:review", "color": "C5DEF5", "description": "Raised by the brain review workflow" },
   { "name": "workflow:relevance", "color": "C5DEF5", "description": "Raised by the brain relevance workflow" },
   { "name": "workflow:core", "color": "C5DEF5", "description": "Raised by the brain core workflow" },
-  { "name": "workflow:summary", "color": "C5DEF5", "description": "Raised by the weekly brain summary" }
+  { "name": "workflow:summary", "color": "C5DEF5", "description": "Raised by the weekly brain summary" },
+  { "name": "eval-candidate", "color": "BFD4F2", "description": "A lookup that missed, for the weekly retrieval eval to verify" }
 ]

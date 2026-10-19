@@ -9,6 +9,7 @@ Nothing installs it and nothing links to it at runtime. Each brain keeps its own
 - **Planning layer**: the tracker docs under `docs/agents/`, and the "Planning workflow" and "Operating projects" sections of `AGENTS.md`.
 - **Brain-ops layer**: the core behavior skills under `skills/` (`brain-ops`, `query`, `capture`, `signal-detector`, `brain-taxonomist`, `repo-architecture`) with their routing evals, the shared conventions under `skills/conventions/`, `skills/_output-rules.md`, `skills/README.md`, `brain-transport` under `ops/brain-infra/skills/`, and the other shared `AGENTS.md` sections.
 - **Brain-infra reference copies**: each brain-infra skill that every brain runs has its reference copy under `ops/brain-infra/skills/`: `gbrain-host-reconciler`, the `brain-routines` framework, the `brain-change-review` workflow and the `brain-core` workflow; the concrete copy and its scripts live in each brain.
+  The retrieval eval's code and `EVAL.md` sit under `brain-health/eval/`; each brain keeps its own set (`qrels.json`) and candidate queue (`candidates.json`).
 
 [`templates/workspace/AGENTS.md`](../workspace/AGENTS.md) is the brain section of the `AGENTS.md` of an agent runtime workspace bound to a brain on its host.
 
