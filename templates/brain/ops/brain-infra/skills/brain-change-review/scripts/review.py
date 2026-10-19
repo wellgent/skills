@@ -581,6 +581,7 @@ def usage_snapshot(cfg):
     try:
         out = lib.run([cfg['openclaw']['bin'], 'status', '--usage', '--json', '--agent', cfg['openclaw']['agent']], timeout=90)
         data = json.loads(out[out.find('{'):])
+        data = data.get('usage') or data  # the full status nests the quota snapshot under usage
     except (Failed, OSError, ValueError):
         return None
     snap = {}
