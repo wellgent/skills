@@ -252,8 +252,9 @@ class Reconciler:
     def file_rescue_issue(self, branch, snapshot, origin, problems, dirty):
         na = self.cfg['needs_attention']
         slug = self.cfg['github_repo']
-        changed = self.git('diff', '--name-status', origin, snapshot).splitlines()
-        commits = self.git('log', '--format=%h %an: %s', f'{origin}..{snapshot}').splitlines()[1:]
+        base = self.git('merge-base', origin, snapshot)  # the published commit the divergence grew from
+        changed = self.git('diff', '--name-status', base, snapshot).splitlines()
+        commits = self.git('log', '--format=%h %an: %s', f'{base}..{snapshot}').splitlines()[1:]
         shown = changed[:40] + ([f'... {len(changed) - 40} more'] if len(changed) > 40 else [])
         content = any(line.split('\t')[-1].endswith('.md') for line in changed)
         url = f'https://github.com/{slug}/tree/{branch}'
@@ -265,7 +266,7 @@ class Reconciler:
             '',
             f'**What it did.** It pushed everything to [`{branch}`]({url}), reset the copy to `origin/{self.branch}` (`{origin[:12]}`) and kept syncing.',
             '',
-            '**Evidence.** Changes against main:',
+            f'**Evidence.** Changes on the branch since `{base[:12]}`, the published commit they grew from:',
             '',
             '```',
             *(shown or ['(none)']),
@@ -351,15 +352,16 @@ class Reconciler:
             self.rescue(origin, problems, dirty)
         s.pop('dirty_since', None)
         s.pop('dirty', None)
-        head = self.git('rev-parse', 'HEAD')
-        if head != origin:
-            changed = self.git('diff', '--name-only', head, origin).splitlines()
+        if self.git('rev-parse', 'HEAD') != origin:
             self.git('merge', '--ff-only', '--quiet', origin)
-            self.event('publish', old=head, new=origin, files=len(changed))
-            head = origin
+        head, old = origin, s.get('published_head')
+        if old and old != head:
+            changed = self.git('diff', '--name-only', old, head).splitlines()
+            self.event('publish', old=old, new=head, files=len(changed))
             if self.own and any(p.startswith(self.own) for p in changed):
                 self.restart = True
-        self.save(phase='publishing', published_head=head, published_at=iso())
+        if old != head:
+            self.save(phase='publishing', published_head=head, published_at=iso())
         due = now() - s.get('health_checked_at', 0) >= self.t['health_check_seconds']
         if s.get('indexed_head') != head or due:
             if due and s.get('indexed_head') == head:
