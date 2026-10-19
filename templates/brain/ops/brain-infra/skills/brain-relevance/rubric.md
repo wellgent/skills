@@ -37,3 +37,5 @@ The code refuses to remove an eval-case page and to delete or merge a page live 
 - `reason` - one or two sentences naming the evidence: the trigger, the dates, the linking pages.
 - `summary` - the commit subject after the area scope, in the present tense: what is now true, for example `<Name> moves to the archive: the <company> engagement ended`.
 - Spans are copied exactly from the page; quotes are copied exactly from the cited page.
+- New text carries its citations in the form the page already uses.
+- A flag's `recommended_reason` completes "Recommended: N, ...": it starts lowercase and has no final period.
