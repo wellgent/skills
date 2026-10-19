@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # cost <session id> | cost latest <checkout>
 # Prints what one Claude Code session used, as JSON: tokens per model read from its transcript and
-# the transcripts of its subagents, priced at API list prices from prices.json beside this script.
+# the transcripts of its subagents, priced at API list prices from prices.json beside this script,
+# each response at the rate its prompt length takes where a model has long_prompt rates.
 # `latest <checkout>` takes the newest transcript of that checkout.
 # Exit 3 when the host holds no transcript for the session.
 set -euo pipefail
@@ -51,8 +52,8 @@ esac
              output: ($u.output_tokens // 0)}
        else . end)
   | . as $s
-  | ([$s.messages[]] | group_by(.model)
-     | map({key: .[0].model, value: (reduce .[] as $m
+  | ([$s.messages[] | .bucket = bucket($prices[0])] | group_by(.bucket)
+     | map({key: .[0].bucket, value: (reduce .[] as $m
          ({input: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0};
           .input += $m.input | .cache_write_5m += $m.cache_write_5m | .cache_write_1h += $m.cache_write_1h
           | .cache_read += $m.cache_read | .output += $m.output))})
