@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# ready [--smoke] <owner>/<repo>
+# Run from the brain's checkout before /operate writes a run's prompt. Prints one line per check:
+#   brain     the brain checkout clean and at its remote head
+#   project   ~/repos/<repo> clean on main and at its remote head (fast-forwarded when only behind)
+#   tool      each check command under "## Host tools" in the project's docs/agents/dev-loop.md
+#   pstack    the plugin version installed for this checkout against the port's latest release
+#   pin       each skills-lock.json pin against the newest commit of its source touching the skill
+# With --smoke it then sets up a fresh worktree of origin/main with the Set up command from
+# dev-loop.md, runs `scripts/check --dry` there, and tears the worktree down with Tear down.
+# Exit 0 ready, 3 ready but something is behind (pstack or a pin: run setup-project with latest),
+# 1 blocked (a dirty or diverged checkout, a failing tool, a failing smoke step).
+set -euo pipefail
+die() { echo "ready: $*" >&2; exit 1; }
+for tool in git gh jq; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+
+smoke=""
+[ "${1:-}" != --smoke ] || { smoke=1; shift; }
+repo=${1:?usage: ready [--smoke] <owner>/<repo>}
+case $repo in */*) ;; *) die "repo must be <owner>/<repo>, got: $repo" ;; esac
+name=${repo##*/}
+cwd="$HOME/repos/$name"
+[ -d "$cwd/.git" ] || die "no checkout at $cwd"
+loop="$cwd/docs/agents/dev-loop.md"
+[ -f "$loop" ] || die "no $loop"
+
+blocked=""
+behind=""
+block() { echo "$1 BLOCKED: $2"; blocked=1; }
+
+# A checkout is ready when clean, on the given branch and at its remote head; only behind is fixed.
+head_check() {
+  local label=$1 dir=$2 branch=$3 counts
+  git -C "$dir" fetch -q || { block "$label" "git fetch failed in $dir"; return; }
+  [ -z "$(git -C "$dir" status --porcelain)" ] || { block "$label" "$dir has uncommitted changes"; return; }
+  [ "$(git -C "$dir" branch --show-current)" = "$branch" ] || { block "$label" "$dir is not on $branch"; return; }
+  counts=$(git -C "$dir" rev-list --left-right --count "HEAD...@{u}")
+  case $counts in
+    "0	0") ;;
+    "0	"*) git -C "$dir" merge -q --ff-only "@{u}" || { block "$label" "fast-forward failed in $dir"; return; } ;;
+    *) block "$label" "$dir has commits its remote lacks"; return ;;
+  esac
+  echo "$label ok at $(git -C "$dir" rev-parse --short=8 HEAD)"
+}
+
+head_check brain "$PWD" "$(git rev-parse --abbrev-ref 'origin/HEAD' 2>/dev/null | sed 's#^origin/##' || echo main)"
+head_check project "$cwd" main
+
+# Host tools: "- **<tool>:** `<check command>`" lines under "## Host tools".
+tools=$(awk '/^## Host tools/{on=1; next} /^## /{on=0} on' "$loop" | sed -n 's/^- \*\*\([^*]*\):\*\* `\([^`]*\)`.*/\1	\2/p')
+[ -n "$tools" ] || block tool "dev-loop.md has no \"## Host tools\" checks"
+while IFS=$'\t' read -r tool cmd; do
+  [ -n "$tool" ] || continue
+  if (cd "$cwd" && bash -c "$cmd") >/dev/null 2>&1 </dev/null; then echo "tool ok: $tool"; else block "tool" "$tool (\`$cmd\`)"; fi
+done <<<"$tools"
+
+# pstack: the version installed for this checkout against the port's latest release.
+installed=$(jq -r --arg p "$cwd" '.plugins["pstack@pstack-claude"][]? | select(.projectPath == $p) | .version' \
+  "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json" 2>/dev/null | head -1 || true)
+latest=$(gh api repos/michael-denyer/pstack-claude/releases/latest --jq '.tag_name | ltrimstr("v")' 2>/dev/null || true)
+if [ -z "$installed" ]; then
+  block pstack "not installed for $cwd"
+elif [ -n "$latest" ] && [ "$installed" != "$latest" ]; then
+  echo "pstack behind: $installed (latest $latest)"; behind=1
+else
+  echo "pstack ok: $installed"
+fi
+
+# Pins: each skills-lock.json entry against the newest commit of its source touching its directory.
+if [ -f "$cwd/skills-lock.json" ]; then
+  while IFS=$'\t' read -r skill source ref path; do
+    newest=$(gh api "repos/$source/commits?path=$(dirname "$path")&per_page=1" --jq '.[0].sha' 2>/dev/null || true)
+    if [ -z "$newest" ]; then echo "pin unknown: $skill ($source)"
+    elif [ "$newest" != "$ref" ]; then echo "pin behind: $skill ${ref:0:7} (newest ${newest:0:7})"; behind=1
+    else echo "pin ok: $skill"; fi
+  done < <(jq -r '.skills | to_entries[] | [.key, .value.source, .value.ref, .value.skillPath] | @tsv' "$cwd/skills-lock.json")
+fi
+
+if [ -n "$smoke" ] && [ -z "$blocked" ]; then
+  field() { sed -n "s/^- \*\*$1:\*\* \`\([^\`]*\)\`.*/\1/p" "$loop" | head -1; }
+  setup=$(field "Set up"); teardown=$(field "Tear down")
+  [ -n "$setup" ] && [ -n "$teardown" ] || die "dev-loop.md lacks a Set up or Tear down line"
+  tree="$HOME/repos/$name-ready"
+  [ ! -e "$tree" ] || die "$tree exists: a smoke from an earlier Ready was not torn down"
+  log="${XDG_STATE_HOME:-$HOME/.local/state}/operate/$name-ready.log"
+  mkdir -p "$(dirname "$log")"; : >"$log"
+  git -C "$cwd" worktree add -q --detach "$tree" origin/main
+  cleanup() { (cd "$tree" && bash -c "$teardown") >>"$log" 2>&1 || true; git -C "$cwd" worktree remove --force "$tree" 2>/dev/null || true; }
+  trap cleanup EXIT
+  for step in "set up	$setup" "sign-off	scripts/check --dry"; do
+    label=${step%%	*}; cmd=${step#*	}
+    start=$(date +%s)
+    if (cd "$tree" && bash -c "$cmd") >>"$log" 2>&1 </dev/null; then
+      echo "smoke ok: $label in $(( $(date +%s) - start ))s"
+    else
+      block smoke "$label (\`$cmd\`), log $log"; break
+    fi
+  done
+fi
+
+[ -z "$blocked" ] || exit 1
+[ -z "$behind" ] || exit 3
+exit 0

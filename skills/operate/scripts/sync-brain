@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# sync-brain <brain checkout>
+# Brings what a brain needs for /operate to the newest wellgent/skills commit that touches
+# skills/operate: the operate skill pinned at that commit (.agents/skills/operate, the
+# .claude/skills link, its skills-lock.json entry), the run request template
+# .github/ISSUE_TEMPLATE/run.md copied from its request.md, and the `run` label on the tracker.
+# A change is committed with the prefix SYNC_BRAIN_PREFIX (default "setup") and pushed.
+# Prints "operate at <sha>" with "(moved from <sha>)" when the pin moved.
+# Exit 0 current or synced, 1 failed (a dirty or diverged brain, a CLI failure).
+set -euo pipefail
+die() { echo "sync-brain: $*" >&2; exit 1; }
+
+# The whole script is read before it runs, since it replaces its own directory in a brain.
+main() {
+  for tool in git gh jq npx; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+  local brain=${1:?usage: sync-brain <brain checkout>}
+  [ -d "$brain/.git" ] || die "not a git checkout: $brain"
+  cd "$brain"
+  [ -z "$(git status --porcelain)" ] || die "the brain has uncommitted changes"
+  git pull -q --rebase || die "git pull --rebase failed in $brain"
+
+  local sha old tracker
+  sha=$(gh api "repos/wellgent/skills/commits?path=skills/operate&per_page=1" --jq '.[0].sha')
+  [ -n "$sha" ] || die "no wellgent/skills commit touches skills/operate"
+  old=$(jq -r '.skills.operate.ref // empty' skills-lock.json 2>/dev/null || true)
+  tracker=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+
+  if [ "$old" != "$sha" ]; then
+    [ -z "$old" ] || npx -y skills remove operate -y >/dev/null
+    npx -y skills add "wellgent/skills#$sha" --agent codex --copy -y --skill operate >/dev/null
+    [ -f .agents/skills/operate/SKILL.md ] || die "npx skills add wrote no .agents/skills/operate"
+    mkdir -p .claude/skills
+    ln -sfn ../../.agents/skills/operate .claude/skills/operate
+    # In a brain the CLI also links skills/ (the GBrain skill source); that link is not ours.
+    [ ! -L skills/operate ] || rm -f skills/operate
+  fi
+
+  mkdir -p .github/ISSUE_TEMPLATE
+  cp .agents/skills/operate/request.md .github/ISSUE_TEMPLATE/run.md
+  gh label create run --repo "$tracker" --color 0E8A16 --description "A request for /operate" --force >/dev/null
+
+  local stray
+  stray=$(git status --porcelain | grep -vE ' (\.agents/skills/operate/|\.claude/skills/operate$|skills-lock\.json$|\.github/ISSUE_TEMPLATE/run\.md$)' || true)
+  [ -z "$stray" ] || die "the CLI wrote outside the operate paths: $stray"
+  if [ -n "$(git status --porcelain)" ]; then
+    git add -A .agents/skills/operate .claude/skills/operate skills-lock.json .github/ISSUE_TEMPLATE/run.md
+    git commit -qm "${SYNC_BRAIN_PREFIX:-setup}: operate at wellgent/skills ${sha:0:7}, with its run request template"
+    git push -q || die "git push failed in $brain"
+  fi
+
+  if [ "$old" != "$sha" ]; then
+    echo "operate at ${sha:0:7} (moved from ${old:0:7})"
+  else
+    echo "operate at ${sha:0:7}"
+  fi
+}
+
+main "$@"
+exit

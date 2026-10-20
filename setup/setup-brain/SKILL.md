@@ -19,8 +19,8 @@ The tracker is `git remote get-url origin`.
 
 Two sources, each pinned by commit, in the brain's root:
 
-- `wellgent/skills`: `operate`.
-- `mattpocock/skills`: `wayfinder`, `grilling`, `domain-modeling`, `research`, `prototype`, `writing-for-agents`, `wizard`, `ask-matt`.
+- `wellgent/skills`: `operate`, pinned by [`skills/operate/scripts/sync-brain`](../../skills/operate/scripts/sync-brain) `<brain checkout>`, which also writes the run request template and the `run` label; `/operate`'s Ready runs the same script before every run.
+- `mattpocock/skills`: `wayfinder`, `grilling`, `domain-modeling`, `research`, `prototype`, `writing-for-agents`, `wizard`, `ask-matt`, through the steps below.
 
 ```bash
 npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill <name> ...]
@@ -35,7 +35,7 @@ npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill 
 ## 3. Tracker
 
 - Every label in [`labels.json`](labels.json) exists on the tracker with that colour and description: `gh label create <name> --repo <tracker> --color <color> --description <description> --force`.
-- `.github/ISSUE_TEMPLATE/run.md` in the brain is a copy of [`skills/operate/request.md`](../../skills/operate/request.md), written on every run.
+- `.github/ISSUE_TEMPLATE/run.md` in the brain is a copy of [`skills/operate/request.md`](../../skills/operate/request.md), written by `sync-brain` in step 2.
 
 ## 4. Shared core
 
