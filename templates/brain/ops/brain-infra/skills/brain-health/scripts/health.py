@@ -3,7 +3,7 @@
 
   health.py nightly   the derived-maintenance dream phases
   health.py purge     hard-delete pages soft-deleted more than 72 h ago
-  health.py doctor    timeline repair, the full doctor, writer roster, entity lint, deadman, reconciler rollup
+  health.py doctor    timeline repair, the full doctor, writer roster, entity lint, brain checks, deadman, reconciler rollup
 
 A step reports through $ROUTINE_RUN_DIR/result.json. A finding it cannot settle is a journal
 problem: the run ends partial and the runner pages #ops-alerts. A step that cannot run exits 1.
@@ -219,6 +219,23 @@ def entity_lint(s):
     return f'entity lint {len(archive)} archive status' + (f', {len(other)} other' if other else '')
 
 
+def brain_checks(s):
+    """The brain's own checks, `checks` in config.json: each runs from the published copy, and a non-zero exit pages every line it prints."""
+    if not s.hc['checks']:
+        return None
+    failed = 0
+    for check in s.hc['checks']:
+        script = s.published / check['argv'][0]
+        argv = ([s.cfg['python_bin']] if script.suffix == '.py' else []) + [script, *check['argv'][1:]]
+        code, out, err = lib.run(argv, cwd=s.published, timeout=300, check=False)
+        if code == 0:
+            continue
+        failed += 1
+        for line in [line for line in (out or err).strip().splitlines() if line.strip()][:10] or [f'exit {code}']:
+            s.problem(f'{check["name"]}: {line[:120]}', f'{check["name"]}: {line}')
+    return f'{len(s.hc["checks"])} brain check(s) ' + (f'{failed} failed' if failed else 'ok')
+
+
 def cron_sets(expr):
     fields = expr.split()
     bounds = [(0, 59), (0, 23), (1, 31), (1, 12), (0, 7)]
@@ -317,12 +334,12 @@ def reconciler(s):
 
 def doctor(s):
     parts = []
-    for check in (timeline_repair, run_doctor, roster, entity_lint, deadman, reconciler):
+    for check in (timeline_repair, run_doctor, roster, entity_lint, brain_checks, deadman, reconciler):
         try:
             parts.append(check(s))
         except Failed as error:
             s.problem(f'{check.__name__} failed', f'{check.__name__.replace("_", " ")} failed: {error}')
-    s.finish('; '.join(s.problems) if s.problems else ', '.join(parts))
+    s.finish('; '.join(s.problems) if s.problems else ', '.join(p for p in parts if p))
 
 
 def main():

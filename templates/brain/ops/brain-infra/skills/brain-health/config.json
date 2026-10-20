@@ -9,6 +9,7 @@
     }
   },
   "entity_lint": "{{entity_lint}}",
+  "checks": {{health_checks}},
   "timeline_max_rows": 200,
   "timeline_memory_days": 30,
   "deadman_grace_seconds": 1800,
