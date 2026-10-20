@@ -48,4 +48,4 @@ Keep work inline when it is:
 ## Related
 
 - `skills/conventions/scheduled-work.md`
-- `skills/gbrain-advisor/SKILL.md`
+{{local}}
