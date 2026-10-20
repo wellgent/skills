@@ -62,10 +62,10 @@ A start that stops at a startup prompt (folder trust, a login) is answered in th
 ## 6. Record and watch
 
 Comment on the request: `run: <session> started on <hostname> at <UTC time>`, or on a resume `run: <session> resumed on <hostname> at <UTC time> from <hand-back URL>`.
-Start the watch in the background, then end the turn:
+Start the watch in the background from the `ready:` comment's id, then end the turn: a run can post its plan before the `run:` comment, and the watch then prints both.
 
 ```bash
-bash <this skill's directory>/scripts/watch <n> [<comment id>]
+bash <this skill's directory>/scripts/watch <n> <ready: comment id>
 ```
 
 It returns with one reason, printed:
