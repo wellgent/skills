@@ -6,6 +6,8 @@
 # a labelled PR's new head.
 # The build (scripts/vercel-build.sh) gives the preview its own Convex preview deployment pr-<pr>,
 # recreated with the seed for each new head, so an earlier head's preview URL may stop working.
+# --non-interactive fixes the CLI's JSON to its agent shape ({status, deployment}), which it
+# otherwise picks only when it detects an agent, so the script reads the URL from any shell.
 # Needs the host's Vercel CLI login with access to the project.
 set -euo pipefail
 
@@ -30,7 +32,7 @@ trap cleanup EXIT
 git worktree add -q --detach "$tree" "$head"
 
 echo "preview: deploying PR $pr head $head"
-url=$(vercel deploy "$tree" --yes --format json --build-env "PREVIEW_NAME=pr-$pr" \
+url=$(vercel deploy "$tree" --yes --non-interactive --json --build-env "PREVIEW_NAME=pr-$pr" \
   --meta "pr=$pr" --meta "sha=$head" | jq -r '.deployment.url')
 [[ $url == https://* ]] || { echo "preview: the Vercel CLI printed no deployment URL" >&2; exit 1; }
 gh pr comment "$pr" --repo "$repo" --body "Preview of $head: $url" >/dev/null
