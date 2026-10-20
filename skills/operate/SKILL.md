@@ -10,6 +10,7 @@ disable-model-invocation: true
 The operator between a brain and pstack: a **run request** on the brain's tracker goes in, a pstack run on the project comes out, and the run's note comes back to the request.
 Run from the brain's checkout on any host that holds the project at `~/repos/<repo>`.
 pstack owns everything inside the run, under the rules in the project's own files; this skill writes the prompt, starts the session, and stays the run's operator until its note is handled: every stop the run posts reaches this session first, and the requester hears only the calls that are theirs.
+Every comment the operator posts opens with `**Operator:**`, or with `**Operator, <requester>'s call:**` when it relays the requester's answer, since the run, the operator and the requester may share one GitHub account.
 The operator's answers, `scope:` comments and catch-ups hold only calls about this one run; a rule every run should follow belongs in host setup or the project template, and goes to the requester as that proposal.
 
 ## The request
@@ -59,6 +60,7 @@ It returns with one reason, printed:
 - **Exit 3**: the run's session is gone with no new comment (see The note).
 - **Exit 4**: this host's weekly usage is at 90% or above: pause the run (see Pause).
 - **Exit 5**: the run's session has done nothing for 30 minutes with no new comment. Read its pane (`herdr agent read <session> --source visible`) and act on what holds it: a five-hour usage limit waits for its reset, then the run is told in its pane to carry on; anything else is handled like a stop.
+- **Exit 6**: this host's weekly usage has been unreadable for 30 minutes. Read the weekly percentage from the run's status line in its pane; at 90% or above pause the run, otherwise restart the watch.
 
 Restart it after each return, from the newest comment id it printed or that this session posted, until the note is handled.
 This session stays open for the run's whole length; a closed operator leaves the run's stops unread.
@@ -123,7 +125,8 @@ The requester picks the host and time.
 The run ends with its decision log and then its `/ketchup` note on the request.
 Check the note's claims against the project: the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
 Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, and no worktree or scratch tree the run created is left on the host; the project's teardown removes any that remain.
-Then catch the requester up in `/ketchup`'s voice, with what the check found, and assign them on the request; closing it is their acceptance.
+Price the run session and this session with `scripts/cost` (see Cost).
+Then catch the requester up in `/ketchup`'s voice, with what the check found and both totals, and assign them on the request; closing it is their acceptance.
 A watch exit 3 means the run ended without a note: read its pane or transcript, tell the requester what is known, and assign them.
 
 ## Cost

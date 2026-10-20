@@ -43,6 +43,7 @@ No GitHub Actions run for this project.
   A failed production deploy is reported and fixed as the run's next PR.
 - **When `scripts/check` cannot run** (exit 2), landing pauses and the run posts a stop on its request.
   Building and verifying continue.
+- **The final tree is checked.** After a run's last landing, the check command and the journey tests run on the `main` head, since each head was signed off on its own base.
 
 ## Verification
 
@@ -56,7 +57,7 @@ No GitHub Actions run for this project.
 - **A delegate ends its turn** once its PR is pushed or its verdict posted.
 - **Every spawn passes `model` explicitly**, and every review brief says whether its reviewer may spawn agents.
   Agents nest at most two levels deep (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `.claude/settings.json`).
-- **Fix rounds** on a verifier's defect list run one effort step below the role sheet.
+- **Fix rounds** on a verifier's defect list, restacks and one-site mechanical moves run one effort step below the role sheet.
 - **A stop runs leaves first:** `ListAgents`, stop every descendant, then the parent, then `ListAgents` again until it is empty.
 - **Deletes.** A delete through a variable is written `rm -f "${VAR:?}"/...`, or with a literal path, so Claude Code's possibly-empty-variable prompt never holds an unattended session.
 

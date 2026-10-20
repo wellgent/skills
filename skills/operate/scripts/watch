@@ -6,8 +6,9 @@
 #   exit 3  the run's session is gone with no new comment
 #   exit 4  this host's weekly usage is at or above WATCH_WEEKLY_LIMIT percent (default 90; off disables)
 #   exit 5  the run's session has done nothing for WATCH_IDLE_MINUTES (default 30) with no new comment
+#   exit 6  the weekly usage has been unreadable for WATCH_USAGE_BLIND_MINUTES (default 30)
 #   exit 1  a usage error
-# Exits 3, 4 and 5 print a one-line reason. A failed GitHub call or usage read while waiting is retried.
+# Exits 3 to 6 print a one-line reason. A failed GitHub call or usage read while waiting is retried.
 set -euo pipefail
 die() { echo "watch: $*" >&2; exit 1; }
 for tool in gh jq herdr; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
@@ -20,6 +21,7 @@ interval=${WATCH_INTERVAL:-60}
 weekly_limit=${WATCH_WEEKLY_LIMIT:-90}
 usage_every=${WATCH_USAGE_INTERVAL:-300}
 idle_s=$(( ${WATCH_IDLE_MINUTES:-30} * 60 ))
+blind_s=$(( ${WATCH_USAGE_BLIND_MINUTES:-30} * 60 ))
 case $weekly_limit in off|[0-9]|[0-9][0-9]|100) ;; *) die "WATCH_WEEKLY_LIMIT must be a percent or off, got: $weekly_limit" ;; esac
 
 comments() { gh issue view "$issue" --json comments --jq '[.comments[] | {id: (.url | sub(".*issuecomment-"; "") | tonumber), author: .author.login, at: .createdAt, url, body}]'; }
@@ -73,8 +75,11 @@ while :; do
       fi
     elif [ -z "$usage_failed" ]; then
       # Said once per failing streak; the read is retried on the next usage round.
-      usage_failed=1
+      usage_failed=$now
       echo "watch: weekly usage unreadable, retrying: $usage" >&2
+    elif [ $((now - usage_failed)) -ge "$blind_s" ]; then
+      echo "watch: weekly usage on $(hostname -s) unreadable for $(( (now - usage_failed) / 60 )) minutes: $usage" >&2
+      exit 6
     fi
   fi
   sleep "$interval"
