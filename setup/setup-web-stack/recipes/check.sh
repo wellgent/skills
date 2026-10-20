@@ -89,7 +89,8 @@ gh api "repos/$repo/statuses/$sha" -f state=success -f context=check \
   || cannot "gh could not post the check status"
 echo "check: passed in $((duration / 60))m$((duration % 60))s; posted check on $sha ($repo, $branch)"
 
-# A PR labelled preview gets a preview of its new head.
+# A PR labelled preview gets a preview of its new head, on a project with scripts/preview.
+[ -x scripts/preview ] || exit 0
 pr=$(gh pr list --repo "$repo" --head "$branch" --state open --label preview --json number --jq '.[0].number // empty')
 if [ -n "$pr" ]; then
   log="${TMPDIR:-/tmp}/preview-$pr.log"
