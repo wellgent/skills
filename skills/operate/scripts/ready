@@ -4,7 +4,7 @@
 #   brain     the brain checkout clean and at its remote head
 #   project   ~/repos/<repo> clean on main and at its remote head (fast-forwarded when only behind)
 #   tool      each check command under "## Host tools" in the project's docs/agents/dev-loop.md
-#   pstack    the plugin version installed for this checkout against the port's latest release
+#   pstack    the plugin version installed for this checkout against the port's marketplace version
 #   pin       each skills-lock.json pin against the newest commit of its source touching the skill,
 #             current when that commit is the pin or in its history
 # With --smoke it then sets up a fresh worktree of origin/main with the Set up command from
@@ -58,7 +58,9 @@ done <<<"$tools"
 # pstack: the version installed for this checkout against the port's latest release.
 installed=$(jq -r --arg p "$cwd" '.plugins["pstack@pstack-claude"][]? | select(.projectPath == $p) | .version' \
   "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json" 2>/dev/null | head -1 || true)
-latest=$(gh api repos/michael-denyer/pstack-claude/releases/latest --jq '.tag_name | ltrimstr("v")' 2>/dev/null || true)
+# The version `claude plugin update` installs is the marketplace manifest's, ahead of any release tag.
+latest=$(gh api repos/michael-denyer/pstack-claude/contents/.claude-plugin/marketplace.json --jq .content 2>/dev/null \
+  | base64 -d 2>/dev/null | jq -r '.plugins[] | select(.name == "pstack") | .version' 2>/dev/null || true)
 if [ -z "$installed" ]; then
   block pstack "not installed for $cwd"
 elif [ -n "$latest" ] && [ "$installed" != "$latest" ]; then
