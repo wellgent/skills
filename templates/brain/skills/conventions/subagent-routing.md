@@ -1,8 +1,8 @@
 # Subagent Routing Convention
 
-Autonomy And Maintenance convention for choosing native runtime subagents versus durable GBrain Minion jobs.
+Convention for choosing native runtime subagents versus durable GBrain Minion jobs.
 
-This convention is captured in the core skillpack for upstream alignment, but it should be activated through an Autonomy And Maintenance review or setup decision. Do not use it as an Agent Access acceptance gate by itself.
+It guides the owner's Minion decision and gates no other work.
 
 ## Default posture
 

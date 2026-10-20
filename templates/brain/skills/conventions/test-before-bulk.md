@@ -26,6 +26,7 @@ Never run a batch operation before testing a small sample.
 - Commit in small exact-path batches when source files change.
 - Keep generated output reviewable.
 - Stop on pattern-level quality problems instead of cleaning later.
+- Before a batch change to skills, `skills/manifest.json` or `skills/RESOLVER.md`, run `gbrain check-resolvable --skills-dir skills`. The daily `health-doctor` routine (`brain-health`) runs the same skill conformance and resolver reachability checks every day: a failure pages and a new warning becomes a needs-attention item.
 
 ## Anti-patterns
 
