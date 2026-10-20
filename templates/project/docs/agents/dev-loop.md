@@ -53,7 +53,8 @@ No GitHub Actions run for this project.
 - **The verifier reruns no suite.** It drives the app on the changed surface with the verification skill, reads the diff, checks the test changes, and takes the head's `check` status as an input.
 - **Previews.** <What the host builds from git pushes, and how a PR labelled `preview` gets its preview: the command, where the URL is posted, and the preview backend it gets with the PR's own functions and the seed.>
   A change to layout, look and feel or functionality waits for the product's owner to review its preview before it lands.
-  A bug fix, or a fix that makes the UI match the project's design records, lands on its verifier's pass, labelled `preview` with the verifier's before-and-after screenshots, and the run's note lists it.
+  A bug fix, or a fix that makes the UI match the project's design records, lands on its verifier's pass, labelled `preview`, and the run's note lists it.
+  The verifier's screenshots are its own evidence: they stay in its evidence directory and are never committed, pushed or posted.
 
 ## Agents
 

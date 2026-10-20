@@ -101,7 +101,7 @@ A stop is a comment from the run with questions it waits on, each with the defau
 Sort every question:
 
 - **Answer it** when the request, the brain (the map the request came from, decisions on subject pages) or the project's own records settle it, or when it is reversible and the run's default is sound.
-- **Escalate it** when it is a product or preference call only the requester can make, the review of a change to layout, look and feel or functionality on its preview, an irreversible action the constraints do not authorize, or work outside what the request asks for. A bug fix, or a fix that makes the UI match the project's design records, is not escalated: it lands on its verifier's pass with before-and-after screenshots.
+- **Escalate it** when it is a product or preference call only the requester can make, the review of a change to layout, look and feel or functionality on its preview, an irreversible action the constraints do not authorize, or work outside what the request asks for. A bug fix, or a fix that makes the UI match the project's design records, is not escalated: it lands on its verifier's pass.
 
 To escalate, catch the requester up in this session in `/ketchup`'s voice: how many calls wait on them, then each call with your recommendation and why, and what the run does without an answer.
 Assign the requester on the request, so the call shows in their open `run` issues, and wait for their answer.
