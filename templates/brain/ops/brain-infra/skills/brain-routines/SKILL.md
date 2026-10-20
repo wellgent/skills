@@ -115,5 +115,6 @@ Reconciler rescue issues (`reconciler-rescue:<branch>`, workflow health) carry n
 ## Operating
 
 - `routine.py status` prints the lease, the runs queued for it and each routine's last run.
+- **Hold.** A manual operation that must not overlap maintenance, such as an engine upgrade, holds the lease with `routine.py hold --reason "<why>" --admit <id>,<id> --hours <n>`. It waits like a run, then prints the hold id. Until `routine.py release <hold id>` or the expiry, only the admitted routines run, one at a time inside the hold; every other run waits in the queue and fails after the lease wait.
 - Force a run with `routine.py force <id>`, which runs the subscription guard first; `openclaw cron run <job id>` starts the turn without the guard. `openclaw cron runs <job id>` shows the history.
 - Run directories live in `<state_dir>/runs/` for 14 days, with `run.json` (its final `status` and `summary` once the run ends), `journal.jsonl`, `update.md`, the step's `result.json` and each apply output.

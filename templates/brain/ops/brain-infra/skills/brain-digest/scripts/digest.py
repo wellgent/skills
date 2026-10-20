@@ -11,12 +11,13 @@ The digest-daily agent turn runs, in order:
 
 `post --fallback` renders the sentences from the facts instead of a narrative.
 `post --quiet` ends a run with nothing to report without posting.
-The owner's answers come back through `answer`, from the channel or a chat session; `items` lists the last digest's items
-and `edition weekly` makes the next run the weekly edition.
+The owner's answers come back through `answer`, from the channel or a chat session; `items` lists the last digest's items,
+`edition weekly` makes the next run the weekly edition, and `preview` prints what a run starting now would post.
 """
 import argparse
 import datetime as dt
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -46,6 +47,12 @@ RAW = [(re.compile(r'https?://'), 'a raw URL'), (re.compile(r'\b(?=[0-9a-f]*[a-f
 YES = re.compile(r'^\W*(yes|y|ok|okay|sure|agreed|approve[d]?|go ahead|do it|recommended|fine)\b', re.I)
 KIND_WORDS = {'archive move': 'Moved to the archive', 'restore': 'Restored from the archive', 'page deletion': 'Deleted',
               'span deletion': 'Removed text from', 'filing move': 'Refiled', 'edit': 'Edited', 'other': 'Changed'}
+# How upstream's changelog marks a release: in its bold headline, or in the lead paragraph.
+RELEASE = re.compile(r'^## \[([^\]]+)\](?:[^\n\d]*(\d{4}-\d{2}-\d{2}))?[^\n]*\n(.*?)(?=^## \[|\Z)', re.M | re.S)
+SECURITY_HEADLINE = re.compile(r'\bsecurity\b|vulnerab|\bCVE-\d|\badvisor(?:y|ies)\b|escalation'
+                               r'|(?:leak|print|expos|reveal)\w*\b[^.]{0,60}\b(?:secret|token|credential|password)s?\b', re.I)
+SECURITY_LEAD = re.compile(r'\bsecurity (?:fix|hardening|pass|advisor|issue|upgrade|priority)|vulnerab|\bCVE-\d', re.I)
+DEFAULT_ON = re.compile(r'\b(?:on|enabled) by default\b|\bdefault-on\b', re.I)
 
 
 # helpers
@@ -254,9 +261,74 @@ def page_counts(cfg, ref):
     return counts
 
 
+def version_key(version):
+    return tuple(int(x) if x.isdigit() else 0 for x in re.split(r'[.-]', version))
+
+
+def releases(changelog):
+    """The releases in an upstream changelog range, oldest first, each flagged as a security fix or a new default-on feature."""
+    out = []
+    for version, date, body in RELEASE.findall(changelog or ''):
+        lead = body.strip().split('\n\n', 1)[0]
+        bold = re.match(r'^(?:#+\s*)?\*\*(.+?)\*\*', lead, re.S)
+        headline = ' '.join(re.sub(r'[`*#]', '', bold.group(1) if bold else lead).split())
+        out.append({'version': version, 'date': date or None, 'headline': headline,
+                    'security': bool(SECURITY_HEADLINE.search(headline) or SECURITY_LEAD.search(lead)),
+                    'default_on': bool(DEFAULT_ON.search(lead))})
+    return sorted(out, key=lambda r: version_key(r['version']))
+
+
+def engine(cfg):
+    """This brain's GBrain against upstream's latest stable release, from the engine's own update check."""
+    rc = json.loads((SKILLS / 'gbrain-host-reconciler' / 'config.json').read_text())
+    env = dict(os.environ, PATH=rc['path'], GBRAIN_SKIP_STARTUP_HOOKS='1')
+    out = lib.run([rc['gbrain_bin'], 'check-update', '--json'], env=env, timeout=120)
+    check = json.loads(out[out.index('{'):])
+    if check.get('error'):
+        raise Failed(f'the update check failed: {check["error"]}')
+    found = releases(check.get('changelog_diff')) if check.get('update_available') else []
+    behind = [r for r in found if version_key(r['version']) > version_key(check['current_version'])]
+    facts = {'running': check['current_version'], 'latest': check.get('latest_version') or check['current_version'],
+             'behind': len(behind), 'since': behind[0]['date'] if behind else None, 'far_at': WATCH['engine_far_releases'],
+             'security': [{k: r[k] for k in ('version', 'headline')} for r in behind if r['security']],
+             'default_on': [{k: r[k] for k in ('version', 'headline')} for r in behind if r['default_on']]}
+    facts['shown'] = bool(facts['security'] or facts['behind'] >= facts['far_at'])
+    facts['why'] = (f'{facts["behind"]} releases behind (shown from {facts["far_at"]})'
+                    + (f', {len(facts["security"])} security fixes in the range' if facts['security'] else ', no security fix in the range'))
+    return facts
+
+
+def engine_line(f):
+    def gist(headline):
+        text = clip(re.sub(r'^security:\s*', '', headline, flags=re.I), 80)
+        return text[:-1] if text.endswith('.') and not text.endswith('...') else text
+
+    def named(items):
+        text = '; '.join(f'{r["version"]} ({gist(r["headline"])})' for r in items[:2])
+        return text + (f'; and {len(items) - 2} more' if len(items) > 2 else '')
+
+    since = dt.date.fromisoformat(f['since']).strftime('%-d %b') if f['since'] else None
+    line = (f'GBrain is {f["behind"]} releases behind upstream ({f["running"]} here, latest stable {f["latest"]}'
+            + (f', behind since {since}' if since else '') + ').')
+    if f['security']:
+        line += f' Security fixes in that range: {named(f["security"])}.'
+    if f['default_on']:
+        line += f' New default-on features to decide: {named(f["default_on"])}.'
+    return line + ' Upgrade through the GBrain lane when you have time.'
+
+
 def watch(cfg, start):
-    """The weekly edition's watch lines, each only when it moves; a line that cannot be read becomes a problem."""
-    lines, problems = [], []
+    """The weekly edition's watch lines, each only when it moves; a line that cannot be read becomes a problem.
+
+    Returns the lines, the problems and the facts behind the engine line, which the packet keeps so a quiet line shows why."""
+    lines, problems, facts = [], [], {}
+    # the engine against upstream
+    try:
+        facts['engine'] = engine(cfg)
+        if facts['engine']['shown']:
+            lines.append(engine_line(facts['engine']))
+    except (Failed, OSError, ValueError, KeyError) as error:
+        problems.append(f'GBrain version: {error}')
     # search quality
     try:
         rows = []
@@ -316,7 +388,7 @@ def watch(cfg, start):
             lines.append('Pages per area moved this week: ' + ', '.join(moved) + '.')
     except (Failed, OSError) as error:
         problems.append(f'page counts: {error}')
-    return lines, problems
+    return lines, problems, facts
 
 
 def window(cfg, state, end, edition):
@@ -328,20 +400,17 @@ def window(cfg, state, end, edition):
     return max(last, end - CONF['max_window_days'] * lib.DAY)
 
 
-def cmd_gather(cfg, args):
-    meta = lib.current_run(cfg, args.run)
-    m = lib.manifest(cfg)
-    tz = m['timezone']
+def build(cfg, run_id, own, end, edition=None):
+    """The packet of the window ending at `end`: every fact the digest reports, gathered with zero LLM calls."""
+    tz = lib.manifest(cfg)['timezone']
     state = load_state(cfg)
-    end = meta['started_at']
     monday = dt.datetime.fromtimestamp(end, ZoneInfo(tz)).isoweekday() == CONF['weekly_day']
-    edition = state.get('next_edition') or ('weekly' if monday else 'daily')
+    edition = edition or state.get('next_edition') or ('weekly' if monday else 'daily')
     start = window(cfg, state, end, edition)
-    d = lib.run_dir(cfg, meta['run_id'])
     problems = []
-    packet = {'run_id': meta['run_id'], 'brain': cfg['brain'], 'edition': edition, 'timezone': tz,
+    packet = {'run_id': run_id, 'brain': cfg['brain'], 'edition': edition, 'timezone': tz,
               'window': {'start': start, 'end': end, 'start_iso': lib.iso(start), 'end_iso': lib.iso(end)},
-              'narrative_file': str(d / 'narrative.json')}
+              'narrative_file': str(lib.run_dir(cfg, run_id) / 'narrative.json') if run_id else None}
 
     def part(name, fn, *a):
         try:
@@ -355,24 +424,41 @@ def cmd_gather(cfg, args):
     packet['changes'] = (packet['changes'] or []) + outside_changes(cfg, runs)
     part('needs_you', attention, cfg, start)
     packet['done'] = done(runs)
-    packet['health'] = health(cfg, runs, start, meta['routine'])
-    packet['watch'] = []
+    packet['health'] = health(cfg, runs, start, own)
+    packet['watch'], packet['watch_facts'] = [], {}
     if edition == 'weekly':
-        packet['watch'], watch_problems = watch(cfg, start)
+        packet['watch'], watch_problems, packet['watch_facts'] = watch(cfg, start)
         problems += watch_problems
     packet['problems'] = problems
-    for p in problems:
-        lib.journal(cfg, meta['run_id'], 'problem', text=f'Digest data: {p}')
     needs = packet['needs_you'] or []
     packet['news'] = bool(edition == 'weekly' or packet['changes'] or packet['done'] or packet['health']
                           or any(i['new'] for i in needs) or packet['needs_you'] is None)
+    return packet
+
+
+def cmd_gather(cfg, args):
+    meta = lib.current_run(cfg, args.run)
+    packet = build(cfg, meta['run_id'], meta['routine'], meta['started_at'])
+    for p in packet['problems']:
+        lib.journal(cfg, meta['run_id'], 'problem', text=f'Digest data: {p}')
+    d = lib.run_dir(cfg, meta['run_id'])
     lib.atomic(d / 'packet.json', packet)
+    needs = packet['needs_you'] or []
     print(json.dumps({
-        'packet': str(d / 'packet.json'), 'narrative_file': packet['narrative_file'], 'edition': edition, 'news': packet['news'],
+        'packet': str(d / 'packet.json'), 'narrative_file': packet['narrative_file'], 'edition': packet['edition'], 'news': packet['news'],
         'changes': len(packet['changes']), 'needs_you': [i['number'] for i in needs], 'done': [x['number'] for x in packet['done']],
-        'health': len(packet['health']), 'watch': len(packet['watch']), 'problems': problems,
+        'health': len(packet['health']), 'watch': len(packet['watch']), 'problems': packet['problems'],
         'next': f'{sys.executable} {Path(__file__)} post --run {meta["run_id"]}' + ('' if packet['news'] else ' --quiet'),
     }, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_preview(cfg, args):
+    """The digest a run starting now would post, in the sentences built from the facts; it posts nothing and keeps no digest state."""
+    packet = build(cfg, None, CONF['routine'], lib.now(), args.edition)
+    print('\n\n'.join(pack(render(packet, fallback(packet)))))
+    print(json.dumps({'edition': packet['edition'], 'news': packet['news'], 'window': packet['window'],
+                      'watch_facts': packet['watch_facts'], 'problems': packet['problems']}, ensure_ascii=False, indent=2), file=sys.stderr)
     return 0
 
 
@@ -676,11 +762,14 @@ def main():
     c.add_argument('--who', default='The owner', help='who answered, by name')
     c.add_argument('--where', default='', help='where the answer was given, for example "#brain-review" or "a chat with Pulsy"')
     sub.add_parser('items', help="the last digest's numbered items")
+    c = sub.add_parser('preview', help='print the digest a run starting now would post; posts and records nothing')
+    c.add_argument('--edition', choices=('weekly', 'daily'), help='the edition to render; by default the one the next run takes')
     c = sub.add_parser('edition', help='set the edition of the next run')
     c.add_argument('edition', choices=('weekly', 'daily'))
     args = p.parse_args()
     cfg = lib.config()
-    return {'gather': cmd_gather, 'post': cmd_post, 'answer': cmd_answer, 'items': cmd_items, 'edition': cmd_edition}[args.command](cfg, args)
+    return {'gather': cmd_gather, 'post': cmd_post, 'answer': cmd_answer, 'items': cmd_items, 'edition': cmd_edition,
+            'preview': cmd_preview}[args.command](cfg, args)
 
 
 if __name__ == '__main__':

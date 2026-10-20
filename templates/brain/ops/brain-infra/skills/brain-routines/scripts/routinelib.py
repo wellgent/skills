@@ -173,27 +173,45 @@ def _alive(pid):
 LEASE_POLL = 10  # seconds between a waiter's lease checks
 
 
-def acquire_lease(cfg, run_id, rid, ttl, pid=None):
+def _in_force(lease):
+    """The lease in force: a run admitted into a hold that died hands the lease back to the hold."""
+    while lease and not (lease['expires_at'] > now() and _alive(lease.get('pid'))):
+        lease = lease.get('within')
+    return lease
+
+
+def acquire_lease(cfg, run_id, rid, ttl, pid=None, hold=None):
     """Take the brain maintenance lease in arrival order; return the stale lease it replaced, if any.
 
     Waiters queue in lease-queue.json and the oldest one takes the lease when it is free. A waiter refreshes
-    its entry on every check, so the entry of a waiter that died drops out after six missed checks."""
+    its entry on every check, so the entry of a waiter that died drops out after six missed checks.
+    An operator hold (`hold`: its reason and the routines it admits) keeps the lease across a manual
+    operation such as an engine upgrade; only the routines it admits run inside it, one at a time."""
     until = now() + cfg['timing']['lease_wait_seconds']
     path, queue_path = state_dir(cfg) / 'lease.json', state_dir(cfg) / 'lease-queue.json'
     while True:
         with flock(cfg['maintenance_lock'], 60):
-            lease = read_json(path)
-            live = lease and lease['expires_at'] > now() and _alive(lease.get('pid'))
+            raw = read_json(path)
+            lease = _in_force(raw)
             queue = {k: w for k, w in read_json(queue_path, {}).items() if w['seen_at'] > now() - 6 * LEASE_POLL}
             queue.setdefault(run_id, {'routine': rid, 'since': now()})['seen_at'] = now()
-            first = min(queue, key=lambda k: (queue[k]['since'], k))
-            if (not live and first == run_id) or now() >= until:
+            admits = (lease or {}).get('hold', {}).get('admit', [])
+            eligible = [k for k, w in queue.items() if not lease or w['routine'] in admits]
+            first = min(eligible or queue, key=lambda k: (queue[k]['since'], k))
+            if (eligible and first == run_id) or now() >= until:
                 del queue[run_id]
                 atomic(queue_path, queue)
-                if live or first != run_id:
-                    raise Failed(f'maintenance lease held by {lease["run_id"]}' if live else f'maintenance lease queued behind {first}')
-                atomic(path, {'run_id': run_id, 'routine': rid, 'pid': pid, 'acquired_at': now(), 'expires_at': now() + ttl})
-                return lease
+                if run_id not in eligible:
+                    raise Failed(f'maintenance lease held by {lease["run_id"]}')
+                if first != run_id:
+                    raise Failed(f'maintenance lease queued behind {first}')
+                new = {'run_id': run_id, 'routine': rid, 'pid': pid, 'acquired_at': now(), 'expires_at': now() + ttl}
+                if hold:
+                    new['hold'] = hold
+                if lease:
+                    new['within'] = lease
+                atomic(path, new)
+                return raw if raw and raw is not lease else None
             atomic(queue_path, queue)
         time.sleep(LEASE_POLL)
 
@@ -204,11 +222,20 @@ def holds_lease(cfg, run_id):
 
 
 def release_lease(cfg, run_id):
+    """Release a run's lease, handing it back to the hold the run ran within, or end a hold."""
     with flock(cfg['maintenance_lock'], 60):
         path = state_dir(cfg) / 'lease.json'
         lease = read_json(path)
-        if lease and lease['run_id'] == run_id:
-            path.unlink()
+        if not lease:
+            return
+        if lease['run_id'] == run_id:
+            within = _in_force(lease.get('within'))
+            if within:
+                atomic(path, within)
+            else:
+                path.unlink()
+        elif (lease.get('within') or {}).get('run_id') == run_id:
+            atomic(path, {k: v for k, v in lease.items() if k != 'within'})
 
 
 # the run journal

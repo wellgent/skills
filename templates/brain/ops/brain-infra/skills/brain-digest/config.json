@@ -10,7 +10,8 @@
     "eval_move": 0.03,
     "window_near_points": 10,
     "area_change_pages": 5,
-    "area_change_share": 0.05
+    "area_change_share": 0.05,
+    "engine_far_releases": 150
   },
   "narrative": {
     "gist_chars": 200,

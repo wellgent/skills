@@ -52,6 +52,7 @@ A daily digest posts when the window has a change, an applied answer, a new need
 **The weekly edition** is Monday's run (`weekly_day`), over the 7 days before it starts, and it always posts.
 It carries the same sections over the week, at most `items_weekly` change items, and fits on one screen (`screen_chars`), plus **Watch** lines that the code writes only when they move:
 
+- the GBrain version: this brain's engine against upstream's latest stable release, from `gbrain check-update --json` on the host, shown when it is `engine_far_releases` releases behind or the range holds a security fix, with the security fixes and new default-on features in the range named; the packet's `watch_facts` keeps the numbers and why a quiet line stayed quiet. Upgrades stay manual, through the GBrain lane;
 - search quality: the weekly search check did not run, failed, or moved by `eval_move` or more;
 - subscription use within `window_near_points` of the `brain-routines` deferral threshold;
 - judge misses above the threshold for any workflow, from `<state_dir>/judge-misses.json`, recomputed when older than `judge_miss_max_age_hours`;
@@ -73,5 +74,6 @@ Either way the agent records the answer on the issue, and the owning workflow's 
 
 - Force a run with `routine.py force digest-daily`. A forced run posts like a scheduled one.
 - `digest.py edition weekly` makes the next run the weekly edition, and `edition daily` a daily one.
+- `digest.py preview --edition weekly` prints the weekly edition a run starting now would post, in the sentences built from the facts, and its `watch_facts` and data problems on stderr. It posts nothing and keeps no digest state.
 - `<state_dir>/digest/state.json` holds the window start and the last digest's numbered items; each run directory keeps `packet.json`, `narrative.json` and the posted `digest.md`.
 - Areas, ledger areas, windows, watch thresholds and narrative limits are in `config.json`; schedule, model and effort are in `ops/brain-infra/routines.json`. The routine is not deferrable: only a used-up window holds it back.

@@ -411,6 +411,29 @@ def cmd_force(cfg, rid):
     return 0
 
 
+def cmd_hold(cfg, admit, hours, reason):
+    """Hold the maintenance lease for a manual operation; until it is released only the admitted routines run."""
+    known = {r['id'] for r in lib.manifest(cfg)['routines']}
+    admit = [a for a in (admit or '').split(',') if a]
+    unknown = [a for a in admit if a not in known]
+    if unknown:
+        raise Failed('not routines in the manifest: ' + ', '.join(unknown))
+    hold_id = f'hold-{lib.stamp()}-{os.urandom(2).hex()}'
+    lib.acquire_lease(cfg, hold_id, 'hold', int(hours * 3600), hold={'reason': reason, 'admit': admit})
+    print(json.dumps({'hold': hold_id, 'admit': admit, 'reason': reason, 'expires_at': lib.iso(lib.now() + hours * 3600),
+                      'release': f'{cfg["python_bin"]} {SCRIPT} release {hold_id}'}, indent=2))
+    return 0
+
+
+def cmd_release(cfg, hold_id):
+    lease = lib.read_json(lib.state_dir(cfg) / 'lease.json') or {}
+    if not hold_id.startswith('hold-') or hold_id not in (lease.get('run_id'), (lease.get('within') or {}).get('run_id')):
+        raise Failed(f'{hold_id} is not a hold on the maintenance lease')
+    lib.release_lease(cfg, hold_id)
+    print(json.dumps({'released': hold_id}))
+    return 0
+
+
 def cmd_sync(cfg, check):
     """Make the main agent's crons match the manifest; with --check, only report drift."""
     if not SCRIPT.is_relative_to(Path(cfg['published_repo']).resolve()):
@@ -466,6 +489,12 @@ def main():
     c.add_argument('routine')
     c = sub.add_parser('sync', help='register the routine manifest as crons')
     c.add_argument('--check', action='store_true', help='report drift without changing anything')
+    c = sub.add_parser('hold', help='hold the maintenance lease for a manual operation, such as an engine upgrade')
+    c.add_argument('--admit', default='', help='comma-separated routines that may still run inside the hold, one at a time')
+    c.add_argument('--hours', type=float, default=6, help='the hold expires after this long')
+    c.add_argument('--reason', required=True)
+    c = sub.add_parser('release', help='end a hold')
+    c.add_argument('hold_id')
     c = sub.add_parser('status', help='print the lease and each routine state')
     args = p.parse_args()
     cfg = lib.config()
@@ -490,6 +519,10 @@ def main():
         return cmd_force(cfg, args.routine)
     if args.command == 'sync':
         return cmd_sync(cfg, args.check)
+    if args.command == 'hold':
+        return cmd_hold(cfg, args.admit, args.hours, args.reason)
+    if args.command == 'release':
+        return cmd_release(cfg, args.hold_id)
     sd = lib.state_dir(cfg)
     print(json.dumps({'lease': lib.read_json(sd / 'lease.json'), 'queue': lib.read_json(sd / 'lease-queue.json', {}),
                       'routines': {f.stem: lib.read_json(f) for f in sorted((sd / 'routines').glob('*.json'))}}, indent=2))
