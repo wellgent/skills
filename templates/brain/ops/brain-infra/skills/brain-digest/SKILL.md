@@ -5,7 +5,7 @@ description: "The daily digest in #brain-review: what needs {{owner}}, what the 
 
 # Brain Digest
 
-The **digest** workflow is the one place maintenance talks to {{owner}}: a post in `#brain-review` at 09:00 Stockholm, after the last morning routine, only on days with something to report.
+The **digest** workflow is the one place maintenance talks to {{owner}}: a morning post in `#brain-review`, after the last morning routine, only on days with something to report.
 Its routine `digest-daily` is an agentTurn of the main agent on the `brain-routines` framework.
 The other routines post nothing; their results stay in the run records on the host, and their problems page `#ops-alerts`.
 Code states every fact: `scripts/digest.py` gathers the window with zero LLM calls and renders the post.
@@ -38,6 +38,7 @@ Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain
 - **done**: one sentence per applied answer in the packet's `done`, saying what now happened because of it.
 - **health**: one sentence when the packet's `health` lists anything, on what went wrong and what it means for the brain; empty otherwise.
 - Write plain sentences: no counts, timings or internal check names unless they are the news, and no raw URLs, commit ids, file paths, markup or revert instructions. The check refuses them.
+{{local}}
 
 ## What the digest reports
 
