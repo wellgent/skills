@@ -174,17 +174,20 @@ def runs_in(cfg, start, end):
 def outside_changes(cfg, runs):
     """Changes runs journaled in other repositories (the agent workspace, the shared core): no brain commit carries them."""
     prefix = f'https://github.com/{cfg["github_repo"]}/'
+    workspace = Path(cfg['openclaw']['workspace_skills']).parent.name + '/'  # brain-core labels workspace files with it
     out = []
     for meta, entries in runs:
         for e in entries:
             url = e.get('url') or ''
             if e['kind'] == 'change' and url and not url.startswith(prefix) and '/commit/' in url:
                 repo, sha = url.split('/commit/', 1)
-                path = re.search(r'`([^`]+)`', e.get('text', ''))
+                label = re.search(r'`([^`]+)`', e.get('text', ''))
+                label = label.group(1) if label else ''
+                path = label[len(workspace):] if label.startswith(workspace) else label
                 out.append({'sha': sha[:7], 'at': parse_iso(e['at']), 'routine': meta['routine'], 'workflow': meta['workflow'],
-                            'kind': 'other', 'path': path.group(1) if path else '', 'to': None,
-                            'title': path.group(1) if path else repo.rsplit('/', 1)[-1], 'subject': e.get('text', ''),
-                            'link': f'{repo}/blob/{sha}/{path.group(1)}' if path else repo, 'reason': '', 'owner_choice': False, 'files': 1})
+                            'kind': 'other', 'path': path, 'to': None,
+                            'title': label or repo.rsplit('/', 1)[-1], 'subject': e.get('text', ''),
+                            'link': f'{repo}/blob/{sha}/{path}' if path else repo, 'reason': '', 'owner_choice': False, 'files': 1})
     return out
 
 
@@ -226,9 +229,9 @@ def health(cfg, runs, start, own):
     routines = manifest_routines(cfg)
     facts = []
     for meta, entries in runs:
-        if meta['routine'] == own or meta.get('status') in (None, 'ok'):
-            continue
-        r = routines.get(meta['routine'], {})
+        if meta['routine'] == own or meta.get('status') in (None, 'ok') or meta.get('forced'):
+            continue  # a forced or test run speaks only through the content it changed
+        r = routines.get(meta['routine']) or next((x for x in routines.values() if meta['routine'] in x.get('aliases', [])), {})
         problems = [clip(e['text'], 240) for e in entries if e['kind'] == 'problem'][:2]
         facts.append({'routine': meta['routine'], 'title': r.get('title', meta['routine']), 'status': meta['status'],
                       'at': meta['started_at'], 'summary': clip(meta.get('summary', ''), 240), 'problems': problems,
