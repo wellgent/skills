@@ -5,7 +5,8 @@
 #   project   ~/repos/<repo> clean on main and at its remote head (fast-forwarded when only behind)
 #   tool      each check command under "## Host tools" in the project's docs/agents/dev-loop.md
 #   pstack    the plugin version installed for this checkout against the port's latest release
-#   pin       each skills-lock.json pin against the newest commit of its source touching the skill
+#   pin       each skills-lock.json pin against the newest commit of its source touching the skill,
+#             current when that commit is the pin or in its history
 # With --smoke it then sets up a fresh worktree of origin/main with the Set up command from
 # dev-loop.md, runs `scripts/check --dry` there, and tears the worktree down with Tear down.
 # Exit 0 ready, 3 ready but something is behind (pstack or a pin: run setup-project with latest),
@@ -70,9 +71,14 @@ fi
 if [ -f "$cwd/skills-lock.json" ]; then
   while IFS=$'\t' read -r skill source ref path; do
     newest=$(gh api "repos/$source/commits?path=$(dirname "$path")&per_page=1" --jq '.[0].sha' 2>/dev/null || true)
-    if [ -z "$newest" ]; then echo "pin unknown: $skill ($source)"
-    elif [ "$newest" != "$ref" ]; then echo "pin behind: $skill ${ref:0:7} (newest ${newest:0:7})"; behind=1
-    else echo "pin ok: $skill"; fi
+    # Current when the newest commit touching the skill is the pin or inside its history.
+    status=""
+    [ -z "$newest" ] || status=$(gh api "repos/$source/compare/$ref...$newest" --jq .status 2>/dev/null || true)
+    case $status in
+      identical|behind) echo "pin ok: $skill" ;;
+      ahead|diverged) echo "pin behind: $skill ${ref:0:7} (newest ${newest:0:7})"; behind=1 ;;
+      *) echo "pin unknown: $skill ($source)" ;;
+    esac
   done < <(jq -r '.skills | to_entries[] | [.key, .value.source, .value.ref, .value.skillPath] | @tsv' "$cwd/skills-lock.json")
 fi
 
