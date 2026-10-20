@@ -51,6 +51,7 @@ No GitHub Actions run for this project.
 ## Verification
 
 - **The verifier reruns no suite.** It drives the app on the changed surface with the verification skill, reads the diff, checks the test changes, and takes the head's `check` status as an input.
+- **The server log counts.** A screen works only when the app's server log shows no error the browser console misses (a failed hydration, an uncaught exception) since the verifier started it.
 - **Previews.** <What the host builds from git pushes, and how a PR labelled `preview` gets its preview: the command, where the URL is posted, and the preview backend it gets with the PR's own functions and the seed.>
   A change to layout, look and feel or functionality waits for the product's owner to review its preview before it lands.
   A bug fix, or a fix that makes the UI match the project's design records, lands on its verifier's pass, labelled `preview`, and the run's note lists it.
@@ -58,6 +59,8 @@ No GitHub Actions run for this project.
 
 ## Agents
 
+- **Agents in flight:** at most `AGENT_SLOTS` implementers and verifiers run at once on the host (from the environment, 2 when unset), sized to its cores; the heavy-run slots bound the test runs inside them.
+- **Each agent's scratch files are its own:** every agent writes its working files (a PR body, a log, captures) under a directory named for it, never a scratchpad another agent shares.
 - **No agent sleeps or polls inside its own turn.** Waits are background scripts the main session starts, and the main session waits only on merge read-backs through pstack's watcher.
 - **A delegate ends its turn** once its PR is pushed or its verdict posted.
 - **Every spawn passes `model` explicitly**, and every review brief says whether its reviewer may spawn agents.
@@ -65,6 +68,11 @@ No GitHub Actions run for this project.
 - **Fix rounds** on a verifier's defect list, restacks and one-site mechanical moves run one effort step below the role sheet.
 - **A stop runs leaves first:** `ListAgents`, stop every descendant, then the parent, then `ListAgents` again until it is empty.
 - **Deletes.** A delete through a variable is written `rm -f "${VAR:?}"/...`, or with a literal path, so Claude Code's possibly-empty-variable prompt never holds an unattended session.
+
+## Advisories
+
+- **Advisory probe:** `<command>` prints each critical or high advisory of the production dependencies, or that there is none, and exits 0 either way; it never gates. `/operate`'s Ready prints its output in the `ready:` comment.
+- **A reported advisory makes its upgrade the run's first unit.**
 
 ## Critical journeys
 

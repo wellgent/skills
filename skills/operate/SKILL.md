@@ -143,11 +143,27 @@ The requester picks the host and time.
 ## The note
 
 The run ends with its decision log and then its `/ketchup` note on the request.
-Check the note's claims against the project: the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
+Check the note's claims against the project, and route the run's setup changes (see The setup): the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
 Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, and no worktree or scratch tree the run created is left on the host; the project's teardown removes any that remain.
 Price the run session and this session with `scripts/cost` (see Cost).
 Then catch the requester up in `/ketchup`'s voice, with what the check found and both totals, and assign them on the request; closing it is their acceptance.
 A watch exit 3 means the run ended without a note: read its pane or transcript, tell the requester what is known, and assign them.
+
+## The setup
+
+A project's run machinery is not the project's own: it comes from wellgent/skills, and a fix to it belongs there first.
+
+- `AGENTS.md`, `docs/agents/dev-loop.md`, `scripts/land` and `scripts/slot` come from `templates/project/`, written by `setup-project`.
+- `scripts/check`, `scripts/dev-server.sh`, `scripts/worktree-setup.sh`, `scripts/worktree-teardown.sh`, `scripts/host-claims.sh`, `scripts/vercel-ignore.sh`, `scripts/preview`, their tests, the Playwright output helper and the advisory probe come from the `setup-web-stack` recipes, filled with the project's values; the stack's rules come from its catalog and `standards/web-products.md`.
+- `operate`, the setup skills and the templates are wellgent/skills itself; pstack is the port's (`michael-denyer/pstack-claude`).
+
+At the note check, diff those paths from the run's starting commit to the final main branch, and sort every change:
+
+- **Project-local** when it states a fact of this repo (a port, a command name, a journey, a route): it stays in the project.
+- **Setup-wide** when it would hold for every project on the stack (a race in a recipe, a missing rule, a gap in a template): port it to wellgent/skills from its checkout, with the project's values turned back into the recipe's own, in a commit that names the request, before catching the requester up. Other projects take it at their next run's Ready.
+- **pstack's** when the fault is in pstack itself: an issue on the port's repository, linked in the catch-up.
+
+The catch-up names what was ported and where.
 
 ## Cost
 

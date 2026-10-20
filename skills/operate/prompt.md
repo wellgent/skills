@@ -15,7 +15,8 @@ Resume from: <hand-back URL; this line goes on a first run>
 Run lines from the operator:
 
 - Work in a fresh worktree, under the rules in the project's `AGENTS.md`.
-- Keep a decision log, and keep it out of git.
+- Keep a decision log, and keep it out of git. A row records a command's result only after its exit is read, and a loop over landings or checks runs in bash.
+- Run at most `AGENT_SLOTS` implementers and verifiers at once (the host's environment; the project's `dev-loop.md` under Agents).
 - Scope: on mid-run discoveries, pstack's Orchestrate rule (`orchestrate.md`) holds over its Autonomous run rule (`autonomous-run.md`). Fix only what blocks the done check; everything else parks as a follow-up in your note.
 - Before you start any implementer, post your plan on <request URL> as a stop and wait for the operator's go or cut. The plan names each unit's model and effort.
 - A unit the approved plan does not hold: a leftover copy of an approved unit's own finding needs no stop and is listed in your next comment; a bug that blocks landing is a run note, fixed in its own pull request; anything else, including a change to a public contract, is a stop.

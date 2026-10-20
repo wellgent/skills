@@ -5,6 +5,7 @@
 #   project   ~/repos/<repo> clean on main and at its remote head (fast-forwarded when only behind)
 #   tool      each check command under "## Host tools" in the project's docs/agents/dev-loop.md
 #   pstack    the plugin version installed for this checkout against the port's marketplace version
+#   advisory  the output of the "Advisory probe" command in dev-loop.md, when it names one; never blocks
 #   pin       each skills-lock.json pin against the newest commit of its source touching the skill,
 #             current when that commit is the pin or in its history
 # With --smoke it then sets up a fresh worktree of origin/main with the Set up command from
@@ -84,8 +85,15 @@ if [ -f "$cwd/skills-lock.json" ]; then
   done < <(jq -r '.skills | to_entries[] | [.key, .value.source, .value.ref, .value.skillPath] | @tsv' "$cwd/skills-lock.json")
 fi
 
+field() { sed -n "s/^- \*\*$1:\*\* \`\([^\`]*\)\`.*/\1/p" "$loop" | head -1; }
+
+# Advisories: the project's probe reports and never gates.
+probe=$(field "Advisory probe")
+if [ -n "$probe" ]; then
+  (cd "$cwd" && bash -c "$probe" 2>&1 </dev/null || true) | sed 's/^/advisory: /'
+fi
+
 if [ -n "$smoke" ] && [ -z "$blocked" ]; then
-  field() { sed -n "s/^- \*\*$1:\*\* \`\([^\`]*\)\`.*/\1/p" "$loop" | head -1; }
   setup=$(field "Set up"); teardown=$(field "Tear down")
   [ -n "$setup" ] && [ -n "$teardown" ] || die "dev-loop.md lacks a Set up or Tear down line"
   tree="$HOME/repos/$name-ready"

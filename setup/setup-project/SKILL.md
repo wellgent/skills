@@ -11,6 +11,7 @@ Converge one project on the state below.
 Run from a checkout of this repo on a host that holds the project at `~/repos/<repo>`; a re-run changes only what is behind.
 This skill names no stack: the project's stack setup writes everything stack-specific, for a web product [`setup-web-stack`](../setup-web-stack/SKILL.md).
 With `latest`, as `/operate`'s Ready runs it before every run, the plugin moves to the version its marketplace serves on this host and every stack pin to its source's current `main`, passed on to the stack setup; otherwise both stay where they are.
+Every run re-applies the templates and the stack setup's recipes: a script or file copied from a recipe is rewritten from the current recipe with the project's values kept, so a fix landed in wellgent/skills reaches the project at its next Ready.
 
 ## 1. Read
 
