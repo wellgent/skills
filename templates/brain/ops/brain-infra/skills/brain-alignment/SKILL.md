@@ -70,6 +70,7 @@ A page that goes `max_attempts` batches without an apply leaves the queue and ma
 
 A **judge miss** is a maintenance edit whose span another writer reverts or rewrites within 14 days.
 `scripts/judge_misses.py` reads them from Git for every workflow, from the `Routine:` and `Op:` lines `apply.py` writes into each commit, and `finish` writes `<state_dir>/judge-misses.json` for the digest's weekly edition.
+A merge commit is never a writer's edit: the check reads the commits a merge brings in, each under its own author, and only those made on top of the maintenance edit.
 When the alignment's own rate over the last 28 days passes 10%, `finish` files a needs-attention issue with the missed edits: option 1 keeps the routine as it is, option 2 holds the alignment writes.
 While writes are held, runs judge and report but apply nothing, and an open issue offers the release (`alignment.py hold --off`).
 

@@ -54,9 +54,14 @@ def maintenance_edits(cfg, author, since_days):
 
 
 def later_commits(cfg, sha, path, until):
-    """Commits after sha that touch path, up to the window end: [(sha, author, ct, status)]."""
-    raw = lib.clone_git(cfg, 'log', '--reverse', '--no-merges', '--format=%x01%H%x02%an%x02%ct', '--name-status',
-                        f'{sha}..HEAD', '--', path, timeout=120)
+    """Commits built on sha that touch path, up to the window end: [(sha, author, ct, status)].
+
+    Merge-safe: merges are skipped, so a merge's incoming changes count only for the commits that made them.
+    --full-history keeps those commits even when the merge result matches the parent that never had the edit,
+    and --ancestry-path keeps only commits with the edit in their history, since only those can correct it.
+    """
+    raw = lib.clone_git(cfg, 'log', '--reverse', '--no-merges', '--full-history', '--ancestry-path',
+                        '--format=%x01%H%x02%an%x02%ct', '--name-status', f'{sha}..HEAD', '--', path, timeout=120)
     out = []
     for chunk in raw.split('\x01'):
         if not chunk.strip():
@@ -64,7 +69,7 @@ def later_commits(cfg, sha, path, until):
         head, _, files = chunk.partition('\n')
         c, author, ct = head.split('\x02')
         if int(ct) > until:
-            break
+            continue
         status = next((f.split('\t', 1)[0] for f in files.splitlines() if f.strip()), '')
         out.append((c, author, int(ct), status))
     return out

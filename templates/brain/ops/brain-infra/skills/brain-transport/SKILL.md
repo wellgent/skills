@@ -12,6 +12,7 @@ Use when working in a {{brain}} checkout, or when a task involves {{brain}}/GBra
 - Shared brain behavior comes from `skills/`; read `skills/RESOLVER.md` before substantive brain work, then the skill it routes to.
 - Brain reads use the `gbrain` CLI: `search`, `get`, `query`, `timeline`, validation, and status.
 - Durable writes are markdown plus Git, pushed to `main` on GitHub. The brain host is the sole GBrain database writer: it imports and embeds what lands on `main` (see Host).
+- On-box agent writers committing through `gbrain git commit-push` may land the merge commits it makes in memory when `main` has moved; every other writer lands linearly on `main`.
 - Read governance files directly from the filesystem, not through GBrain retrieval: `AGENTS.md`, `README.md`, `RESOLVER.md`, `schema.md`, directory `README.md` files, and `skills/`.
 - The CLI-plus-files surface is the one canonical access model for every session agent: reads are checkout files plus the `gbrain` CLI, writes are markdown plus Git. Session agents do not register or use raw GBrain MCP tools.
 
