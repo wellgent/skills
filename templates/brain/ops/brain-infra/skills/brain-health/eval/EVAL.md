@@ -5,7 +5,7 @@ The set grows from real misses: a case enters only after the weekly turn verifie
 
 ## Files
 
-- `qrels.json` - the set, in the gate's qrels shape (`schema_version` 1, `queries`), plus `set_version`.
+- `qrels.json` - the set, in the gate's qrels shape (`schema_version` 1, `queries`), plus `set_version` and optional `local_families`.
   Each case: `query_id` (`q<n>`), `query`, `family`, `relevant_slugs` (brain paths without `.md`), optional `first_relevant_slug` (the page that must rank first), optional `critical`, `origin` (where the lookup came from), `added_in` (the set version that took it).
 - `candidates.json` - the queue of cases waiting for verification, with `next_id`.
 - `scripts/score.py` - scores the set; `scripts/evalset.py` - validates, queues, builds the packet and promotes.
@@ -19,6 +19,8 @@ Every slug in `relevant_slugs` is a **hard keep** for the relevance routine.
 - `generic` - the query describes the subject without naming it.
 - `relational` - the answer lives on a page connected to the thing the query names.
 - `negative` - a near-namesake or broader page competes, and the expected page must still rank first.
+
+A brain adds families of its own in the set's `local_families`, each name mapped to its meaning; they are scored, alerted and promoted like the five above.
 
 ## Scoring
 
@@ -41,7 +43,7 @@ History lives on the host in `<state_dir>/eval/history.jsonl`, the band in `<sta
 A candidate is a real lookup that missed, with the pages it should have found.
 They come in two ways:
 
-- **A routine run** queues one: `evalset.py add --query "<q>" --expected <slug> [...] --origin <run id or URL> [--family F] [--note N]`, between apply batches, from any workflow's run, for example a miss the daily change review finds.
+- **A routine run** queues one: `evalset.py add --query "<q>" --expected <slug> [...] --origin <run id or URL> [--family F] [--note N]`, between apply batches, from any workflow's run, for example a miss the daily alignment finds.
 - **An issue labelled `eval-candidate`**: any needs-attention item or issue about a failed lookup, from a routine, an agent or the owner. The weekly turn reads the lookup and the expected page from the issue.
 
 ## The `health-eval` routine

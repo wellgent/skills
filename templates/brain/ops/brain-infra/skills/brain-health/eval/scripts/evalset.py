@@ -16,7 +16,7 @@ A promote verdict, one per candidate (a queued id like "c3", or an eval-candidat
   {"candidate": "https://github.com/.../issues/9", "verdict": "reject", "reason": "..."}
 
 Guards on an accepted candidate: the candidate is open, the query is non-empty and new to the
-set, the family is known, every slug is a page in the brain, the first relevant slug is one of
+set, the family is one of the set's families, every slug is a page in the brain, the first relevant slug is one of
 the relevant slugs. Promoted cases are never critical. A candidate that fails a guard stays
 open for the next run. Accepting any candidate makes a new set version.
 """
@@ -42,9 +42,18 @@ def norm(text):
     return ' '.join((text or '').lower().split())
 
 
+def families(data):
+    """The set's families: the shared ones plus the brain's own in `local_families`."""
+    local = data.get('local_families') or {}
+    return FAMILIES + tuple(f for f in local if f not in FAMILIES) if isinstance(local, dict) else FAMILIES
+
+
 def validate(data, repo):
     """Every problem with a set, as text; an empty list means valid."""
     problems = []
+    known = families(data)
+    if not isinstance(data.get('local_families', {}), dict):
+        problems.append('local_families must map each family name to its meaning')
     if data.get('schema_version') != 1:
         problems.append('schema_version must be 1')
     if not isinstance(data.get('set_version'), int) or data['set_version'] < 1:
@@ -61,8 +70,8 @@ def validate(data, repo):
         if not (c.get('query') or '').strip() or norm(c.get('query')) in texts:
             problems.append(f'{qid}: query must be non-empty and unique')
         texts.add(norm(c.get('query')))
-        if c.get('family') not in FAMILIES:
-            problems.append(f'{qid}: family must be one of {", ".join(FAMILIES)}')
+        if c.get('family') not in known:
+            problems.append(f'{qid}: family must be one of {", ".join(known)}')
         slugs = c.get('relevant_slugs') or []
         if not slugs:
             problems.append(f'{qid}: relevant_slugs is empty')
@@ -129,10 +138,11 @@ def cmd_add(args, cfg):
     missing = [s for s in args.expected if not (Path(cfg['maintenance_repo']) / f'{s}.md').is_file()]
     if missing:
         raise Failed('not brain pages: ' + ', '.join(missing))
-    if args.family and args.family not in FAMILIES:
-        raise Failed(f'family must be one of {", ".join(FAMILIES)}')
+    data = load(set_path)
+    if args.family and args.family not in families(data):
+        raise Failed(f'family must be one of {", ".join(families(data))}')
     queue = load(cand_path)
-    known = {norm(c['query']) for c in load(set_path)['queries']} | {norm(c['query']) for c in queue['candidates']}
+    known = {norm(c['query']) for c in data['queries']} | {norm(c['query']) for c in queue['candidates']}
     if norm(args.query) in known:
         print(json.dumps({'note': f'"{args.query}" is already in the eval set or its candidates'}))
         return 0
@@ -153,7 +163,7 @@ def cmd_packet(args, cfg):
     set_path, cand_path = clone_files(cfg)
     data = load(set_path)
     packet = {
-        'set_version': data['set_version'], 'families': FAMILIES,
+        'set_version': data['set_version'], 'families': families(data), 'local_families': data.get('local_families') or {},
         'cases': [{k: c.get(k) for k in ('query_id', 'query', 'family', 'relevant_slugs')} for c in data['queries']],
         'candidates': load(cand_path)['candidates'],
         'issues': candidate_issues(cfg),
@@ -193,8 +203,8 @@ def cmd_promote(args, cfg):
                 slugs = v.get('relevant_slugs') or []
                 if not query or norm(query) in texts:
                     raise ValueError('the query is empty or already in the set')
-                if v.get('family') not in FAMILIES:
-                    raise ValueError(f'family must be one of {", ".join(FAMILIES)}')
+                if v.get('family') not in families(data):
+                    raise ValueError(f'family must be one of {", ".join(families(data))}')
                 missing = [s for s in slugs if not (repo / f'{s}.md').is_file()]
                 if not slugs or missing:
                     raise ValueError('not brain pages: ' + (', '.join(missing) or 'none given'))
@@ -261,7 +271,7 @@ def main():
     c.add_argument('--query', required=True)
     c.add_argument('--expected', nargs='+', required=True, help='the brain page slugs the query should return')
     c.add_argument('--origin', required=True, help='where the miss came from: an issue URL, a run id, a commit')
-    c.add_argument('--family', choices=FAMILIES)
+    c.add_argument('--family', help='one of the set\'s families')
     c.add_argument('--note', default='')
     c.add_argument('--run')
     c = sub.add_parser('packet', help='print the set, queued candidates and eval-candidate issues for the weekly turn')
