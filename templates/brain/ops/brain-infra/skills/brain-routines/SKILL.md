@@ -68,6 +68,7 @@ Each agentTurn cron's trigger runs `routine.py gate <id>`, which reads the windo
 - **Escalation.** `deferrable` maps each deferrable routine to the deferrals in a row that open a needs-attention issue: raise the threshold, lower the review's page cap, or move the routines to another model.
 
 A routine held back starts no agent session: its run update says why, it records a `deferred` run and the heartbeat, and its next scheduled run tries again.
+The gate records the run and hands the report (run update, escalation, page) to `routine.py deferred <run_id>` in a transient systemd user unit, since a Discord post outlasts the trigger's 30-second budget.
 The deferrals in a row are in the routine's `deferred_runs` in `routine.py status`; a run that starts clears them.
 Windows that cannot be read let the turn start, and its `Load:` note says so.
 

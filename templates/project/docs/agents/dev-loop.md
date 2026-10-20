@@ -31,6 +31,8 @@ No GitHub Actions run for this project.
   Exit 2 is infrastructure, not code.
 - **Check before push.** The implementer runs `scripts/check` on its commit before the PR is reviewed, and `scripts/check` is what pushes a signed-off head.
   A head pushed any other way has no `check` status and cannot land.
+- **Dry run.** `scripts/check --dry` runs the same steps on any checked-out commit, a detached HEAD or `main` included, and pushes and posts nothing.
+  `/operate`'s Ready runs it in a fresh worktree as the smoke test before a run starts.
 
 ## Landing
 
@@ -49,7 +51,8 @@ No GitHub Actions run for this project.
 
 - **The verifier reruns no suite.** It drives the app on the changed surface with the verification skill, reads the diff, checks the test changes, and takes the head's `check` status as an input.
 - **Previews.** <What the host builds from git pushes, and how a PR labelled `preview` gets its preview: the command, where the URL is posted, and the preview backend it gets with the PR's own functions and the seed.>
-  The run labels an interaction-changing PR `preview`, the PR the product's owner reviews.
+  A change to layout, look and feel or functionality waits for the product's owner to review its preview before it lands.
+  A bug fix, or a fix that makes the UI match the project's design records, lands on its verifier's pass, labelled `preview` with the verifier's before-and-after screenshots, and the run's note lists it.
 
 ## Agents
 
@@ -77,6 +80,12 @@ Every branch is worked in its own worktree with its own dev environment, so para
 - **Tear down:** `<worktree teardown command>`, run inside the worktree once its work is pushed. <What it stops and removes.>
 - **A run cleans up after itself.** Before a run posts its note, it tears down every worktree and scratch tree it created, so `git worktree list` shows only the main checkout and no run directory remains.
 - **Main checkout:** <the backend the main checkout keeps for the human's interactive work>.
+
+## Host tools
+
+What a run needs on its host beyond the checkout, each with the check `/operate`'s Ready runs (exit 0 when ready):
+
+- **<tool>:** `<check command>`
 
 ## Crons and seed data
 

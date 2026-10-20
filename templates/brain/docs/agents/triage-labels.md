@@ -23,7 +23,7 @@ When a skill asks for a category and neither `defect` nor `change` fits, apply `
 | `needs-triage`    | `needs-triage`       | Maintainer needs to evaluate this issue |
 | `needs-info`      | `needs-info`         | Waiting on the reporter for more information |
 | `ready-for-agent` | `ready-for-agent`    | Fully specified, ready for an AFK agent |
-| `ready-for-human` | `ready-for-human`    | Requires human judgment or action |
+| `ready-for-human` | `needs-human`        | A call or task that stays with the owner, after a run or someday |
 | `wontfix`         | `wontfix`            | Will not be actioned |
 
 ## Other axes

@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import subprocess
 import sys
 
 sys.dont_write_bytecode = True  # routines write nothing into the published copy
@@ -208,9 +207,8 @@ def gate(cfg, rid, forced=False):
     deferred = lib.read_json(lib.state_dir(cfg) / 'routines' / f'{rid}.json', {}).get('deferred_runs', [])
     deferred.append({'run_id': run_id, 'at': lib.iso(), 'window': f'{provider} {label.lower()}', 'used': used})
     routine_state(cfg, rid, last_run_id=run_id, started_at=lib.iso(), deferred_runs=deferred)
-    # Report outside the trigger: OpenClaw holds the cron service while the trigger runs, and cron calls would wait on it.
-    subprocess.Popen([cfg['python_bin'], SCRIPT, 'deferred', run_id], start_new_session=True,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Report in a unit of its own: a Discord post outlasts the trigger's 30 s budget, and the trigger's exec ends its child processes.
+    lib.run(['systemd-run', '--user', '--collect', '--quiet', cfg['python_bin'], SCRIPT, 'deferred', run_id], timeout=30)
     return False
 
 

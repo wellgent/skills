@@ -1,6 +1,6 @@
 ---
 name: operate
-description: Run a brain request on a project through pstack - read the request issue, write the run prompt, start the run in herdr with landing authority, then watch the request, answer the run's plan and stops or bring them to the requester, pause the run near the weekly usage limit, and check its note. Use for /operate <issue>, which also resumes a paused run, and /operate cost <session> to price a finished run.
+description: Run a brain request on a project through pstack - read the request issue, bring the brain, the project and the host up to date and prove the project's tools (Ready), write the run prompt, start the run in herdr with landing authority, then watch the request, answer the run's plan and stops or bring them to the requester, pause the run near the weekly usage limit, and check its note. Use for /operate <issue>, which also resumes a paused run, and /operate cost <session> to price a finished run.
 argument-hint: "<request issue> | cost <session id | latest <checkout>>"
 disable-model-invocation: true
 ---
@@ -27,16 +27,30 @@ The one exception is a paused run: when the newest `run:` comment is followed by
 
 ## 2. Check the project
 
-In `~/repos/<repo>`: `git fetch`, a clean tree on the main branch at its remote head, `pstack@pstack-claude` enabled in `.claude/settings.json`, `scripts/land` present, and `gh auth status` green.
+In `~/repos/<repo>`: `git fetch`, a clean tree on the main branch with no commit its remote lacks, `pstack@pstack-claude` enabled in `.claude/settings.json`, `scripts/land` present, and `gh auth status` green.
 Anything missing stops the run with its fix; a project not set up gets `setup-project`.
 
-## 3. Write the prompt
+## 3. Ready
+
+A run starts on the newest `operate`, the newest pstack release, the newest stack skill pins and project docs on the current templates, with the project's tools proven on this host.
+`ready` (below) fast-forwards a checkout that is only behind, so the brain and the project start at their remote heads.
+
+1. `bash <this skill's directory>/scripts/sync-brain <brain checkout>` pins `operate` at the newest wellgent/skills commit that touches it, with the run request template and the `run` label. When it moved the pin, read the new `SKILL.md` and carry on from this step under it.
+2. `bash <this skill's directory>/scripts/ready <owner>/<repo>` from the brain: the brain and the project at their remote heads, each check under "Host tools" in the project's `docs/agents/dev-loop.md`, the host's pstack version and every stack pin against upstream. Exit 1 is blocked, exit 3 is behind.
+3. `setup-project` with `latest` on the project, from the wellgent/skills checkout at `~/repos/wellgent-skills` pulled first: pstack at its latest release on this host, every stack pin at its source's newest commit, and the project's docs on the current templates. A change goes on a branch `ready/<n>` as one PR, signed off with `scripts/check` in its own worktree, and lands through `scripts/land`; its sign-off is the smoke test.
+4. Without a change, `bash <this skill's directory>/scripts/ready --smoke <owner>/<repo>`: a fresh worktree of `origin/main`, its Set up command, `scripts/check --dry`, then its Tear down.
+
+Comment on the request `ready: <hostname>, main at <sha>`, then what moved (the `operate` pin, pstack, each pin, the docs, with old and new) and the smoke's duration; the run starts from that commit.
+Anything that fails in Ready, a blocked check, a failed update or a red smoke, stops here: no run starts. Leave the failed PR open, catch the requester up in `/ketchup`'s voice with what failed and a recommendation, assign them, and wait for their call.
+On a resume, Ready moves nothing: run `ready --smoke`, report what is behind in the `ready:` comment, and start only when it passes.
+
+## 4. Write the prompt
 
 Fill [`prompt.md`](prompt.md) with the request's URL, and its five sections copied as written; save it as `~/.local/state/operate/<repo>-<n>.md`.
 On a resume, the resume line takes the URL of the first `Hand-back` comment; otherwise it goes.
 Its run lines stay as the template has them.
 
-## 4. Start the run
+## 5. Start the run
 
 ```bash
 bash <this skill's directory>/scripts/start <owner>/<repo> <n> ~/.local/state/operate/<repo>-<n>.md
@@ -45,7 +59,7 @@ bash <this skill's directory>/scripts/start <owner>/<repo> <n> ~/.local/state/op
 It opens a tab in the project checkout inside the herdr workspace `<repo>-operate`, starts Claude Code there with `/pstack:poteto-mode` pointed at the prompt file, names the session `op-<repo>-<n>`, and prints the session name and pane.
 A start that stops at a startup prompt (folder trust, a login) is answered in that pane: `herdr agent read <session> --source visible` shows it.
 
-## 5. Record and watch
+## 6. Record and watch
 
 Comment on the request: `run: <session> started on <hostname> at <UTC time>`, or on a resume `run: <session> resumed on <hostname> at <UTC time> from <hand-back URL>`.
 Start the watch in the background, then end the turn:
@@ -87,13 +101,19 @@ A stop is a comment from the run with questions it waits on, each with the defau
 Sort every question:
 
 - **Answer it** when the request, the brain (the map the request came from, decisions on subject pages) or the project's own records settle it, or when it is reversible and the run's default is sound.
-- **Escalate it** when it is a product or preference call only the requester can make, an irreversible action the constraints do not authorize, or work outside what the request asks for.
+- **Escalate it** when it is a product or preference call only the requester can make, the review of a change to layout, look and feel or functionality on its preview, an irreversible action the constraints do not authorize, or work outside what the request asks for. A bug fix, or a fix that makes the UI match the project's design records, is not escalated: it lands on its verifier's pass with before-and-after screenshots.
 
 To escalate, catch the requester up in this session in `/ketchup`'s voice: how many calls wait on them, then each call with your recommendation and why, and what the run does without an answer.
 Assign the requester on the request, so the call shows in their open `run` issues, and wait for their answer.
 
 Answer the stop in one comment on the request covering every question, the requester's calls in their substance, and remove the assignee.
 Then tell the run: "Your stop on <request URL> is answered: read it now."
+
+## needs-human
+
+`needs-human` on a project's tracker marks a call or task that stays with the requester after the run, or someday; open `needs-human` issues across projects are the requester's queue.
+Anything that can be settled within the run's scope is a stop taken to the requester in this session, never a `needs-human` issue.
+The operator files one only for what is on the requester after the run, with that call written on the issue, and never closes or edits one.
 
 ## Scope changes
 

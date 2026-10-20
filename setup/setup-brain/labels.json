@@ -11,7 +11,7 @@
   { "name": "needs-triage", "color": "E4E669", "description": "Maintainer needs to evaluate this issue" },
   { "name": "needs-info", "color": "FBCA04", "description": "Waiting on reporter for more information" },
   { "name": "ready-for-agent", "color": "0E8A16", "description": "Fully specified, ready for an AFK agent" },
-  { "name": "ready-for-human", "color": "1D76DB", "description": "Requires human judgment or action" },
+  { "name": "needs-human", "color": "1D76DB", "description": "A call or task that stays with the owner, after a run or someday" },
   { "name": "wontfix", "color": "ffffff", "description": "This will not be worked on" },
   { "name": "needs-attention", "color": "B60205", "description": "A maintenance routine needs the owner to pick an option" },
   { "name": "workflow:health", "color": "C5DEF5", "description": "Raised by the brain health workflow" },

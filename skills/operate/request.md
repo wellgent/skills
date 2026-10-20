@@ -20,7 +20,7 @@ labels: run
 
 ## Known
 
-<What is already known: the files, records, decisions and findings the run starts from.>
+<What is already known: the files, records, decisions and findings the run starts from. The run starts from the main branch after the operator's Ready; a starting commit named here is the last one known.>
 
 ## Constraints
 

@@ -3,6 +3,8 @@
 # the frozen install, `pnpm run check` and the journey tests against this worktree's local Convex
 # backend, and only on a pass pushes HEAD to origin/<branch> and posts the `check` commit status
 # on that exact SHA. The verifier and scripts/land read that status.
+# --dry runs the same steps on any checked-out commit, detached or main included, and pushes and
+# posts nothing: the smoke test /operate's Ready runs in a fresh worktree.
 # Exit: 0 passed and posted, 1 refused or failed, 2 could not run (no gh auth, the backend would
 # not start, no slot dir: infrastructure, not code).
 # Copied to scripts/check by setup-web-stack. A project without Convex drops the local-deployment
@@ -15,12 +17,19 @@ PORT_HIGH="<highest dev-server port, e.g. 6199>"
 
 cd "$(git rev-parse --show-toplevel)"
 
+dry=""
+[ "${1:-}" != --dry ] || dry=1
+
 refuse() { echo "check: refused: $*" >&2; exit 1; }
 fail() { echo "check: FAILED at $*" >&2; exit 1; }
 cannot() { echo "check: could not run: $*" >&2; exit 2; }
 
-branch=$(git symbolic-ref --quiet --short HEAD) || refuse "HEAD is detached; a sign-off is for a PR branch head"
-[ "$branch" != main ] || refuse "the branch is main; a sign-off is for a PR branch head"
+if [ -n "$dry" ]; then
+  branch=$(git symbolic-ref --quiet --short HEAD || echo detached)
+else
+  branch=$(git symbolic-ref --quiet --short HEAD) || refuse "HEAD is detached; a sign-off is for a PR branch head"
+  [ "$branch" != main ] || refuse "the branch is main; a sign-off is for a PR branch head"
+fi
 [ -z "$(git status --porcelain)" ] || refuse "the worktree has uncommitted or untracked files (git status)"
 [ -f .convex/local/default/config.json ] \
   || refuse "this worktree has no local Convex deployment; run: bash scripts/worktree-setup.sh"
@@ -61,6 +70,12 @@ JOURNEYS_PORT=$port pnpm run test:journeys || fail "pnpm run test:journeys"
 
 [ "$(git rev-parse HEAD)" = "$sha" ] && [ -z "$(git status --porcelain)" ] \
   || fail "the worktree changed while check ran; run it again on the commit to sign off"
+
+if [ -n "$dry" ]; then
+  duration=$(($(date +%s) - started))
+  echo "check: dry run passed in $((duration / 60))m$((duration % 60))s on $sha; nothing pushed or posted"
+  exit 0
+fi
 
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || cannot "gh could not read the repository"
 remote=$(git ls-remote origin "refs/heads/$branch" | cut -f1)
