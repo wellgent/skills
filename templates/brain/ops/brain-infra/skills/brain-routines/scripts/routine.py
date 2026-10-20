@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 
 sys.dont_write_bytecode = True  # routines write nothing into the published copy
@@ -200,22 +201,35 @@ def gate(cfg, rid, forced=False):
         return True
     run_id = f'{rid}-{lib.stamp()}-{os.urandom(2).hex()}'
     meta = {'run_id': run_id, 'routine': rid, 'workflow': r['workflow'], 'skill': r['skill'], 'kind': r['kind'],
-            'started_at': lib.now(), 'repo': cfg['maintenance_repo'], 'forced': forced}
+            'started_at': lib.now(), 'repo': cfg['maintenance_repo'], 'forced': forced,
+            'deferral': {'reason': reason, 'credits': used >= 100, 'escalate': bool(escalate_after)}}
     lib.run_dir(cfg, run_id).mkdir(parents=True, exist_ok=True, mode=0o700)
     lib.atomic(lib.run_dir(cfg, run_id) / 'run.json', meta)
     deferred = lib.read_json(lib.state_dir(cfg) / 'routines' / f'{rid}.json', {}).get('deferred_runs', [])
     deferred.append({'run_id': run_id, 'at': lib.iso(), 'window': f'{provider} {label.lower()}', 'used': used})
     routine_state(cfg, rid, last_run_id=run_id, started_at=lib.iso(), deferred_runs=deferred)
-    if used >= 100:
-        lib.alert(cfg, f'credits:{provider}', f'{cfg["brain"]} routine `{rid}` did not start: {reason}. '
+    # Report outside the trigger: OpenClaw holds the cron service while the trigger runs, and cron calls would wait on it.
+    subprocess.Popen([cfg['python_bin'], SCRIPT, 'deferred', run_id], start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return False
+
+
+def cmd_deferred(cfg, run_id):
+    """A deferral's report: page credits, escalate too many deferrals in a row, post the run update."""
+    meta = lib.read_json(lib.run_dir(cfg, run_id) / 'run.json')
+    rid, d = meta['routine'], meta['deferral']
+    provider = lib.routine(cfg, rid)['model'].split('/')[0]
+    if d['credits']:
+        lib.alert(cfg, f'credits:{provider}', f'{cfg["brain"]} routine `{rid}` did not start: {d["reason"]}. '
                   f'Maintenance turns stay off credits until the window resets.')
+    deferred = lib.read_json(lib.state_dir(cfg) / 'routines' / f'{rid}.json', {}).get('deferred_runs', [])
     try:
-        if escalate_after and len(deferred) >= escalate_after:
-            escalate(cfg, meta, deferred, guard)
+        if d['escalate'] and len(deferred) >= cfg['window_guard']['deferrable'][rid]:
+            escalate(cfg, meta, deferred, cfg['window_guard'])
     except Failed as error:
         lib.journal(cfg, run_id, 'problem', text=f'Deferral escalation failed: {error}')
-    end(cfg, meta, 'deferred', f'{reason}; the agent turn did not start')
-    return False
+    end(cfg, meta, 'deferred', f'{d["reason"]}; the agent turn did not start')
+    return 0
 
 
 def escalate(cfg, meta, deferred, guard):
@@ -439,6 +453,8 @@ def main():
     c.add_argument('--counts', default='{}', help='silent-tier counts as a JSON object')
     c = sub.add_parser('gate', help="the subscription guard (an agentTurn cron's trigger): prints {\"fire\": true|false}")
     c.add_argument('routine')
+    c = sub.add_parser('deferred', help="report a deferral the guard recorded (the gate starts it)")
+    c.add_argument('run_id')
     c = sub.add_parser('force', help='run a routine now through the subscription guard')
     c.add_argument('routine')
     c = sub.add_parser('sync', help='register the routine manifest as crons')
@@ -461,6 +477,8 @@ def main():
     if args.command == 'gate':
         print(json.dumps({'fire': gate(cfg, args.routine)}))
         return 0
+    if args.command == 'deferred':
+        return cmd_deferred(cfg, args.run_id)
     if args.command == 'force':
         return cmd_force(cfg, args.routine)
     if args.command == 'sync':
