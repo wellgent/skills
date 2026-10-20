@@ -24,7 +24,7 @@ Every slug in `relevant_slugs` is a **hard keep** for the relevance routine.
 
 `score.py` runs each case as its own single-entry gate at k=10, so every case gets recall@10, a top-1 hit and, with `first_relevant_slug`, an expected-top-1 hit.
 A case **passes** when its top result is the expected page, or any relevant page when none is expected.
-The run update carries the set-level score with the gate's own verdict, the score per family and the cases that miss at top-1.
+The run record carries the set-level score with the gate's own verdict, the score per family and the cases that miss at top-1.
 
 Alerts to `#ops-alerts`, once per fingerprint a day:
 

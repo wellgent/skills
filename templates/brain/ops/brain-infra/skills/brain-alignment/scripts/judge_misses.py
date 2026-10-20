@@ -9,8 +9,8 @@ in its body; owner-chosen options carry `Reason: Owner chose ...` and do not cou
 - page DELETE or MOVE: a later commit by another writer re-creates the old path.
 
 The rate per workflow is misses over the maintenance edits made in the lookback window.
-`python3 judge_misses.py` prints the report and writes `<state_dir>/judge-misses.json`, which the weekly
-brain summary reads.
+`python3 judge_misses.py` prints the report and writes `<state_dir>/judge-misses.json`, which the digest's
+weekly edition reads.
 """
 import json
 from pathlib import Path
@@ -94,10 +94,11 @@ def judge(cfg, edit, author, window):
 
 
 def workflow_of(cfg, routine):
-    try:
-        return lib.routine(cfg, routine)['workflow']
-    except lib.Failed:
-        return routine.split('-', 1)[0]
+    """The workflow of a commit's routine id, matching a manifest routine's `aliases` too."""
+    for r in lib.manifest(cfg)['routines']:
+        if routine == r['id'] or routine in r.get('aliases', []):
+            return r['workflow']
+    return routine.split('-', 1)[0]
 
 
 def compute(cfg, conf):

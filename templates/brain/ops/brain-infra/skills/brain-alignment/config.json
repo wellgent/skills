@@ -1,12 +1,12 @@
 {
-  "routine": "review-daily",
+  "routine": "alignment-daily",
   "areas": {
-    "editable": {{review_editable}},
-    "records": {{review_records}},
-    "context": {{review_context}}
+    "editable": {{alignment_editable}},
+    "records": {{alignment_records}},
+    "context": {{alignment_context}}
   },
   "batch_size": 5,
-  "max_pages": {{review_max_pages}},
+  "max_pages": {{alignment_max_pages}},
   "budget_seconds": 3600,
   "cooldown_days": 3,
   "first_run_hours": 24,

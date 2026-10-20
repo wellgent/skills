@@ -140,7 +140,7 @@ def page_slice(name):
 
 
 def slice_label(name):
-    """A slice's name for the brief and the run update: a long page slice reads as its count and common directory."""
+    """A slice's name for the brief and the run record: a long page slice reads as its count and common directory."""
     pages = page_slice(name)
     if len(pages) <= 3:
         return name

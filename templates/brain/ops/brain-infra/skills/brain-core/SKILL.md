@@ -12,7 +12,7 @@ It has two **targets**, each under its own core root in `config.json` `targets`:
 - **workspace** (`templates/workspace/`): the brain section of the main agent's workspace `AGENTS.md`. The workspace is the parent of `brain-routines` `openclaw.workspace_skills`. It is written from its own maintenance clone `<workspace>-maintenance`, which the first run clones from the workspace's origin with the maintenance writer's name. Each run resets that clone to origin like the brain's.
 
 Each target keeps its own concrete copies, and this workflow keeps them aligned with the core.
-It runs on the `brain-routines` framework and reports to the `core` workflow channel.
+It runs on the `brain-routines` framework; its changes and needs-attention items reach the owner in the daily digest.
 
 ## The cross-check
 
@@ -37,7 +37,7 @@ The routine moves a target's base forward, in a brain commit, whenever the whole
 
 The workspace is the main agent's live working tree, so the routine never commits in it.
 It commits and pushes from the workspace maintenance clone, then fast-forwards the live workspace when that is clean, on its branch and only behind its origin.
-Otherwise the run update notes that the live workspace lags, and the next run tries again.
+Otherwise the run record notes that the live workspace lags, and the next run tries again.
 
 Then `routine.py sync --check` compares the routine manifest with the main agent's crons and workspace skill links.
 Drift is needs attention, except within `settle_minutes` of a manifest change.
@@ -76,7 +76,7 @@ Each file action takes `--target workspace` for a workspace file; the brain is t
 - `core.py crons` - runs `routine.py sync`.
 - A "by hand" option closes the issue; the next run files it again while the finding lasts.
 
-Every write is one commit by the maintenance writer, listed in the run update with its revert command.
+Every write is one commit by the maintenance writer, listed in the run record with its revert command.
 
 ## Operating
 

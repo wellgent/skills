@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Brain routine runner: run a routine under the maintenance lease, post its run update,
+"""Brain routine runner: run a routine under the maintenance lease, write its run record,
 page partial runs, guard agentTurns against the subscription window, and register the
-routine manifest as the main agent's crons."""
+routine manifest as the main agent's crons. Routines post nothing to Discord: the daily
+digest reports what they changed, and a problem pages #ops-alerts."""
 import argparse
 import json
 import os
@@ -49,30 +50,26 @@ def begin(cfg, rid, pid=None):
 
 
 def end(cfg, meta, status, summary='', counts=None, detail=''):
-    """Post the run update, page a partial run, write the heartbeat and release the lease."""
+    """Write the run record, page a partial run, write the heartbeat and release the lease."""
     rid, run_id = meta['routine'], meta['run_id']
     if 'load_start' in meta:
         load(cfg, meta)
     entries = lib.read_journal(cfg, run_id)
     if status == 'ok' and any(e['kind'] == 'problem' for e in entries):
         status = 'partial'
-    state = lib.load_state(cfg)
-    failures = state.pop('send_failures', [])
-    failures += failure_alert_misses(cfg, rid, state)
-    lib.save_state(cfg, state)
-    took = lib.now() - meta['started_at']
-    text = run_update(meta, status, took, summary, counts or {}, entries, failures, detail)
-    error = lib.post(cfg, cfg['channels'][meta['workflow']], text)
-    if error:
+    misses = failure_alert_misses(cfg, rid, lib.load_state(cfg))
+    if misses:
         state = lib.load_state(cfg)
-        state.setdefault('send_failures', []).extend(failures + [{'at': lib.iso(), 'target': meta['workflow'], 'error': error}])
+        state.setdefault('send_failures', []).extend(misses)
+        state.setdefault('failure_alert_seen', {})[rid] = misses[-1]['run_at_ms']
         lib.save_state(cfg, state)
+    took = lib.now() - meta['started_at']
+    (lib.run_dir(cfg, run_id) / 'update.md').write_text(run_update(meta, status, took, summary, counts or {}, entries, detail) + '\n')
     if status == 'partial' or (status == 'failed' and meta['kind'] == 'agentTurn'):
         # A failed command job exits non-zero, and the cron failureAlert pages for it.
-        lib.alert(cfg, f'routine:{rid}:{status}', f'{cfg["brain"]} routine `{rid}` {status}: {summary or "see its run update"}\n'
-                  f'Run update in #brain-{meta["workflow"]}, run `{run_id}`.')
+        lib.alert(cfg, f'routine:{rid}:{status}', alert_text(cfg, rid, status, summary, entries))
     routine_state(cfg, rid, finished_at=lib.iso(), status=status, seconds=round(took, 1), running=False,
-                  heartbeat_at=lib.iso(), update_error=error)
+                  heartbeat_at=lib.iso())
     lib.atomic(lib.run_dir(cfg, run_id) / 'run.json', {**meta, 'status': status, 'summary': summary, 'finished_at': lib.now()})
     heartbeat = lib.state_dir(cfg) / 'heartbeats' / rid
     heartbeat.parent.mkdir(exist_ok=True)
@@ -81,7 +78,24 @@ def end(cfg, meta, status, summary='', counts=None, detail=''):
     prune_runs(cfg)
 
 
-def run_update(meta, status, took, summary, counts, entries, failures, detail):
+def title(cfg, rid):
+    """The routine's plain name from the manifest, for alerts and the digest."""
+    try:
+        return lib.routine(cfg, rid).get('title') or rid
+    except Failed:
+        return rid
+
+
+def alert_text(cfg, rid, status, summary, entries):
+    """A plain-language page: which routine, what happened, and the problems it hit."""
+    problems = [e['text'] for e in entries if e['kind'] == 'problem'][:3]
+    what = 'ran only partly' if status == 'partial' else 'failed'
+    reason = '; '.join(problems) or summary
+    return f'{cfg["brain"]}: {title(cfg, rid)} {what}' + (f': {reason}' if reason else '.')
+
+
+def run_update(meta, status, took, summary, counts, entries, detail):
+    """The run record's readable form, kept in the run directory as update.md."""
     head = f'**{meta["routine"]}** {status}' + ('' if status == 'deferred' else f' in {duration(took)}') + (f': {summary}' if summary else '')
     changes = [e for e in entries if e['kind'] == 'change']
     attention = [e for e in entries if e['kind'] == 'attention']
@@ -103,9 +117,6 @@ def run_update(meta, status, took, summary, counts, entries, failures, detail):
         lines += [f'- {e["title"]} <{e["url"]}>' + ('' if e.get('new') else ' (still open)') for e in attention]
     if notes:
         lines += [f'{"Problem" if e["kind"] == "problem" else "Note"}: {e["text"]}' for e in notes]
-    if failures:
-        lines.append('Alert sends that failed:')
-        lines += [f'- {f["at"]} to {f["target"]}: {f["error"][:200]}' for f in failures]
     if detail:
         lines.append(detail.strip()[-600:])
     if len(lines) == 1 and status == 'ok':
@@ -126,8 +137,8 @@ def load(cfg, meta):
     for provider, s in (start or {}).items():
         before, after = s.get('credits'), (end_snap or {}).get(provider, {}).get('credits')
         if before is not None and after is not None and after < before:
-            lib.alert(cfg, f'credits:{provider}', f'{cfg["brain"]} routine `{meta["routine"]}`: the {provider} credit balance fell by '
-                      f'{before - after:,.1f} during run `{meta["run_id"]}`, so the quota window is used up and credits are being drawn.')
+            lib.alert(cfg, f'credits:{provider}', f'{cfg["brain"]}: {title(cfg, meta["routine"])} drew on {provider} credits, '
+                      'so the subscription window is used up. Maintenance turns stay off credits until it resets.')
 
 
 def session_usage(cfg, meta):
@@ -207,19 +218,19 @@ def gate(cfg, rid, forced=False):
     deferred = lib.read_json(lib.state_dir(cfg) / 'routines' / f'{rid}.json', {}).get('deferred_runs', [])
     deferred.append({'run_id': run_id, 'at': lib.iso(), 'window': f'{provider} {label.lower()}', 'used': used})
     routine_state(cfg, rid, last_run_id=run_id, started_at=lib.iso(), deferred_runs=deferred)
-    # Report in a unit of its own: a Discord post outlasts the trigger's 30 s budget, and the trigger's exec ends its child processes.
+    # Report in a unit of its own: an alert or an issue outlasts the trigger's 30 s budget, and the trigger's exec ends its child processes.
     lib.run(['systemd-run', '--user', '--collect', '--quiet', cfg['python_bin'], SCRIPT, 'deferred', run_id], timeout=30)
     return False
 
 
 def cmd_deferred(cfg, run_id):
-    """A deferral's report: page credits, escalate too many deferrals in a row, post the run update."""
+    """A deferral's report: page credits, escalate too many deferrals in a row, write the run record."""
     meta = lib.read_json(lib.run_dir(cfg, run_id) / 'run.json')
     rid, d = meta['routine'], meta['deferral']
     provider = lib.routine(cfg, rid)['model'].split('/')[0]
     if d['credits']:
-        lib.alert(cfg, f'credits:{provider}', f'{cfg["brain"]} routine `{rid}` did not start: {d["reason"]}. '
-                  f'Maintenance turns stay off credits until the window resets.')
+        lib.alert(cfg, f'credits:{provider}', f'{cfg["brain"]}: {title(cfg, rid)} did not start, because {d["reason"]}. '
+                  'Maintenance turns stay off credits until the window resets.')
     deferred = lib.read_json(lib.state_dir(cfg) / 'routines' / f'{rid}.json', {}).get('deferred_runs', [])
     try:
         if d['escalate'] and len(deferred) >= cfg['window_guard']['deferrable'][rid]:
@@ -245,7 +256,7 @@ def escalate(cfg, meta, deferred, guard):
            + (' (' + ', '.join(f'{r} {p:g}' for r, p in sorted(maintenance.items())) + ')' if maintenance else '') + '.'],
         [{'label': 'Raise the threshold', 'detail': f'set `window_guard.defer_at` in the brain-routines `config.json` above {guard["defer_at"]}, '
           "leaving the agent's chat less of the window"},
-         {'label': 'Lower the page cap', 'detail': 'set `max_pages` in the brain-change-review `config.json` lower, so each review takes less of the window'},
+         {'label': 'Lower the page cap', 'detail': 'set `max_pages` in the brain-alignment `config.json` lower, so each alignment run takes less of the window'},
          {'label': 'Move the routines to another model', 'detail': 'set `model` of the deferrable routines in the routine manifest to a model '
           'on another subscription, then sync the crons'}],
         2 if moved * 2 >= deferred[-1]['used'] else 1,
@@ -260,17 +271,15 @@ def routine_state(cfg, rid, **fields):
 
 
 def failure_alert_misses(cfg, rid, state):
-    """Cron failure alerts OpenClaw could not deliver, reported once each."""
+    """Cron failure alerts OpenClaw could not deliver and the digest has not seen yet."""
     job = find_jobs(cfg).get(declaration_key(cfg, rid))
     if not job:
         return []
     st = job.get('state', {})
     status = st.get('lastFailureNotificationDeliveryStatus')
-    seen = state.setdefault('failure_alert_seen', {})
-    if status in ('not-delivered', 'unknown') and seen.get(rid) != st.get('lastRunAtMs'):
-        seen[rid] = st.get('lastRunAtMs')
-        return [{'at': lib.iso((st.get('lastRunAtMs') or 0) / 1000), 'target': 'ops-alerts (cron failureAlert)',
-                 'error': st.get('lastFailureNotificationDeliveryError') or status}]
+    if status in ('not-delivered', 'unknown') and state.get('failure_alert_seen', {}).get(rid) != st.get('lastRunAtMs'):
+        return [{'at': lib.iso((st.get('lastRunAtMs') or 0) / 1000), 'run_at_ms': st.get('lastRunAtMs'), 'routine': rid,
+                 'target': 'ops-alerts (cron failureAlert)', 'error': st.get('lastFailureNotificationDeliveryError') or status}]
     return []
 
 
@@ -351,7 +360,7 @@ def desired(cfg, m, r):
         spec['payload'] = {'kind': 'agentTurn', 'model': r['model'], 'thinking': r.get('thinking', 'high'), 'timeoutSeconds': timeout,
                            'message': f'Run the {cfg["brain"]} routine `{r["id"]}`: read {skill_md} and follow its `{r["id"]}` routine. '
                                       f'Start with `{cfg["python_bin"]} {SCRIPT} begin {r["id"]}` and finish with its `end` command; '
-                                      'the run update is the only output, so end the turn with NO_REPLY.'}
+                                      'the turn itself posts nothing, so end it with NO_REPLY.'}
     return spec
 
 
@@ -393,7 +402,7 @@ def register(cfg, rid, spec):
 def cmd_force(cfg, rid):
     """Run a routine now through the subscription guard, as its schedule would."""
     if not gate(cfg, rid, forced=True):
-        print(json.dumps({'deferred': rid, 'run_update': f'#brain-{lib.routine(cfg, rid)["workflow"]}'}))
+        print(json.dumps({'deferred': rid, 'run_record': str(lib.state_dir(cfg) / 'routines' / f'{rid}.json')}))
         return 0
     job = find_jobs(cfg).get(declaration_key(cfg, rid))
     if not job:

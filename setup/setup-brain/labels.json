@@ -15,9 +15,9 @@
   { "name": "wontfix", "color": "ffffff", "description": "This will not be worked on" },
   { "name": "needs-attention", "color": "B60205", "description": "A maintenance routine needs the owner to pick an option" },
   { "name": "workflow:health", "color": "C5DEF5", "description": "Raised by the brain health workflow" },
-  { "name": "workflow:review", "color": "C5DEF5", "description": "Raised by the brain review workflow" },
+  { "name": "workflow:alignment", "color": "C5DEF5", "description": "Raised by the brain alignment workflow" },
   { "name": "workflow:relevance", "color": "C5DEF5", "description": "Raised by the brain relevance workflow" },
   { "name": "workflow:core", "color": "C5DEF5", "description": "Raised by the brain core workflow" },
-  { "name": "workflow:summary", "color": "C5DEF5", "description": "Raised by the weekly brain summary" },
+  { "name": "workflow:digest", "color": "C5DEF5", "description": "Raised by the brain digest workflow" },
   { "name": "eval-candidate", "color": "BFD4F2", "description": "A lookup that missed, for the weekly retrieval eval to verify" }
 ]

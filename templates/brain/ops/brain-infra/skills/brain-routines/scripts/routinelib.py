@@ -22,6 +22,7 @@ SKILL_DIR = SCRIPTS.parent
 SKILLS_DIR = SKILL_DIR.parent
 CONFIG = SKILL_DIR / 'config.json'
 MARKER = '<!-- brain-routines -->'
+ANSWER = '<!-- brain-routines-answer -->'  # an owner's answer the agent recorded from the digest channel or a chat
 DAY = 86400
 DISCORD_LIMIT = 1900
 TIMING = {
@@ -230,7 +231,7 @@ def current_run(cfg, run_id=None):
 
 
 def journal(cfg, run_id, kind, **fields):
-    """Record what a run did; the run update is built from this journal."""
+    """Record what a run did; the run record and the daily digest are built from this journal."""
     if not run_id:
         return
     path = run_dir(cfg, run_id) / 'journal.jsonl'
@@ -276,7 +277,7 @@ def post(cfg, channel, text, silent=True):
 
 
 def alert(cfg, fingerprint, text):
-    """Page #ops-alerts once per fingerprint per day; a failed send is kept for the next run update."""
+    """Page #ops-alerts once per fingerprint per day; a failed send is kept for the daily digest."""
     state = load_state(cfg)
     sent = state.setdefault('alerts', {})
     if now() - sent.get(fingerprint, 0) < DAY:
@@ -399,7 +400,7 @@ def _parse_comment(name, body):
 def open_attention(cfg, workflow=None):
     labels = ['--label', 'needs-attention'] + (['--label', f'workflow:{workflow}'] if workflow else [])
     raw = gh(cfg, 'issue', 'list', '--repo', cfg['github_repo'], '--state', 'open', *labels,
-             '--json', 'number,title,url,body', '--limit', '200')
+             '--json', 'number,title,url,body,author', '--limit', '200')
     return json.loads(raw or '[]')
 
 
@@ -424,7 +425,8 @@ def file_attention(cfg, meta, fingerprint, title, finding, why, evidence, option
         '**Options.**', '',
         *[f'{i}. **{o["label"]}**' + (f' - {o["detail"]}' if o.get('detail') else '') for i, o in enumerate(options, 1)], '',
         f'**Recommended:** {recommended}' + (f', {reason}' if reason else '') + '.', '',
-        f'Reply with the option number. The next `{meta["routine"] if meta else workflow}` run applies it and closes this issue.', '',
+        f'Reply with the option number, here or to the digest in `#brain-review`. '
+        f'The next `{meta["routine"] if meta else workflow}` run applies it and closes this issue.', '',
         f'<!-- fingerprint: {fingerprint} -->',
         _json_comment('options', {'skill': meta['skill'] if meta else 'brain-routines',
                                   'options': [{'label': o['label'], 'action': o.get('action', {'type': 'close'})} for o in options]}),
@@ -521,7 +523,9 @@ def process_replies(cfg, meta):
         number = issue['number']
         comments = json.loads(gh(cfg, 'api', f'repos/{cfg["github_repo"]}/issues/{number}/comments', '--paginate') or '[]')
         last_ours = max((i for i, c in enumerate(comments) if MARKER in (c.get('body') or '')), default=-1)
-        replies = [c for c in comments[last_ours + 1:] if c['user']['login'] == cfg['owner_github'] and MARKER not in (c.get('body') or '')]
+        filer = (issue.get('author') or {}).get('login')
+        replies = [c for c in comments[last_ours + 1:] if MARKER not in (c.get('body') or '')
+                   and (c['user']['login'] == cfg['owner_github'] or (ANSWER in (c.get('body') or '') and c['user']['login'] == filer))]
         if not replies:
             continue
         reply = replies[-1]['body']

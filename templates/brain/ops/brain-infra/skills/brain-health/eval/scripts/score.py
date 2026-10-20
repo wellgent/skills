@@ -192,15 +192,15 @@ def main():
                     + '; '.join(f'{q}: {e[:120]}' for q, e in list(errored.items())[:5]) + '.')
     alerts = []
     for c in critical_failed:
-        alerts.append(('critical:' + c['query_id'], f'critical case {c["query_id"]} "{c["query"]}" no longer returns '
+        alerts.append(('critical:' + c['query_id'], f'the critical lookup "{c["query"]}" no longer returns '
                        f'`{c.get("first_relevant_slug") or c["relevant_slugs"][0]}` first'))
     if band is None:
         lib.journal(cfg, meta['run_id'], 'note', text=f'Noise band: {len(complete_runs) + complete}/{RUNS_FOR_BAND} complete runs measured; family drops alert from then on.')
     elif complete and complete_runs:
         for text in drops(complete_runs[-1], results, band):
-            alerts.append(('drop:' + text.split(' ', 1)[0], f'family drop: {text}'))
+            alerts.append(('drop:' + text.split(' ', 1)[0], f'search quality dropped for one family of lookups: {text}'))
     for fingerprint, text in alerts:
-        lib.alert(cfg, f'{meta["routine"]}:{fingerprint}', f'{cfg["brain"]} retrieval eval: {text}.\nRun update in #brain-{meta["workflow"]}, run `{meta["run_id"]}`.')
+        lib.alert(cfg, f'{meta["routine"]}:{fingerprint}', f'{cfg["brain"]}: the weekly search check found that {text}.')
         lib.journal(cfg, meta['run_id'], 'note', text=f'Alerted: {text}.')
     counts['alerts'] = len(alerts)
     entry = {'run_id': meta['run_id'], 'at': lib.iso(), 'set_version': data.get('set_version'), 'complete': complete,

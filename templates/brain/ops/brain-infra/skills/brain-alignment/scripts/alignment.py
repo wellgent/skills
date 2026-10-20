@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""The daily change review: the queue of changed pages, batch packets, the review guards and the run summary.
+"""The daily alignment: the queue of changed pages, batch packets, the alignment guards and the run summary.
 
-The review-daily agent turn runs, in order:
+The alignment-daily agent turn runs, in order:
 
-  routine.py begin review-daily                  the run id (brain-routines)
-  review.py prep --run <run_id>                  queue the changed pages, oldest change first
-  review.py next --run <run_id>                  the next batch packet, or {"done": true} at the page cap
-  review.py apply --run <run_id> <verdicts>      the batch's verdicts through the review guards and apply.py
+  routine.py begin alignment-daily               the run id (brain-routines)
+  alignment.py prep --run <run_id>               queue the changed pages, oldest change first
+  alignment.py next --run <run_id>               the next batch packet, or {"done": true} at the page cap
+  alignment.py apply --run <run_id> <verdicts>   the batch's verdicts through the alignment guards and apply.py
   ... next and apply until done ...
-  review.py finish --run <run_id>                judge misses, then routine.py end
+  alignment.py finish --run <run_id>             judge misses, then routine.py end
 
 Owner replies to needs-attention issues run `apply-option <proposal>` and `hold --on|--off`.
 Everything zero-LLM: Git in the maintenance clone, `gbrain lint` and `gbrain query`.
@@ -34,7 +34,7 @@ import judge_misses  # noqa: E402
 
 CONF = json.loads((SKILL_DIR / 'config.json').read_text())
 RID = CONF['routine']
-CMD = f'{sys.executable} {SCRIPTS / "review.py"}'
+CMD = f'{sys.executable} {SCRIPTS / "alignment.py"}'
 FRONTMATTER_KEY = re.compile(r'^\s*(updated|created|status|tags|aliases|related|title|type|last_verified):')
 WORD = re.compile(r"[\w][\w.,:/'-]*\w|\w")
 DATE = re.compile(r'\*\*(\d{4}-\d{2}-\d{2})\*\*')
@@ -44,27 +44,27 @@ STOP = {'about', 'after', 'again', 'their', 'there', 'these', 'those', 'which', 
 
 # state
 
-def review_dir(cfg):
-    path = lib.state_dir(cfg) / 'review'
+def alignment_dir(cfg):
+    path = lib.state_dir(cfg) / 'alignment'
     path.mkdir(exist_ok=True, mode=0o700)
     return path
 
 
 def load_state(cfg):
-    return lib.read_json(review_dir(cfg) / 'state.json', {'cursor': None, 'queue': {}, 'held': False})
+    return lib.read_json(alignment_dir(cfg) / 'state.json', {'cursor': None, 'queue': {}, 'held': False})
 
 
 def save_state(cfg, state):
-    lib.atomic(review_dir(cfg) / 'state.json', state)
+    lib.atomic(alignment_dir(cfg) / 'state.json', state)
 
 
 def run_record(cfg, run_id):
-    return lib.read_json(lib.run_dir(cfg, run_id) / 'review.json', {'batches': [], 'ops': {}, 'review_rejected': [],
+    return lib.read_json(lib.run_dir(cfg, run_id) / 'alignment.json', {'batches': [], 'ops': {}, 'guard_rejected': [],
                                                                     'dropped': [], 'deferred': 0, 'new': 0, 'lint': 0})
 
 
 def save_run(cfg, run_id, rec):
-    lib.atomic(lib.run_dir(cfg, run_id) / 'review.json', rec)
+    lib.atomic(lib.run_dir(cfg, run_id) / 'alignment.json', rec)
 
 
 def git(cfg, *args, **kw):
@@ -132,7 +132,7 @@ def related(text):
 
 
 class LinkIndex:
-    """Outbound and inbound links among the pages the review reads."""
+    """Outbound and inbound links among the pages the alignment reads."""
 
     def __init__(self, repo, pages):
         self.out, self.inbound = {}, {}
@@ -206,7 +206,7 @@ def cmd_prep(cfg, args):
 # the batch packet
 
 def lint(cfg, paths, run_dir):
-    """gbrain lint findings on the given pages, minus the rules this review leaves to other workflows."""
+    """gbrain lint findings on the given pages, minus the rules the alignment leaves to other workflows."""
     try:
         code, out, _ = lib.run(['gbrain', 'lint', cfg['maintenance_repo']], cwd=run_dir, timeout=180, check=False)
     except (Failed, OSError) as error:
@@ -347,7 +347,7 @@ def cmd_next(cfg, args):
         if entry.get('attempts', 0) >= CONF['max_attempts']:
             queue.pop(path)
             rec['dropped'].append(path)
-            lib.journal(cfg, run_id, 'problem', text=f'`{path}` dropped from the review queue after {CONF["max_attempts"]} batches without an apply.')
+            lib.journal(cfg, run_id, 'problem', text=f'`{path}` dropped from the alignment queue after {CONF["max_attempts"]} batches without an apply.')
             continue
         entry['attempts'] = entry.get('attempts', 0) + 1
         targets.append(path)
@@ -439,24 +439,24 @@ def cmd_next(cfg, args):
     return 0
 
 
-# the review guards, then apply.py
+# the alignment guards, then apply.py
 
 def proposal_action(cfg, run_id, fingerprint, n, verdict):
     key = hashlib.sha1(fingerprint.encode()).hexdigest()[:12]
-    path = review_dir(cfg) / 'proposals' / f'{key}-{n}.json'
+    path = alignment_dir(cfg) / 'proposals' / f'{key}-{n}.json'
     lib.atomic(path, verdict)
-    return {'type': 'command', 'argv': ['scripts/review.py', 'apply-option', str(path)]}
+    return {'type': 'command', 'argv': ['scripts/alignment.py', 'apply-option', str(path)]}
 
 
 def check_verdict(v, packet, targets, cooling, seen):
-    """The review's own guards on one verdict; return the reason it is refused, or None."""
+    """The alignment's own guards on one verdict; return the reason it is refused, or None."""
     op = v.get('op')
     if op == 'NOOP':
         return None
     if op == 'FLAG':
         return None if v.get('fingerprint') and v.get('options') else 'a FLAG needs a fingerprint and options'
     if op not in ('UPDATE', 'ADD', 'DELETE'):
-        return f'{op} is not a review op; page moves belong to the relevance routine'
+        return f'{op} is not an alignment op; page moves belong to the relevance routine'
     if op == 'DELETE' and not v.get('old'):
         return 'whole-page deletion belongs to the relevance routine; FLAG it instead'
     path = os.path.normpath(v.get('path') or '')
@@ -468,7 +468,7 @@ def check_verdict(v, packet, targets, cooling, seen):
     if path in cooling:
         return 'cooldown: the maintenance writer edited this page in the last few days'
     if not page['editable'] and not (page['class'] == 'records' and path in targets):
-        return f'{path} is read-only for the review ({page["class"]})'
+        return f'{path} is read-only for the alignment ({page["class"]})'
     if page['class'] == 'records' and path not in targets:
         return f'{path} is a record and only its own lint is repaired'
     return None
@@ -514,7 +514,7 @@ def cmd_apply(cfg, args):
         lib.journal(cfg, run_id, 'note', text=f'Batch {args.batch}: writes are held, so {len(writes)} edit verdict(s) were judged and not applied.')
         passed = [v for v in passed if v not in writes]
         for v in writes:
-            refused.append({'verdict': v, 'reason': 'held: review writes are held by the owner'})
+            refused.append({'verdict': v, 'reason': 'held: alignment writes are held by the owner'})
     result = applylib.Applier(cfg, meta).apply(passed) if passed else {'applied': [], 'rejected': [], 'flagged': [], 'noop': 0}
     for path in targets:
         state['queue'].pop(path, None)
@@ -522,7 +522,7 @@ def cmd_apply(cfg, args):
     for v in verdicts:
         op = v.get('op', '?')
         rec['ops'][op] = rec['ops'].get(op, 0) + 1
-    rec['review_rejected'] += [{'path': r['verdict'].get('path'), 'op': r['verdict'].get('op'), 'reason': r['reason']} for r in refused]
+    rec['guard_rejected'] += [{'path': r['verdict'].get('path'), 'op': r['verdict'].get('op'), 'reason': r['reason']} for r in refused]
     for b in rec['batches']:
         if b['batch'] == args.batch:
             b.update(applied=True, commits=len(result['applied']), rejected=len(result['rejected']) + len(refused), flagged=len(result['flagged']))
@@ -532,7 +532,7 @@ def cmd_apply(cfg, args):
         for r in refused:
             key = r['reason'].split(':', 1)[0]
             reasons[key] = reasons.get(key, 0) + 1
-        lib.journal(cfg, run_id, 'note', text=f'Batch {args.batch}: {len(refused)} verdict(s) refused by the review guards: '
+        lib.journal(cfg, run_id, 'note', text=f'Batch {args.batch}: {len(refused)} verdict(s) refused by the alignment guards: '
                     + '; '.join(f'{k} ({n})' for k, n in reasons.items()) + '.')
     print(json.dumps({'batch': args.batch, 'applied': result['applied'], 'flagged': result['flagged'], 'noop': result['noop'],
                       'rejected': [{'path': r['verdict'].get('path'), 'op': r['verdict'].get('op'), 'reason': r['reason']}
@@ -563,7 +563,7 @@ def cmd_apply_option(cfg, args):
             raise Failed(reason)  # transient: the reply loop retries on the next run
         Path(args.proposal).unlink(missing_ok=True)
         print(json.dumps({'note': f'The chosen edit no longer applies to `{path}` ({reason}); the page changed since the issue was filed, '
-                                  'and the next review judges it again.'}))
+                                  'and the next alignment judges it again.'}))
         return 0
     Path(args.proposal).unlink(missing_ok=True)
     print(json.dumps({'note': f'Applied the chosen edit to `{path}`.', 'commits': [a['url'] for a in result['applied']]}))
@@ -574,8 +574,8 @@ def cmd_hold(cfg, args):
     state = load_state(cfg)
     state['held'] = args.on
     save_state(cfg, state)
-    print(json.dumps({'note': 'Review writes are held: verdicts are judged and reported, nothing is applied.' if args.on
-                      else 'Review writes are released: the next run applies verdicts again.'}))
+    print(json.dumps({'note': 'Alignment writes are held: verdicts are judged and reported, nothing is applied.' if args.on
+                      else 'Alignment writes are released: the next run applies verdicts again.'}))
     return 0
 
 
@@ -589,14 +589,14 @@ def miss_check(cfg, meta, report):
     key = hashlib.sha1(' '.join(sorted(m['commit'] for m in misses)).encode()).hexdigest()[:12]
     lib.file_attention(
         cfg, meta, f'{RID}:judge-miss:{key}',
-        f'{cfg["brain"]} daily change review: judge-miss rate {wf["rate"]:.0%} over {wf["edits"]} edits',
-        f'{wf["misses"]} of the {wf["edits"]} edits the review made in the last {report["lookback_days"]} days were reverted or rewritten '
+        f'{cfg["brain"]} daily alignment: judge-miss rate {wf["rate"]:.0%} over {wf["edits"]} edits',
+        f'{wf["misses"]} of the {wf["edits"]} edits the alignment made in the last {report["lookback_days"]} days were reverted or rewritten '
         f'by another writer within {report["window_days"]} days, over the {CONF["judge_miss"]["threshold"]:.0%} threshold.',
         'A miss means the judge got a page wrong in a way a person or agent had to correct; only the owner can say whether the rubric or the evidence rule needs to change.',
         [f'{m["op"]} `{m["path"]}` {m["url"]} - {m["by_author"]} {m["how"]} in {m["by_url"]}' for m in misses[:20]],
         [{'label': 'Keep the routine as it is', 'detail': 'the misses are isolated corrections', 'action': {'type': 'close'}},
-         {'label': 'Hold the review writes', 'detail': 'runs keep judging and reporting but apply nothing until released',
-          'action': {'type': 'command', 'argv': ['scripts/review.py', 'hold', '--on']}}],
+         {'label': 'Hold the alignment writes', 'detail': 'runs keep judging and reporting but apply nothing until released',
+          'action': {'type': 'command', 'argv': ['scripts/alignment.py', 'hold', '--on']}}],
         1 if wf['misses'] < 3 else 2,
         'a single miss in a small sample is noise' if wf['misses'] < 3 else 'repeated misses point at the rubric')
 
@@ -609,19 +609,19 @@ def cmd_finish(cfg, args):
     try:
         report = judge_misses.compute(cfg, CONF)
         wf = report['workflows'].get(meta['workflow'], {'edits': 0, 'misses': 0, 'open': 0, 'rate': 0.0})
-        lib.journal(cfg, run_id, 'note', text=f'Judge misses, last {report["lookback_days"]} days: {wf["misses"]} of {wf["edits"]} review edits '
+        lib.journal(cfg, run_id, 'note', text=f'Judge misses, last {report["lookback_days"]} days: {wf["misses"]} of {wf["edits"]} alignment edits '
                     f'({wf["rate"]:.0%}), {wf["open"]} still inside the {report["window_days"]}-day window.')
         miss_check(cfg, meta, report)
     except Failed as error:
         lib.journal(cfg, run_id, 'problem', text=f'Judge-miss check failed: {error}')
     if state.get('held'):
         lib.file_attention(
-            cfg, meta, f'{RID}:held', f'{cfg["brain"]} daily change review writes are held',
-            'The daily change review judges and reports, but applies no edit.',
-            'The owner chose to hold the review writes; only the owner releases them.',
+            cfg, meta, f'{RID}:held', f'{cfg["brain"]} daily alignment writes are held',
+            'The daily alignment judges and reports, but applies no edit.',
+            'The owner chose to hold the alignment writes; only the owner releases them.',
             ['The hold was set through a judge-miss needs-attention option.'],
             [{'label': 'Release the hold', 'detail': 'the next run applies verdicts again',
-              'action': {'type': 'command', 'argv': ['scripts/review.py', 'hold', '--off']}}], 1)
+              'action': {'type': 'command', 'argv': ['scripts/alignment.py', 'hold', '--off']}}], 1)
     judged = sum(len(b['targets']) for b in rec['batches'] if b.get('applied'))
     applied = sum(b.get('commits', 0) for b in rec['batches'])
     rejected = sum(b.get('rejected', 0) for b in rec['batches'])

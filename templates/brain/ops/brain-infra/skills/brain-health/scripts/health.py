@@ -152,11 +152,44 @@ def run_doctor(s):
     paged = [c for c in checks if c.get('status') == 'fail' or (c.get('name') in page and c.get('status') != 'ok') or unknown(c)]
     for c in paged:
         why = 'unknown at the entry budget' if unknown(c) and c.get('status') != 'fail' else c.get('status')
-        s.problem(f'doctor `{c["name"]}` {why}', f'Doctor `{c["name"]}` {why}: {(c.get("message") or "")[:300]}')
-    warns = [c['name'] for c in checks if c.get('status') == 'warn' and c not in paged]
+        s.problem(f'doctor `{c["name"]}` {why}', f'The engine doctor reports `{c["name"]}` as {why}: {(c.get("message") or "")[:300]}')
+    warns = [c for c in checks if c.get('status') == 'warn' and c not in paged]
     if warns:
-        s.note('Doctor warnings: ' + ', '.join(f'`{w}`' for w in warns) + '.')
+        s.note('Doctor warnings: ' + ', '.join(f'`{c["name"]}`' for c in warns) + '.')
+    new_warnings(s, warns)
     return f'doctor {len(warns)} warn' + (f', {len(paged)} paged' if paged else '')
+
+
+def new_warnings(s, warns):
+    """A doctor warning speaks once, when it is new: one needs-attention issue, closed again when it clears.
+
+    The known warnings live in <state_dir>/health/doctor-warnings.json; the first run records what it finds without filing."""
+    path = lib.state_dir(s.cfg) / 'health' / 'doctor-warnings.json'
+    known = lib.read_json(path)
+    current = {c['name']: c for c in warns}
+    if known is not None:
+        for name in sorted(set(current) - set(known)):
+            message = (current[name].get('message') or 'no message').strip()[:400]
+            s.counts['new doctor warnings'] = s.counts.get('new doctor warnings', 0) + 1
+            lib.file_attention(
+                s.cfg, s.meta, f'health-doctor:warn:{name}', f'{s.cfg["brain"]} health: the engine doctor has a new warning, {name}',
+                f'The engine doctor started warning on `{name}`: {message}',
+                'A warning is not a failure, so the health check cannot tell whether it needs a fix or is expected for this brain.',
+                [f'`gbrain doctor` on {lib.iso()[:10]}: `{name}` warn, "{message}"'],
+                [{'label': 'Accept it', 'detail': 'the health check stays quiet about it while it lasts, and raises it again if it clears and comes back',
+                  'action': {'type': 'close'}},
+                 {'label': 'Look into it by hand', 'detail': 'close this issue once it is settled', 'action': {'type': 'close'}}],
+                2, 'a new warning usually means something changed in the brain or the engine')
+        cleared = set(known) - set(current)
+        if cleared:
+            for issue in lib.open_attention(s.cfg, 'health'):
+                fp = lib._parse_comment('fingerprint', issue['body'])
+                if isinstance(fp, str) and fp.startswith('health-doctor:warn:') and fp.split(':', 2)[2] in cleared:
+                    lib.gh(s.cfg, 'issue', 'comment', str(issue['number']), '--repo', s.cfg['github_repo'], '--body-file', '-',
+                           input=f'The warning cleared on {lib.iso()[:10]}, so this issue closes.\n\n{lib.MARKER}')
+                    lib.gh(s.cfg, 'issue', 'close', str(issue['number']), '--repo', s.cfg['github_repo'], '--reason', 'completed')
+                    lib.journal(s.cfg, s.meta['run_id'], 'note', text=f'Closed <{issue["url"]}>: the warning cleared.')
+    lib.atomic(path, {name: (known or {}).get(name, lib.iso()) for name in current})
 
 
 def roster(s):
@@ -239,7 +272,7 @@ def deadman(s):
             continue
         job = jobs.get(runner.declaration_key(s.cfg, r['id'])) if jobs is not None else {}
         if job is None:
-            s.problem(f'`{r["id"]}` has no cron', f'Deadman: `{r["id"]}` is in the manifest but has no cron; run `routine.py sync`.')
+            s.problem(f'`{r["id"]}` has no cron', f'{runner.title(s.cfg, r["id"])} (`{r["id"]}`) has no cron, so it does not run.')
             late += 1
             continue
         timeout = r.get('timeout_seconds', s.cfg['timing']['default_timeout_seconds'])
@@ -252,8 +285,8 @@ def deadman(s):
         if at is None or at < due:
             late += 1
             disabled = ', its cron is disabled' if job and not job.get('enabled', True) else ''
-            s.problem(f'`{r["id"]}` missed its run', f'Deadman: `{r["id"]}` missed its {lib.iso(due)} run, last heartbeat '
-                      + (lib.iso(at) if at else 'none') + disabled + '.')
+            s.problem(f'`{r["id"]}` missed its run', f'{runner.title(s.cfg, r["id"])} (`{r["id"]}`) missed its run due {lib.iso(due)}; '
+                      + (f'it last finished {lib.iso(at)}' if at else 'it has never finished') + disabled + '.')
     return 'deadman ok' if not late else f'deadman {late} late'
 
 
@@ -262,8 +295,9 @@ def reconciler(s):
     beat = state.get('heartbeat_at')
     age = lib.now() - dt.datetime.fromisoformat(beat.replace('Z', '+00:00')).timestamp() if beat else None
     if age is None or age > s.hc['reconciler_stale_seconds']:
-        s.problem('reconciler heartbeat stale', f'Reconciler heartbeat is ' + ('missing' if age is None else f'{int(age // 60)} minutes old')
-                  + f'; check `systemctl --user status {s.rc["unit"]}`.')
+        s.problem('reconciler heartbeat stale', 'The reconciler, which publishes and indexes pushed commits, '
+                  + ('has no heartbeat' if age is None else f'last reported {int(age // 60)} minutes ago')
+                  + f', so it may have stopped; check `systemctl --user status {s.rc["unit"]}`.')
     script = s.published / 'ops/brain-infra/skills/gbrain-host-reconciler/scripts/reconciler.py'
     try:
         r = json.loads(lib.run([s.rc['python_bin'], script, 'rollup', '--hours', '24'], cwd=s.dir, timeout=120))

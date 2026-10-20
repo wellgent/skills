@@ -33,6 +33,13 @@ TIMING = {
     'alert_repeat_seconds': 86400,  # one page per fingerprint per day
     'event_retention_days': 14,
 }
+STAGES = {  # what each alert stage means, in plain words
+    'blocked': 'cannot publish new commits',
+    'embed': 'cannot embed new text',
+    'lock_busy': 'is waiting on a sync lock another process holds',
+    'deadman': 'sees no recent heartbeat from {name}',
+    'rescue_issue': 'rescued the published copy but could not file its issue',
+}
 OP_MARKERS = ('MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD')
 
 
@@ -305,7 +312,10 @@ class Reconciler:
             return
         attempts[stage] = now()
         a = self.cfg['alert']
-        text = f'{self.cfg["brain"]} reconciler needs attention\nStage: {stage}\nReason: {reason}\nInspect: journalctl --user -u {self.cfg["unit"]}'
+        what = STAGES.get(stage.split(':', 1)[0], 'hit a problem')
+        if stage.startswith('deadman:'):
+            what = what.format(name=stage.split(':', 1)[1])
+        text = f'{self.cfg["brain"]}: the reconciler, which publishes and indexes pushed commits, {what}: {reason}'
         try:
             run([a['openclaw_bin'], 'message', 'send', '--account', a['account'], '--channel', 'discord',
                  '--target', 'channel:' + a['channel'], '--message', text, '--silent'], timeout=60)
@@ -323,7 +333,9 @@ class Reconciler:
             with contextlib.suppress(Blocked):
                 run([a['openclaw_bin'], 'message', 'send', '--account', a['account'], '--channel', 'discord',
                      '--target', 'channel:' + a['channel'], '--message',
-                     f'{self.cfg["brain"]} reconciler recovered: {stage}', '--silent'], timeout=60)
+                     f'{self.cfg["brain"]}: the reconciler problem is resolved'
+                     + (f': {stage.split(":", 1)[1]} reports a heartbeat again.' if stage.startswith('deadman:') else ', and it publishes normally again.'),
+                     '--silent'], timeout=60)
             self.event('recovered', stage=stage)
 
     def check_deadman(self):
@@ -332,7 +344,7 @@ class Reconciler:
             age = now() - path.stat().st_mtime if path.exists() else None
             stage = 'deadman:' + item['name']
             if age is None or age > item['max_age_seconds']:
-                self.alert(stage, f'{item["name"]} heartbeat {path} is ' + ('missing' if age is None else f'{int(age // 60)} minutes old'))
+                self.alert(stage, 'it has never written one' if age is None else f'the last one is {int(age // 3600)} hours old')
             else:
                 self.recovered(stage)
 

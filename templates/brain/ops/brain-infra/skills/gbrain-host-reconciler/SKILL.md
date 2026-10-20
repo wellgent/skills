@@ -16,7 +16,7 @@ It runs as a systemd user service on the brain host, from the published copy its
   Without a new commit it re-checks the engine every 30 minutes.
 - **Rescue.** A published copy with uncommitted files, local commits, another branch or an unfinished Git operation gets 10 minutes, because a writer may be mid-commit.
   After that the reconciler pushes everything to a `rescue/<UTC timestamp>` branch, resets the copy to `origin/main`, keeps syncing, and files a needs-attention issue with the branch, the changed paths and the options (land through a writer clone, or discard).
-- **Paging.** A step that keeps failing for 10 minutes pages `#ops-alerts` once per day per stage, and a recovery posts once.
+- **Paging.** A step that keeps failing for 10 minutes pages `#ops-alerts` once per day per stage, in a plain sentence naming what the reconciler cannot do, and a recovery posts once.
   The same applies to embedding failures and to a sync lock held by someone else for an hour.
   A failed send is logged as an `alert_failed` event and shows in the rollup.
 - **Shared sync lock.** Every host job that runs `gbrain sync`, `gbrain embed` or a full doctor takes the same lock file as the reconciler, blocking with `flock -w`. While a job holds it, the reconciler waits.
@@ -39,7 +39,7 @@ python3 <published>/ops/brain-infra/skills/gbrain-host-reconciler/scripts/reconc
 ## Operating
 
 - `reconciler.py status` prints the state file, including `heartbeat_at`, the published, indexed and embedded heads, and any block.
-- `reconciler.py rollup --hours 24` summarizes publishes, imports, embeds, blocks, alerts, failed sends and rescues for the health workflow's daily post.
+- `reconciler.py rollup --hours 24` summarizes publishes, imports, embeds, blocks, alerts, failed sends and rescues for the health workflow's daily run record.
 - The journal is `journalctl --user -u <unit>`; events also go to `<state_dir>/events/YYYY-MM-DD.jsonl`, kept for 14 days.
 - The health workflow pages on a stale `heartbeat_at`. The reconciler watches the heartbeats listed under `deadman` in `config.json`.
 - Install or change the unit: `reconciler.py unit > ~/.config/systemd/user/<unit>`, then `systemctl --user daemon-reload && systemctl --user enable --now <unit>`.

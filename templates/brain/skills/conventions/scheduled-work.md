@@ -17,7 +17,7 @@ Brain work is never scheduled any other way: no host crontab entry, no Minion jo
 ## What every routine gets
 
 - the brain maintenance lease, so two routines never run at once
-- a run update in its workflow channel after every run
+- a run record on the host after every run, with its changes and needs-attention items reported in the daily digest in `#brain-review`
 - a heartbeat that the health workflow checks against the schedule
 - failure paging to `#ops-alerts`, once per incident
 - needs-attention issues with options for anything the routine cannot settle

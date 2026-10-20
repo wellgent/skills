@@ -1,0 +1,23 @@
+{
+  "routine": "digest-daily",
+  "weekly_day": 1,
+  "first_window_hours": 24,
+  "max_window_days": 7,
+  "areas": {{digest_areas}},
+  "ledger": {{digest_ledger}},
+  "judge_miss_max_age_hours": 36,
+  "watch": {
+    "eval_move": 0.03,
+    "window_near_points": 10,
+    "area_change_pages": 5,
+    "area_change_share": 0.05
+  },
+  "narrative": {
+    "gist_chars": 200,
+    "item_chars": 260,
+    "items_daily": 8,
+    "items_weekly": 6,
+    "health_chars": 300,
+    "screen_chars": 2800
+  }
+}

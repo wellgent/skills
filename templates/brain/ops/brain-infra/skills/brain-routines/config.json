@@ -19,11 +19,7 @@
   },
   "channels": {
     "ops-alerts": "{{ops_alerts_channel}}",
-    "health": "{{health_channel}}",
-    "review": "{{review_channel}}",
-    "relevance": "{{relevance_channel}}",
-    "core": "{{core_channel}}",
-    "summary": "{{summary_channel}}"
+    "brain-review": "{{brain_review_channel}}"
   },
   "window_guard": {"defer_at": {{window_defer_at}}, "deferrable": {{window_deferrable}}},
   "tripwire_share": 0.2,

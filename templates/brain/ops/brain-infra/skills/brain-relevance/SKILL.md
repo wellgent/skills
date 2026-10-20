@@ -27,10 +27,10 @@ Scripts live at `{{host_home}}/{{name}}/ops/brain-infra/skills`; run each with `
 2. `brain-relevance/scripts/relevance.py prep --run <run_id>` - builds `packet.json` and `brief.md` in the run directory and prints the slice and page count.
 3. Read `brief.md` and `brain-relevance/rubric.md`. For each page in the brief, read the page in the published copy (and its linking pages when the verdict turns on them) and append one judgment line to `<run dir>/judgments.jsonl`. The judgment format is in the `relevance.py` docstring; only the brief's allowed verdicts pass.
 4. `brain-relevance/scripts/relevance.py apply --run <run_id>` - checks the judgments, applies them through `apply.py` and prints what was applied, flagged, rejected or invalid, and which pages are not judged yet. Fix an invalid judgment and run `apply` again; settled pages are skipped. A verdict `apply.py` rejected stays rejected: the page is judged again on the next run of its slice.
-5. `brain-relevance/scripts/relevance.py finish --run <run_id>` - posts the run update to the relevance channel with the summary, every applied change with its commit link and the revert command for each deletion and move, and advances the rotation.
+5. `brain-relevance/scripts/relevance.py finish --run <run_id>` - writes the run record with the summary, every applied change with its commit link and the revert command for each deletion and move, and advances the rotation.
 
 If a step fails and the run cannot finish, end it with `brain-routines/scripts/routine.py end <run_id> --status failed --summary "<what failed>"`.
-End the turn with `NO_REPLY`: the run update is the only output.
+End the turn with `NO_REPLY`: the run posts nothing, and the daily digest reports its changes and flags.
 
 ## Guards in code
 
@@ -52,5 +52,5 @@ The tripwire holds every deletion and archive move of an area when they pass `tr
 - Force a run with `routine.py force relevance-weekly`.
 - `relevance-weekly` is deferrable: the `brain-routines` subscription guard holds it back while the shared quota window is too full. A deferred run leaves the rotation where it is, so its slice runs the following week.
 - The baseline pass is this routine over every slice: queue them all and force runs until the queue is empty.
-- Revert a change with the `git revert <sha>` from its run update, in a writer clone.
+- Revert a change with the `git revert <sha>` from its run record, in a writer clone.
 {{local}}

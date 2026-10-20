@@ -1,35 +1,35 @@
 ---
-name: brain-change-review
-description: "The daily change review of the brain: each day's changed pages judged against their one-hop links, backlinks and semantic neighbours, with guarded edits, needs-attention flags and judge-miss tracking. Use when running the review-daily routine, or when debugging or tuning the change review."
+name: brain-alignment
+description: "The daily alignment of the brain: each day's changed pages judged against their one-hop links, backlinks and semantic neighbours, with guarded edits, needs-attention flags and judge-miss tracking. Use when running the alignment-daily routine, or when debugging or tuning the alignment."
 ---
 
-# Brain Change Review
+# Brain Alignment
 
-The **review** workflow keeps the brain coherent after each day's writes.
-Its routine `review-daily` is an agentTurn of the main agent on the `brain-routines` framework, reporting to `#brain-review`.
-Code writes, the model judges: `scripts/review.py` builds every packet with zero LLM calls, and every edit goes through the review guards and then `apply.py`.
+The **alignment** workflow keeps the brain coherent after each day's writes.
+Its routine `alignment-daily` is an agentTurn of the main agent on the `brain-routines` framework; its applied edits and flags reach the owner in the daily digest.
+Code writes, the model judges: `scripts/alignment.py` builds every packet with zero LLM calls, and every edit goes through the alignment guards and then `apply.py`.
 
 Scope comes from the relevance model (`{{relevance_model}}`), set in `config.json` `areas`:
 
-{{review_scope}}
+{{alignment_scope}}
 
-## The `review-daily` routine
+## The `alignment-daily` routine
 
 Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain-infra/skills`.
 
-1. **Begin.** `python3 $S/brain-routines/scripts/routine.py begin review-daily` prints the run id; it takes the maintenance lease and applies {{owner}}'s replies on open review issues.
-2. **Prep.** `python3 $S/brain-change-review/scripts/review.py prep --run <run_id>` queues every page changed since the last run by any writer except the maintenance writer, oldest change first, after the pages carried over from earlier runs.
-3. **Rubric.** Read `$S/brain-change-review/rubric.md` once; it governs every verdict.
+1. **Begin.** `python3 $S/brain-routines/scripts/routine.py begin alignment-daily` prints the run id; it takes the maintenance lease and applies {{owner}}'s replies on open alignment issues.
+2. **Prep.** `python3 $S/brain-alignment/scripts/alignment.py prep --run <run_id>` queues every page changed since the last run by any writer except the maintenance writer, oldest change first, after the pages carried over from earlier runs.
+3. **Rubric.** Read `$S/brain-alignment/rubric.md` once; it governs every verdict.
 4. **Batch loop.** Repeat until `next` prints `"done": true`:
-   1. `review.py next --run <run_id>` prints the batch number and the packet path.
+   1. `alignment.py next --run <run_id>` prints the batch number and the packet path.
    2. Read the packet and judge every target under the rubric, reading full pages from the packet's `repo`, the maintenance clone.
    3. Write the verdict list to the packet's `verdicts_file` as `{"verdicts": [...]}`; the formats are below.
    4. Run the packet's `apply` command and read its output. The batch is done when that command has run, whatever it applied or refused.
       Its commit links are the receipt: the reconciler indexes every push, so the batch needs no further verification.
-5. **Finish.** `review.py finish --run <run_id>` checks judge misses and runs `routine.py end`, which posts the run update.
-   The status is `ok` by default: refused verdicts, flags and pages left in the queue are normal outcomes the run update reports.
+5. **Finish.** `alignment.py finish --run <run_id>` checks judge misses and runs `routine.py end`, which writes the run record.
+   The status is `ok` by default: refused verdicts, flags and pages left in the queue are normal outcomes the run record holds.
    Pass `--status failed --summary "<what broke>"` only when a command failed and the run could not finish its batches.
-6. End the turn with `NO_REPLY`; the run update is the only output.
+6. End the turn with `NO_REPLY`; the run posts nothing.
 
 Verdict shapes (the full contract is the `apply.py` docstring in `brain-routines`):
 
@@ -51,7 +51,7 @@ Neighbours come in this order up to `neighbour_cap`: propagation hits, the top `
 
 ## Guards
 
-`review.py apply` refuses, before `apply.py` sees them:
+`alignment.py apply` refuses, before `apply.py` sees them:
 
 - a page outside the packet, a second verdict on one page, an edit on a read-only page or on a record that is not the target;
 - MOVE and whole-page DELETE, which belong to the relevance routine;
@@ -62,20 +62,20 @@ There is no edit cap.
 
 ## Queue and overflow
 
-`<state_dir>/review/state.json` holds the cursor (the last commit prep read) and the queue.
-`next` hands out batches oldest first and stops at `max_pages` pages per run or once the run has used `budget_seconds`; everything left carries to the next run, and the run update says how many pages carried over.
+`<state_dir>/alignment/state.json` holds the cursor (the last commit prep read) and the queue.
+`next` hands out batches oldest first and stops at `max_pages` pages per run or once the run has used `budget_seconds`; everything left carries to the next run, and the run record says how many pages carried over.
 A page that goes `max_attempts` batches without an apply leaves the queue and makes the run partial.
 
 ## Judge misses
 
 A **judge miss** is a maintenance edit whose span another writer reverts or rewrites within 14 days.
-`scripts/judge_misses.py` reads them from Git for every workflow, from the `Routine:` and `Op:` lines `apply.py` writes into each commit, and `finish` writes `<state_dir>/judge-misses.json` for the weekly brain summary.
-When the review's own rate over the last 28 days passes 10%, `finish` files a needs-attention issue with the missed edits: option 1 keeps the routine as it is, option 2 holds the review writes.
-While writes are held, runs judge and report but apply nothing, and an open issue offers the release (`review.py hold --off`).
+`scripts/judge_misses.py` reads them from Git for every workflow, from the `Routine:` and `Op:` lines `apply.py` writes into each commit, and `finish` writes `<state_dir>/judge-misses.json` for the digest's weekly edition.
+When the alignment's own rate over the last 28 days passes 10%, `finish` files a needs-attention issue with the missed edits: option 1 keeps the routine as it is, option 2 holds the alignment writes.
+While writes are held, runs judge and report but apply nothing, and an open issue offers the release (`alignment.py hold --off`).
 
 ## Operating
 
-- Force a run with `routine.py force review-daily`.
-- Each run directory keeps `review.json`, every `batch-<n>.json` packet, the verdict files and each apply output.
+- Force a run with `routine.py force alignment-daily`.
+- Each run directory keeps `alignment.json`, every `batch-<n>.json` packet, the verdict files and each apply output.
 - Tune scope, batch size, page cap, budget and cooldown in `config.json`; the routine's schedule, model and effort are in `ops/brain-infra/routines.json`.
-- `review-daily` is deferrable: the `brain-routines` subscription guard holds it back while the shared quota window is too full, and its queue waits for the next run.
+- `alignment-daily` is deferrable: the `brain-routines` subscription guard holds it back while the shared quota window is too full, and its queue waits for the next run.

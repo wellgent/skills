@@ -1,4 +1,4 @@
-# Change Review Rubric
+# Alignment Rubric
 
 The judge reads one batch packet and returns one verdict list.
 The goal is **coherence**: after the day's changes, every page an agent reads tells the same current truth.
