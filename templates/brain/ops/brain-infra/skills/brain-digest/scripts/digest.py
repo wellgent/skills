@@ -150,7 +150,7 @@ def changes(cfg, start, end):
         if kind == 'page deletion':
             link, title = f'{web}/{parent}/{path}', page_title(cfg, parent, path)
         else:
-            link, title = f'{web}/{sha}/{to}', page_title(cfg, sha, to)
+            link, title = f'{web}/{cfg.get("branch", "main")}/{to}', page_title(cfg, sha, to)
         out.append({'sha': sha[:7], 'at': int(ct), 'routine': rid, 'workflow': judge_misses.workflow_of(cfg, rid) if rid else 'other',
                     'kind': kind, 'path': path, 'to': to if to != path else None, 'title': title, 'link': link,
                     'subject': body.splitlines()[0] if body.strip() else '',

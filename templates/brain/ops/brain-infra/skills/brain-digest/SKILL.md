@@ -42,7 +42,7 @@ Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain
 ## What the digest reports
 
 1. **Needs you**: every open `needs-attention` issue, oldest first, numbered, each with its sentence, the recommended option parsed from the issue and the issue link, then how to reply.
-2. **Changed**: the maintenance writer's commits in the window, and changes routines recorded in other repositories (the agent workspace, the shared core), one link per item to the page as the change left it.
+2. **Changed**: the maintenance writer's commits in the window, and changes routines recorded in other repositories (the agent workspace, the shared core), one link per item to the page on the main branch, or to its last version for a deleted page.
 3. **Done**: the answers the workflows applied in the window.
 4. **Health**: one line, only when a routine run failed, ran partly or was deferred in the window, or an alert could not be sent.
 
