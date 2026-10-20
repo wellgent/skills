@@ -12,7 +12,16 @@
   "kinds": {
 {{relevance_kinds}}
   },
-  "archivable": ["person", "company", "project", "program", "tool", "meeting"],
+  "archivable": {{relevance_archivable}},
+  "restorable": {{relevance_restorable}},
+  "never_removed": {{relevance_never_removed}},
+  "archived_in_place": {{relevance_archived_in_place}},
+  "follows_subjects": {{relevance_follows_subjects}},
+  "record_subjects": {{relevance_record_subjects}},
+  "evidence_kinds": {{relevance_evidence_kinds}},
+  "named_keeps": {{relevance_named_keeps}},
+  "drift_skip": {{relevance_drift_skip}},
+  "tasks": {{relevance_tasks}},
   "live_statuses": {
 {{relevance_live_statuses}}
   },
@@ -22,7 +31,6 @@
   "relationship_key": "relationship_types",
   "prospect_types": ["prospect"],
   "tool_sources": {{relevance_tool_sources}},
-  "meeting_subjects": ["people", "companies", "projects", "programs"],
   "file_targets": {{relevance_file_targets}},
   "days": {
 {{relevance_days}}

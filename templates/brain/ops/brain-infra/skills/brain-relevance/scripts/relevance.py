@@ -217,14 +217,14 @@ class Brain:
         m = SLUG_DATE.search(os.path.basename(path))
         if m:
             return '-'.join(m.groups())
-        for key in ('meeting_date', 'date', 'created'):
+        for key in ('meeting_date', 'email_date', 'date', 'created'):
             if isinstance(fm.get(key), str) and DATE.match(fm[key]):
                 return fm[key][:10]
         m = re.search(r'\*\*Date:\*\*\s*(20\d\d-\d\d-\d\d)', self.text[path])
         return m.group(1) if m else self.last_commit.get(path)
 
     def evidence(self, path):
-        """The latest interaction evidence for a page: its own timeline rows and the meetings that link it."""
+        """The latest interaction evidence for a page: its own timeline rows and the linking records of the evidence kinds."""
         best = (None, None)
         rows = TIMELINE_ROW.findall(self.text[path])
         if rows:
@@ -232,7 +232,7 @@ class Brain:
         archive = self.rc['archive']
         links = self.inbound.get(path, []) + (self.inbound.get(path[len(archive):], []) if path.startswith(archive) else [])
         for link in links:
-            if self.kind(link['from']) == 'meeting':
+            if self.kind(link['from']) in self.rc['evidence_kinds']:
                 date = self.page_date(link['from'])
                 if date and (best[0] is None or date > best[0]):
                     best = (date, link['from'])
@@ -240,6 +240,54 @@ class Brain:
 
     def sources(self, path):
         return [s for s in self.rc['tool_sources'] if self.fm[path].get(s)]
+
+    def archived(self, path):
+        """Archived: under archive/, or carrying status archived in place."""
+        return path.startswith(self.rc['archive']) or self.fm.get(path, {}).get('status') == 'archived'
+
+    def refs(self, src, keys):
+        """The brain pages the frontmatter keys of page src name."""
+        out = []
+        for key in keys:
+            value = self.fm[src].get(key) or []
+            for ref in value if isinstance(value, list) else [value]:
+                if ref and ref != 'null':
+                    out.append(ap.ref_target(src, ref))
+        return out
+
+    def named_by(self, spec):
+        """For spec {prefix: [keys]}: each page that the frontmatter keys of pages under the prefix name,
+        mapped to the pages naming it."""
+        names = collections.defaultdict(list)
+        for src in self.files:
+            for prefix, keys in spec.items():
+                if src.startswith(prefix) and not src.endswith('README.md'):
+                    for target in self.refs(src, keys):
+                        names[target].append(src)
+        return names
+
+    def task_state(self, path):
+        """A task's place in the task rule: closed past retention, with the pages naming it, or paused past
+        its window; None for every other task and for a brain without the rule."""
+        t, d = self.rc.get('tasks') or {}, self.rc['days']
+        if not t:
+            return None
+        fm = self.fm[path]
+        status = fm.get('status') if isinstance(fm.get('status'), str) else ''
+        if status in t['closed']:
+            done = fm.get(t['completed_key'])
+            closed = days_since(done[:10]) if isinstance(done, str) and done else days_since(self.last_commit.get(path))
+            if closed is not None and closed >= d['task_retention']:
+                if not hasattr(self, '_task_names'):
+                    self._task_names = self.named_by(t['named_by'])
+                return {'state': 'closed', 'days': closed, 'named_by': sorted(set(self._task_names.get(path, [])))}
+        elif status == t['paused']:
+            updated = fm.get('updated') if isinstance(fm.get('updated'), str) else ''
+            last = max(filter(None, [updated[:10], self.last_commit.get(path)]), default=None)
+            quiet = days_since(last)
+            if quiet is not None and quiet >= d['task_paused']:
+                return {'state': 'paused', 'days': quiet, 'named_by': []}
+        return None
 
 
 def eval_refs(brain):
@@ -290,7 +338,7 @@ def triggers(brain, path):
     d = rc['days']
     status = fm.get('status') if isinstance(fm.get('status'), str) else ''
     out = []
-    if status == 'archived':
+    if status == 'archived' and kind not in rc['archived_in_place']:
         out.append('status archived outside archive/: archive or delete')
     live_in = [i for i in brain.inbound.get(path, []) if brain.live_source(i['from'])]
     ev = brain.evidence(path)
@@ -310,7 +358,8 @@ def triggers(brain, path):
             out.append('no inbound links from live pages: check admission')
     elif kind in ('project', 'program'):
         if status in rc['terminal_statuses'].get(kind, []):
-            out.append(f'{status}: archive when nothing current depends on it')
+            if kind in rc['archivable']:
+                out.append(f'{status}: archive when nothing current depends on it')
         elif status != 'archived':
             last = max(filter(None, [ev['date'], brain.last_commit.get(path)]), default=None)
             limit = d['project_quiet' if kind == 'project' else 'program_quiet']
@@ -320,9 +369,17 @@ def triggers(brain, path):
         if fm.get('stance') == 'retired':
             out.append('retired with no news sources: archive' if not brain.sources(path)
                        else 'retired and still watched: stays in tools/')
-    elif kind == 'meeting':
-        subjects = meeting_subjects(brain, path)
-        if subjects and all(s.startswith(rc['archive']) for s in subjects):
+    elif kind == 'task':
+        t = brain.task_state(path)
+        if t and t['state'] == 'closed':
+            out.append(f'closed {t["days"]} days ago and named by {", ".join(t["named_by"][:3])}'
+                       + (f' and {len(t["named_by"]) - 3} more' if len(t['named_by']) > 3 else '') + ': archive'
+                       if t['named_by'] else f'closed {t["days"]} days ago and no page names it: delete')
+        elif t:
+            out.append(f'paused with no update for {t["days"]} days: flag for the owner')
+    elif kind in rc['follows_subjects']:
+        subjects = record_subjects(brain, path)
+        if subjects and all(s['archived'] for s in subjects):
             out.append('every linked subject is archived: archive')
     elif kind == 'knowledge':
         age = days_since(brain.last_commit.get(path))
@@ -331,21 +388,16 @@ def triggers(brain, path):
     return out
 
 
-def meeting_subjects(brain, path, archived=()):
-    """The people, companies, projects and programs a meeting links in its frontmatter, resolved to where they live."""
+def record_subjects(brain, path, archived=()):
+    """The subjects a record links in its frontmatter (pages in the record_subjects areas, live or archived),
+    each with whether it is archived; pages in `archived` count as archived."""
     subjects = []
-    fm = brain.fm[path]
-    refs = []
-    for key in ('related_pages', 'related'):
-        value = fm.get(key) or []
-        refs += value if isinstance(value, list) else [value]
-    for ref in refs:
-        target = ap.ref_target(path, ref)
+    for target in brain.refs(path, ('related_pages', 'related')):
         if target not in brain.fileset:
             continue
         area = target.split('/', 1)[0]
-        if area in brain.rc['meeting_subjects'] or target.startswith(brain.rc['archive']):
-            subjects.append(brain.rc['archive'] + target if target in archived else target)
+        if area in brain.rc['record_subjects'] or target.startswith(brain.rc['archive']):
+            subjects.append({'path': target, 'archived': brain.archived(target) or target in archived})
     return subjects
 
 
@@ -370,15 +422,31 @@ def allowed(brain, path, group):
         return ['delete', 'file', 'flag']
     if group == 'research':
         return ['keep', 'delete', 'flag']
+    if kind in rc['never_removed']:
+        return ['keep', 'update', 'flag']
+    if kind == 'task':
+        t = brain.task_state(path)
+        if not t:
+            return ['keep', 'update', 'flag']
+        if t['state'] == 'paused':
+            return ['flag']
+        return ['keep', 'archive', 'flag'] if t['named_by'] and 'task' in rc['archivable'] else ['keep', 'delete', 'flag']
     verbs = ['keep', 'update', 'delete', 'merge', 'flag']
-    if kind == 'meeting':
+    if kind in rc['follows_subjects']:
         verbs = ['keep', 'delete', 'merge', 'flag']
     if kind in rc['archivable']:
         verbs.insert(2, 'archive')
     return verbs
 
 
-def entry(brain, path, group, why, issues, evals):
+def option_verbs(brain, path, group):
+    """The verdicts a flag's options may carry: the page's own, and keep or update for a long-paused task."""
+    if group == 'slice' and brain.kind(path) == 'task' and (brain.task_state(path) or {}).get('state') == 'paused':
+        return ['keep', 'update']
+    return allowed(brain, path, group)
+
+
+def entry(brain, path, group, why, issues, evals, names):
     fm, rc = brain.fm[path], brain.rc
     inbound = brain.inbound.get(path, [])
     by_area = collections.Counter(i['from'].split('/', 1)[0] if '/' in i['from'] else i['from'] for i in inbound)
@@ -389,7 +457,11 @@ def entry(brain, path, group, why, issues, evals):
     cited = sorted({i['from'] for i in live if i['cite']})
     if cited:
         hard.append('cited: live pages cite it as a source: ' + ', '.join(cited[:5]))
-    fields = {k: fm[k] for k in ('type', 'title', 'status', rc['relationship_key'], 'stance', 'created', 'updated', 'meeting_date')
+    naming = sorted({src for src in names.get(path, []) if not brain.archived(src)})
+    if naming:
+        hard.append('named: live pages name it in a kept field: ' + ', '.join(naming[:5]))
+    fields = {k: fm[k] for k in ('type', 'title', 'status', rc['relationship_key'], 'stance', 'created', 'updated', 'completed',
+                                 'meeting_date', 'email_date')
               if fm.get(k) not in (None, [], '')}
     return {
         'path': path, 'group': group, 'kind': brain.kind(path), 'sha256': lib.sha256(brain.repo / path),
@@ -399,7 +471,7 @@ def entry(brain, path, group, why, issues, evals):
                     'live_from': sorted({i['from'] for i in live})[:10]},
         'sources': brain.sources(path) if brain.kind(path) == 'tool' else None,
         'triggers': why, 'hard_keeps': hard, 'tickets': ticket_refs(issues, path),
-        'allowed': allowed(brain, path, group),
+        'allowed': allowed(brain, path, group), 'option_verbs': option_verbs(brain, path, group),
     }
 
 
@@ -414,6 +486,7 @@ def build_packet(cfg, rc, meta, slice_name, brain=None, issues=None):
     issues = open_issues(cfg) if issues is None else issues
     waiting = pending_pages(issues)
     evals = eval_refs(brain)
+    names = brain.named_by(rc['named_keeps'])
     d = rc['days']
     pages, skipped = {}, []
 
@@ -421,7 +494,7 @@ def build_packet(cfg, rc, meta, slice_name, brain=None, issues=None):
         if path in waiting:
             skipped.append(path)
         elif path not in pages:
-            pages[path] = entry(brain, path, group, why, issues, evals)
+            pages[path] = entry(brain, path, group, why, issues, evals, names)
 
     slice_pages = requested or [p for p in brain.files if under(p, rc['slices'][slice_name]) and brain.reviewable(p)]
     for path in slice_pages:
@@ -445,7 +518,7 @@ def build_packet(cfg, rc, meta, slice_name, brain=None, issues=None):
             age = days_since(brain.page_date(path))
             if age is not None and age > d['research']:
                 add(path, 'research', [f'research record {age} days old: delete unless a live page cites it for a decision in force'])
-        elif path.startswith(rc['archive']) and kind in ('person', 'company', 'project', 'program'):
+        elif path.startswith(rc['archive']) and kind in rc['restorable']:
             since = brain.last_commit.get(path)
             ev = brain.evidence(path)
             if ev['date'] and since and ev['date'] > since and ev['from'] != 'timeline row':
@@ -460,7 +533,7 @@ def build_packet(cfg, rc, meta, slice_name, brain=None, issues=None):
         for older in group[:-1]:
             add(older, 'research', [f'superseded by {group[-1]}'])
     # a bounded sample of unchanged pages for time-sensitive drift
-    rest = [] if requested else [p for p in slice_pages if p not in pages and brain.kind(p) not in ('inbox', 'research', 'meeting')]
+    rest = [] if requested else [p for p in slice_pages if p not in pages and brain.kind(p) not in rc['drift_skip']]
     scored = sorted(((drift_score(brain, p), brain.last_commit.get(p) or '', p) for p in rest), key=lambda t: (-t[0], t[1]))
     for score, _, path in [t for t in scored if t[0] > 0][:rc['drift_sample']]:
         add(path, 'drift', [f'{score} time-sensitive statement(s) with a past date'])
@@ -499,6 +572,8 @@ def brief(packet):
             if e['tickets']:
                 lines.append('- open tickets naming it: ' + '; '.join(e['tickets']))
             lines.append('- allowed verdicts: ' + ', '.join(e['allowed']))
+            if e.get('option_verbs', e['allowed']) != e['allowed']:
+                lines.append('- a flag\'s options may carry: ' + ', '.join(e['option_verbs']))
     return '\n'.join(lines) + '\n'
 
 
@@ -517,8 +592,9 @@ def convert(packet, rc, j, brain_repo, depth=0):
     verdict = j.get('verdict')
     if verdict not in VERDICTS:
         raise Invalid(f'unknown verdict {verdict!r}')
-    if verdict not in e['allowed'] and not (depth and verdict == 'keep'):  # keep is always an option of a flag
-        raise Invalid(f'{verdict} is not allowed for {path} ({e["group"]}): allowed {", ".join(e["allowed"])}')
+    verbs = e.get('option_verbs', e['allowed']) if depth else e['allowed']
+    if verdict not in verbs and not (depth and verdict == 'keep'):  # keep is always an option of a flag
+        raise Invalid(f'{verdict} is not allowed for {path} ({e["group"]}): allowed {", ".join(verbs)}')
     if verdict != 'keep' and not j.get('reason'):
         raise Invalid('a verdict other than keep needs a reason')
     hard = ' '.join(e['hard_keeps'])
@@ -526,6 +602,8 @@ def convert(packet, rc, j, brain_repo, depth=0):
         raise Invalid('hard keep: a retrieval-eval case names this page')
     if 'cited:' in hard and verdict in ('delete', 'merge'):
         raise Invalid('hard keep: live pages cite this page as a source')
+    if 'named:' in hard and verdict in ('archive', 'delete', 'merge'):
+        raise Invalid('hard keep: live pages name this page in a kept field')
     summary = j.get('summary') or f'{verdict} {path}'
     base = {'path': path, 'sha256': e['sha256'], 'summary': summary, 'reason': j.get('reason', '')}
     if verdict == 'keep':
@@ -539,10 +617,10 @@ def convert(packet, rc, j, brain_repo, depth=0):
     if verdict == 'archive':
         if e['kind'] == 'tool' and (e['sources'] or e['fields'].get('stance') != 'retired'):
             raise Invalid('only a retired tool with no news sources moves to the archive')
-        if e['kind'] == 'meeting':
+        if e['kind'] in rc['follows_subjects']:
             subjects = j.get('_subjects') or []
-            if not subjects or not all(s.startswith(rc['archive']) for s in subjects):
-                raise Invalid('a meeting moves to the archive only when every linked subject is archived')
+            if not subjects or not all(s['archived'] for s in subjects):
+                raise Invalid(f'a {e["kind"]} moves to the archive only when every linked subject is archived')
         return [{**base, 'op': 'MOVE', 'to': archive_path(rc, path), 'status': 'archived'}]
     if verdict == 'restore':
         live = path[len(rc['archive']):]
@@ -639,9 +717,9 @@ def cmd_apply(cfg, rc, meta, source):
         if outcomes.get(path, {}).get('status') in SETTLED:
             continue
         try:
-            if j.get('verdict') == 'archive' and packet['pages'].get(path, {}).get('kind') == 'meeting':
+            if j.get('verdict') == 'archive' and packet['pages'].get(path, {}).get('kind') in rc['follows_subjects']:
                 brain = brain or Brain(cfg, rc)
-                j = dict(j, _subjects=meeting_subjects(brain, path, archived=archiving))
+                j = dict(j, _subjects=record_subjects(brain, path, archived=archiving))
             verdicts = convert(packet, rc, j, repo)
         except Invalid as error:
             outcomes[path] = {'verdict': j.get('verdict'), 'status': 'invalid', 'reason': str(error)}

@@ -15,7 +15,8 @@ Every brain value lives in `config.json` here and in the `brain-routines` `confi
 - **The standing rules**, every run: inbox items past the window, research records past retention or superseded by a newer run, and archived pages that show new interaction evidence.
 - **A drift sample**: up to `drift_sample` slice pages with no other trigger whose compiled truth pairs a past date with time-sensitive wording.
 
-`prep` picks a slice page when a trigger of the model fires: a terminal or in-place archived status, no interaction evidence for the trigger's window, a quiet open project or program, a retired tool with no news sources, a meeting whose subjects are all archived, or a knowledge page no live page links that has not changed for `knowledge_quiet` days.
+`prep` picks a slice page when a trigger of the model fires: a terminal status, or an in-place archived status outside the `archived_in_place` kinds, no interaction evidence for the trigger's window, a quiet open project or program, a retired tool with no news sources, a record of a `follows_subjects` kind whose subjects are all archived, a closed task past `task_retention` days or a paused task quiet for `task_paused` days, or a knowledge page no live page links that has not changed for `knowledge_quiet` days.
+Interaction evidence is a page's own timeline rows and the linking records of the `evidence_kinds`.
 Ledger areas, the `unpruned` paths, `archive/` (except restore checks), READMEs and the paths in `not_reviewed` are never judged.
 A page with an open relevance needs-attention issue waits for the owner's reply instead.
 
@@ -37,8 +38,10 @@ End the turn with `NO_REPLY`: the run posts nothing, and the daily digest report
 On top of the `apply.py` guards (content hash, exact spans, cited quotes, numbers in the source, the tripwire per area per run):
 
 - a judgment must name a page in this run's packet, one per page, with a verdict the brief allows for it;
-- archive moves go to `archive/<kind>/<slug>.md` with `status: archived`, only for archivable kinds, a tool only when it is retired with no news sources, a meeting only when every linked subject is or becomes archived;
-- a page a retrieval-eval case names is never archived, deleted or merged, and a page live pages cite as a source is never deleted or merged;
+- archive moves go to `archive/<kind>/<slug>.md` with `status: archived`, only for the `archivable` kinds: a tool only when it is retired with no news sources, a record of a `follows_subjects` kind only when every linked subject is or becomes archived, a closed task only when a page under `tasks.named_by` names it;
+- a closed task past retention that no such page names can only be deleted, a long-paused task can only be flagged, with keep or update options, and an open task is never removed;
+- a page of a `never_removed` kind is only kept, updated or flagged;
+- a page a retrieval-eval case names is never archived, deleted or merged, a page live pages cite as a source is never deleted or merged, and a page a live page names in a `named_keeps` field is never archived, deleted or merged;
 - a merge stays within one area and must state why both pages are the same subject; links to the merged page are repointed to the target;
 - filing an inbox item creates a new page under `file_targets` with its type and status;
 - a flag stores each option's verdicts, and choosing an option applies them on the next run (`relevance.py option`), still under the content hash.
