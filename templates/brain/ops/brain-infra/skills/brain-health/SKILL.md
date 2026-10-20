@@ -38,6 +38,6 @@ The reconciler watches this run in turn: its `deadman` config lists the `health-
 
 ## Operating
 
-- Force a run with `openclaw cron run <job id>`; `routine.py status` shows each routine's last run, and `<state_dir>/runs/<run_id>/` holds the raw `dream-*.json`, `purge.json` and `doctor.json`.
+- Force a run with `routine.py force <id>`; `routine.py status` shows each routine's last run, and `<state_dir>/runs/<run_id>/` holds the raw `dream-*.json`, `purge.json` and `doctor.json`.
 - Needs-attention issues labelled `workflow:health`, reconciler rescues included, get their reply loop at the start of every health run.
 - Restoring dropped timeline rows: they are in the run's `timeline-dropped.json` for 14 days; the page text never held them.

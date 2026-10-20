@@ -25,6 +25,7 @@
     "core": "{{core_channel}}",
     "summary": "{{summary_channel}}"
   },
+  "window_guard": {"defer_at": {{window_defer_at}}, "deferrable": {{window_deferrable}}},
   "tripwire_share": 0.2,
   "active_lists": {{active_lists}},
   "timing": {}

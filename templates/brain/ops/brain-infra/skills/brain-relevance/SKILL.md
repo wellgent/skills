@@ -49,7 +49,8 @@ The tripwire holds every deletion and archive move of an area when they pass `tr
 
 - `relevance.py status` prints the rotation, the queue and the last slices.
 - `relevance.py queue <slice>...` puts slices ahead of the rotation; a slice can also be page paths, comma-separated, for a review on request. Queued slices do not move the rotation.
-- Force a run with `openclaw cron run <job id>` (the job is `{{name}} relevance: relevance-weekly`).
+- Force a run with `routine.py force relevance-weekly`.
+- `relevance-weekly` is deferrable: the `brain-routines` subscription guard holds it back while the shared quota window is too full. A deferred run leaves the rotation where it is, so its slice runs the following week.
 - The baseline pass is this routine over every slice: queue them all and force runs until the queue is empty.
 - Revert a change with the `git revert <sha>` from its run update, in a writer clone.
 {{local}}

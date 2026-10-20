@@ -30,7 +30,6 @@ from routinelib import Failed  # noqa: E402
 import routine as runner  # noqa: E402
 from health import cron_sets  # noqa: E402
 import judge_misses  # noqa: E402
-from review import usage_snapshot  # noqa: E402
 
 CONF = json.loads((SKILL_DIR / 'config.json').read_text())
 NARR = CONF['narrative']
@@ -212,16 +211,18 @@ def routines(cfg, start, end):
         if entries is None:
             problems.append(f'cron runs of `{rid}` unreadable')
             entries = []
-        statuses = []
+        statuses, gated = [], 0
         for d in sorted(runs_dir.glob(f'{rid}-*')):
             meta = lib.read_json(d / 'run.json')
             if meta and re.fullmatch(rf'{re.escape(rid)}-\d{{8}}T\d{{6}}Z-[0-9a-f]+', meta.get('run_id', '')) \
                     and start <= meta.get('started_at', 0) < end:
                 statuses.append(run_status(cfg, d, meta, state))
+                gated += statuses[-1] == 'deferred' and not meta.get('forced')  # a scheduled fire the guard held back
         scheduled = sum(1 for e in entries if not str(e.get('runId', '')).startswith('manual:'))
         cron_errors = sum(1 for e in entries if e.get('status') not in ('ok', None))
         grid.append({'routine': rid, 'workflow': r['workflow'], 'enabled': enabled, 'cron': bool(job), 'due': due,
-                     'scheduled_runs': scheduled, 'missed': max(0, due - scheduled), 'runs': len(statuses),
+                     'scheduled_runs': scheduled, 'missed': max(0, due - scheduled - gated),
+                     'runs': len(statuses) - statuses.count('deferred'), 'deferred': statuses.count('deferred'),
                      'ok': statuses.count('ok'), 'partial': statuses.count('partial'),
                      'failed': max(statuses.count('failed'), cron_errors), 'running': statuses.count('running'),
                      'last_status': state.get('status'), 'last_at': state.get('finished_at')})
@@ -260,11 +261,11 @@ def engine_usage(cfg, run_dir):
 
 
 def window_reading(cfg):
-    """The subscription windows now, or the last reading the review logged."""
-    snap = usage_snapshot(cfg)
+    """The subscription windows now, or the last reading an agentTurn logged."""
+    snap = lib.usage(cfg)
     if snap:
         return snap, lib.iso()
-    path = lib.state_dir(cfg) / 'review' / 'load.jsonl'
+    path = lib.state_dir(cfg) / 'load.jsonl'
     if path.exists():
         for line in reversed(path.read_text().splitlines()):
             rec = json.loads(line)
@@ -357,8 +358,8 @@ def cmd_gather(cfg, args):
         problems += grid_problems
         snap, read_at = window_reading(cfg)
         packet['routines'] = grid
-        packet['load'] = {'windows': snap, 'read_at': read_at, 'routines': load_rows, 'other_agent_crons': other,
-                          'engine_chat': engine_usage(cfg, d)}
+        packet['load'] = {'windows': snap, 'read_at': read_at, 'maintenance': lib.window_deltas(cfg, start, end), 'routines': load_rows,
+                          'other_agent_crons': other, 'engine_chat': engine_usage(cfg, d)}
     except (Failed, OSError, ValueError, KeyError) as error:
         problems.append(f'routines: {error}')
         packet['routines'] = packet['load'] = None
@@ -515,7 +516,7 @@ def render(cfg, p, n):
 
     grid = p.get('routines')
     if grid is not None:
-        rows = [f'{"routine":<17} {"due":>3} {"runs":>4} {"ok":>3} {"part":>4} {"fail":>4} {"miss":>4}  last']
+        rows = [f'{"routine":<17} {"due":>3} {"runs":>4} {"ok":>3} {"part":>4} {"fail":>4} {"def":>3} {"miss":>4}  last']
         for g in grid:
             last = f'{g["last_status"] or "-"} {local(dt.datetime.fromisoformat(g["last_at"].replace("Z", "+00:00")).timestamp(), tz, True)}' \
                 if g.get('last_at') else 'never'
@@ -523,11 +524,12 @@ def render(cfg, p, n):
                 last = 'NO CRON'
             elif not g['enabled']:
                 last = 'disabled'
-            rows.append(f'{g["routine"]:<17} {g["due"]:>3} {g["runs"]:>4} {g["ok"]:>3} {g["partial"]:>4} {g["failed"]:>4} {g["missed"]:>4}  {last}')
+            rows.append(f'{g["routine"]:<17} {g["due"]:>3} {g["runs"]:>4} {g["ok"]:>3} {g["partial"]:>4} {g["failed"]:>4} {g["deferred"]:>3} {g["missed"]:>4}  {last}')
         lines = ['## Routines', '```', *rows, '```']
         red = [g['routine'] for g in grid if g['partial'] or g['failed'] or g['missed'] or not g['cron']]
         lines.append('All routines green.' if not red else 'Not green: ' + ', '.join(f'`{r}`' for r in red) + '. Their run updates and `#ops-alerts` carry the detail.')
-        lines.append('-# due = scheduled runs in the window, runs = every run including forced ones, miss = due runs the cron never started.')
+        lines.append('-# due = scheduled runs in the window, runs = every started run including forced ones, def = runs the subscription guard deferred, '
+                     'miss = due runs the cron never started.')
         lines.append(load_line(cfg, p))
         blocks.append('\n'.join(lines))
 
@@ -590,6 +592,10 @@ def load_line(cfg, p):
     for provider, s in (ld.get('windows') or {}).items():
         for label, used in (s.get('windows') or {}).items():
             parts.append(f'{provider} {label.lower()} window {used}% used')
+            moved = (ld.get('maintenance') or {}).get(f'{provider} {label.lower()}')
+            if moved:
+                parts.append(f'maintenance turns moved it {sum(moved.values()):g} points this week ('
+                             + ', '.join(f'{rid} {pts:g}' for rid, pts in sorted(moved.items(), key=lambda kv: -kv[1])) + ')')
     rows = ld.get('routines') or {}
     total = {k: sum(r[k] for r in rows.values()) for k in ('runs', 'input', 'cached', 'output')}
     if total['runs']:
@@ -604,7 +610,7 @@ def load_line(cfg, p):
         parts.append(f'engine chat on its own subscription {engine["calls"]} calls, {tokens(engine["input"])} input and {tokens(engine["output"])} output tokens')
     issue = f'https://github.com/{cfg["github_repo"]}/issues/{CONF["budget_issue"]}'
     return ('**Subscription load:** ' + '; '.join(parts) + '.' if parts else '**Subscription load:** no usage reported.') + \
-        f' The agent\'s chat shares its window. The budget is open in [#{CONF["budget_issue"]}](<{issue}>).'
+        f' The agent\'s chat shares its window. The budget rules are in [#{CONF["budget_issue"]}](<{issue}>).'
 
 
 def pack(blocks):

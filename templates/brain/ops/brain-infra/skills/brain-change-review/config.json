@@ -6,6 +6,7 @@
     "context": {{review_context}}
   },
   "batch_size": 5,
+  "max_pages": {{review_max_pages}},
   "budget_seconds": 3600,
   "cooldown_days": 3,
   "first_run_hours": 24,

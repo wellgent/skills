@@ -4,11 +4,11 @@
 The review-daily agent turn runs, in order:
 
   routine.py begin review-daily                  the run id (brain-routines)
-  review.py prep --run <run_id>                  queue the changed pages, snapshot the load
-  review.py next --run <run_id>                  the next batch packet, or {"done": true}
+  review.py prep --run <run_id>                  queue the changed pages, oldest change first
+  review.py next --run <run_id>                  the next batch packet, or {"done": true} at the page cap
   review.py apply --run <run_id> <verdicts>      the batch's verdicts through the review guards and apply.py
   ... next and apply until done ...
-  review.py finish --run <run_id>                judge misses, load, then routine.py end
+  review.py finish --run <run_id>                judge misses, then routine.py end
 
 Owner replies to needs-attention issues run `apply-option <proposal>` and `hold --on|--off`.
 Everything zero-LLM: Git in the maintenance clone, `gbrain lint` and `gbrain query`.
@@ -152,8 +152,8 @@ class LinkIndex:
 # the queue
 
 def changed_pages(cfg, base, head, author):
-    """Pages changed in base..head by any writer but the maintenance writer: {path: [authors]}."""
-    raw = git(cfg, 'log', '--no-merges', '-M', '--name-status', '--format=%x01%an', f'{base}..{head}', timeout=120)
+    """Pages changed in base..head by any writer but the maintenance writer, oldest change first: {path: [authors]}."""
+    raw = git(cfg, 'log', '--reverse', '--no-merges', '-M', '--name-status', '--format=%x01%an', f'{base}..{head}', timeout=120)
     pages = {}
     for chunk in raw.split('\x01'):
         if not chunk.strip():
@@ -195,10 +195,10 @@ def cmd_prep(cfg, args):
     state['cursor'] = head
     save_state(cfg, state)
     rec = run_record(cfg, meta['run_id'])
-    rec.update(new=len(changed), carried=len(queue) - len(changed), base=base, head=head, load_start=usage_snapshot(cfg))
+    rec.update(new=len(changed), carried=len(queue) - len(changed), base=base, head=head)
     save_run(cfg, meta['run_id'], rec)
     print(json.dumps({'queued': len(queue), 'changed_since_last_run': len(changed), 'carried_over': len(queue) - len(changed),
-                      'batches_estimate': math.ceil(len(queue) / CONF['batch_size']), 'held': bool(state.get('held')),
+                      'batches_estimate': math.ceil(min(len(queue), CONF['max_pages']) / CONF['batch_size']), 'held': bool(state.get('held')),
                       'next': f'{CMD} next --run {meta["run_id"]}'}, indent=2))
     return 0
 
@@ -328,6 +328,11 @@ def cmd_next(cfg, args):
         print(json.dumps({'done': True, 'reason': f'time budget of {CONF["budget_seconds"]}s used; the rest rolls to the next run',
                           'left': len(queue), 'finish': f'{CMD} finish --run {run_id}'}))
         return 0
+    room = CONF['max_pages'] - sum(len(b['targets']) for b in rec['batches'])
+    if room <= 0:
+        print(json.dumps({'done': True, 'reason': f'page cap of {CONF["max_pages"]} reached; the rest carries to the next run',
+                          'left': len(queue), 'finish': f'{CMD} finish --run {run_id}'}))
+        return 0
     lib.reset_clone(cfg)
     repo = Path(cfg['maintenance_repo'])
     author = maintenance_author(cfg)
@@ -346,7 +351,7 @@ def cmd_next(cfg, args):
             continue
         entry['attempts'] = entry.get('attempts', 0) + 1
         targets.append(path)
-        if len(targets) >= CONF['batch_size']:
+        if len(targets) >= min(CONF['batch_size'], room):
             break
     save_state(cfg, state)
     if not targets:
@@ -576,72 +581,6 @@ def cmd_hold(cfg, args):
 
 # the run summary
 
-def usage_snapshot(cfg):
-    """The subscription quota windows and credit balance, as OpenClaw reports them."""
-    try:
-        out = lib.run([cfg['openclaw']['bin'], 'status', '--usage', '--json', '--agent', cfg['openclaw']['agent']], timeout=90)
-        data = json.loads(out[out.find('{'):])
-        data = data.get('usage') or data  # the full status nests the quota snapshot under usage
-    except (Failed, OSError, ValueError):
-        return None
-    snap = {}
-    for p in data.get('providers', []):
-        snap[p.get('provider', '?')] = {'windows': {w['label']: w.get('usedPercent') for w in p.get('windows', [])},
-                                        'credits': next((b.get('amount') for b in p.get('billing', []) if b.get('unit') == 'credits'), None)}
-    return snap
-
-
-def session_usage(cfg, since):
-    """Token use of this run's cron session so far, and of the previous finished run; each None when OpenClaw cannot say."""
-    o = cfg['openclaw']
-
-    def cli(*args):
-        out = lib.run([o['bin'], *args], timeout=90)
-        return json.loads(out[out.find('{'):])
-
-    try:
-        job = next((j for j in cli('cron', 'list', '--all', '--json').get('jobs', [])
-                    if j.get('declarationKey') == f'{cfg["brain"]}-routine-{RID}'), None)
-    except (Failed, OSError, ValueError):
-        return None, None
-    if not job:
-        return None, None
-    now_use = prev_use = None
-    try:
-        current = next((s for s in cli('sessions', '--json', '--agent', o['agent'], '--limit', '200').get('sessions', [])
-                        if s.get('key') == f'agent:{o["agent"]}:cron:{job["id"]}' and (s.get('sessionStartedAt') or 0) / 1000 >= since - 600), None)
-        if current:
-            now_use = {'input': current.get('inputTokens'), 'output': current.get('outputTokens')}
-    except (Failed, OSError, ValueError):
-        pass
-    try:
-        runs = cli('cron', 'runs', '--id', job['id'], '--limit', '1', '--json').get('entries', [])
-        prev = runs[0] if runs else None
-        if prev:
-            prev_use = {**(prev.get('usage') or {}), 'seconds': round((prev.get('durationMs') or 0) / 1000), 'at': prev.get('runAtIso')}
-    except (Failed, OSError, ValueError):
-        pass
-    return now_use, prev_use
-
-
-def load_note(start, end, now_use, prev_use):
-    parts = []
-    if now_use:
-        parts.append(f'this run so far {now_use["input"] or 0:,} input and {now_use["output"] or 0:,} output tokens')
-    if start and end:
-        for provider, s in start.items():
-            e = end.get(provider, {})
-            for label, before in s['windows'].items():
-                after = e.get('windows', {}).get(label)
-                parts.append(f'{provider} {label.lower()} window {before}% to {after}%')
-            if s.get('credits') is not None and e.get('credits') is not None:
-                parts.append(f'{provider} credits {s["credits"] - e["credits"]:+.1f} used' if s['credits'] != e['credits'] else f'{provider} credits unchanged')
-    if prev_use:
-        parts.append(f'previous run {prev_use.get("input_tokens", 0):,} input ({prev_use.get("cache_read_tokens", 0):,} cached) '
-                     f'and {prev_use.get("output_tokens", 0):,} output tokens in {prev_use["seconds"]}s')
-    return 'Load: ' + '; '.join(parts) + '.' if parts else 'Load: OpenClaw reported no usage for this run.'
-
-
 def miss_check(cfg, meta, report):
     wf = report['workflows'].get(meta['workflow'])
     if not wf or not wf['misses'] or wf['rate'] <= CONF['judge_miss']['threshold']:
@@ -683,20 +622,15 @@ def cmd_finish(cfg, args):
             ['The hold was set through a judge-miss needs-attention option.'],
             [{'label': 'Release the hold', 'detail': 'the next run applies verdicts again',
               'action': {'type': 'command', 'argv': ['scripts/review.py', 'hold', '--off']}}], 1)
-    now_use, prev_use = session_usage(cfg, meta['started_at'])
-    end_snap = usage_snapshot(cfg)
-    note = load_note(rec.get('load_start'), end_snap, now_use, prev_use)
-    lib.journal(cfg, run_id, 'note', text=note)
-    with (review_dir(cfg) / 'load.jsonl').open('a') as f:
-        f.write(json.dumps({'run_id': run_id, 'at': lib.iso(), 'start': rec.get('load_start'), 'end': end_snap,
-                            'session': now_use, 'previous_run': prev_use}) + '\n')
     judged = sum(len(b['targets']) for b in rec['batches'] if b.get('applied'))
     applied = sum(b.get('commits', 0) for b in rec['batches'])
     rejected = sum(b.get('rejected', 0) for b in rec['batches'])
     flagged = sum(b.get('flagged', 0) for b in rec['batches'])
     left = len(state.get('queue', {}))
+    if left and sum(len(b['targets']) for b in rec['batches']) >= CONF['max_pages']:
+        lib.journal(cfg, run_id, 'note', text=f'Page cap: the run judged its {CONF["max_pages"]} pages, and {left} page(s) carry over to the next run, oldest first.')
     summary = args.summary or (f'{judged} changed page(s) judged in {len(rec["batches"])} batch(es): {applied} edit(s) applied, '
-                               f'{rejected} refused, {flagged} flagged, {left} left for the next run')
+                               f'{rejected} refused, {flagged} flagged, {left} carried over to the next run')
     counts = {'pages judged': judged, 'lint findings': rec.get('lint', 0), 'noop': rec['ops'].get('NOOP', 0),
               'deferred by cooldown': rec['deferred']}
     status = args.status

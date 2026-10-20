@@ -43,9 +43,9 @@ In posting order:
 
 1. **Header**: the window (the 7 days before the run started) and the headline.
 2. **Needs you**: every open `needs-attention` issue, oldest first, with its workflow, age, gist and recommended option parsed from the issue body.
-3. **Routines**: a grid per manifest routine with scheduled runs due in the window, runs (forced ones included), ok, partial and failed counts, runs the cron never started, and the last status.
+3. **Routines**: a grid per manifest routine with scheduled runs due in the window, started runs (forced ones included), ok, partial and failed counts, runs the subscription guard deferred, runs the cron never started, and the last status.
    Failed counts the larger of the runs that ended `failed` and the cron's own errors, so a timed-out turn shows.
-   Then the **subscription load**: the provider windows from `openclaw status --usage` (the review's last `review/load.jsonl` reading when that fails), token use of every maintenance agentTurn in the window from `openclaw cron runs`, the other agent crons, and the engine's own chat calls from `gbrain call get_usage`. The budget question links issue `budget_issue`.
+   Then the **subscription load**: the provider windows from OpenClaw (the last `<state_dir>/load.jsonl` reading when that fails), next to the points maintenance agentTurns moved each window in the week from their before and after readings in `load.jsonl`, token use of every maintenance agentTurn in the window from `openclaw cron runs`, the other agent crons, and the engine's own chat calls from `gbrain call get_usage`. The budget rules link issue `budget_issue`.
 4. **Changes by workflow**: per workflow, the maintenance writer's commits counted by kind (archive move, restore, page deletion, span deletion, filing move, edit, other), then the narrative bullets.
 5. **Brain**: markdown pages per area now and their change over the window, the ledger areas in `config.json` `ledger` with their commits by writer and last change, and the week's commits per writer.
 6. **Search and judges**: the last `eval_runs` retrieval eval runs from `<state_dir>/eval/history.jsonl`, and the judge-miss rate per workflow from `<state_dir>/judge-misses.json`, recomputed when it is older than `judge_miss_max_age_hours`.
@@ -54,6 +54,6 @@ A data source that cannot be read becomes a "Missing data" line under the header
 
 ## Operating
 
-- Force a run with `openclaw cron run <job id>` (declaration key `{{name}}-routine-summary-weekly`).
+- Force a run with `routine.py force summary-weekly`.
 - Each run directory keeps `packet.json`, `narrative.json` and the posted `summary.md`.
 - Areas, ledger areas, window and narrative limits are in `config.json`; schedule, model and effort are in `ops/brain-infra/routines.json`.

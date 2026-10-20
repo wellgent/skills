@@ -18,7 +18,7 @@ Scope comes from the relevance model (`{{relevance_model}}`), set in `config.jso
 Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain-infra/skills`.
 
 1. **Begin.** `python3 $S/brain-routines/scripts/routine.py begin review-daily` prints the run id; it takes the maintenance lease and applies {{owner}}'s replies on open review issues.
-2. **Prep.** `python3 $S/brain-change-review/scripts/review.py prep --run <run_id>` queues every page changed since the last run by any writer except the maintenance writer, plus pages carried over from earlier runs.
+2. **Prep.** `python3 $S/brain-change-review/scripts/review.py prep --run <run_id>` queues every page changed since the last run by any writer except the maintenance writer, oldest change first, after the pages carried over from earlier runs.
 3. **Rubric.** Read `$S/brain-change-review/rubric.md` once; it governs every verdict.
 4. **Batch loop.** Repeat until `next` prints `"done": true`:
    1. `review.py next --run <run_id>` prints the batch number and the packet path.
@@ -26,7 +26,7 @@ Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain
    3. Write the verdict list to the packet's `verdicts_file` as `{"verdicts": [...]}`; the formats are below.
    4. Run the packet's `apply` command and read its output. The batch is done when that command has run, whatever it applied or refused.
       Its commit links are the receipt: the reconciler indexes every push, so the batch needs no further verification.
-5. **Finish.** `review.py finish --run <run_id>` checks judge misses, measures the load, and runs `routine.py end`, which posts the run update.
+5. **Finish.** `review.py finish --run <run_id>` checks judge misses and runs `routine.py end`, which posts the run update.
    The status is `ok` by default: refused verdicts, flags and pages left in the queue are normal outcomes the run update reports.
    Pass `--status failed --summary "<what broke>"` only when a command failed and the run could not finish its batches.
 6. End the turn with `NO_REPLY`; the run update is the only output.
@@ -63,7 +63,7 @@ There is no edit cap.
 ## Queue and overflow
 
 `<state_dir>/review/state.json` holds the cursor (the last commit prep read) and the queue.
-`next` stops handing out batches once the run has used `budget_seconds`, and everything left rolls to the next run.
+`next` hands out batches oldest first and stops at `max_pages` pages per run or once the run has used `budget_seconds`; everything left carries to the next run, and the run update says how many pages carried over.
 A page that goes `max_attempts` batches without an apply leaves the queue and makes the run partial.
 
 ## Judge misses
@@ -73,13 +73,9 @@ A **judge miss** is a maintenance edit whose span another writer reverts or rewr
 When the review's own rate over the last 28 days passes 10%, `finish` files a needs-attention issue with the missed edits: option 1 keeps the routine as it is, option 2 holds the review writes.
 While writes are held, runs judge and report but apply nothing, and an open issue offers the release (`review.py hold --off`).
 
-## Load
-
-`prep` and `finish` read the subscription quota windows and credits from `openclaw status --usage`, and `finish` reads this run's session tokens and the previous run's usage from OpenClaw.
-The run update carries them as a `Load:` note, and `<state_dir>/review/load.jsonl` keeps one line per run.
-
 ## Operating
 
-- Force a run with `openclaw cron run <job id>` (the job's declaration key is `{{name}}-routine-review-daily`).
+- Force a run with `routine.py force review-daily`.
 - Each run directory keeps `review.json`, every `batch-<n>.json` packet, the verdict files and each apply output.
-- Tune scope, batch size, budget and cooldown in `config.json`; the routine's schedule, model and effort are in `ops/brain-infra/routines.json`.
+- Tune scope, batch size, page cap, budget and cooldown in `config.json`; the routine's schedule, model and effort are in `ops/brain-infra/routines.json`.
+- `review-daily` is deferrable: the `brain-routines` subscription guard holds it back while the shared quota window is too full, and its queue waits for the next run.

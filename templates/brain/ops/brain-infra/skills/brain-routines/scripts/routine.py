@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Brain routine runner: run a routine under the maintenance lease, post its run update,
-page partial runs, and register the routine manifest as the main agent's crons."""
+page partial runs, guard agentTurns against the subscription window, and register the
+routine manifest as the main agent's crons."""
 import argparse
 import json
 import os
@@ -30,6 +31,8 @@ def begin(cfg, rid, pid=None):
     stale = lib.acquire_lease(cfg, run_id, rid, ttl, pid)
     meta = {'run_id': run_id, 'routine': rid, 'workflow': r['workflow'], 'skill': r['skill'], 'kind': r['kind'],
             'started_at': lib.now(), 'repo': cfg['maintenance_repo']}
+    if r['kind'] == 'agentTurn':
+        meta['load_start'] = lib.usage(cfg)
     lib.run_dir(cfg, run_id).mkdir(parents=True, exist_ok=True, mode=0o700)
     lib.atomic(lib.run_dir(cfg, run_id) / 'run.json', meta)
     routine_state(cfg, rid, last_run_id=run_id, started_at=lib.iso(), running=True)
@@ -48,6 +51,8 @@ def begin(cfg, rid, pid=None):
 def end(cfg, meta, status, summary='', counts=None, detail=''):
     """Post the run update, page a partial run, write the heartbeat and release the lease."""
     rid, run_id = meta['routine'], meta['run_id']
+    if 'load_start' in meta:
+        load(cfg, meta)
     entries = lib.read_journal(cfg, run_id)
     if status == 'ok' and any(e['kind'] == 'problem' for e in entries):
         status = 'partial'
@@ -77,7 +82,7 @@ def end(cfg, meta, status, summary='', counts=None, detail=''):
 
 
 def run_update(meta, status, took, summary, counts, entries, failures, detail):
-    head = f'**{meta["routine"]}** {status} in {duration(took)}' + (f': {summary}' if summary else '')
+    head = f'**{meta["routine"]}** {status}' + ('' if status == 'deferred' else f' in {duration(took)}') + (f': {summary}' if summary else '')
     changes = [e for e in entries if e['kind'] == 'change']
     attention = [e for e in entries if e['kind'] == 'attention']
     resolved = [e for e in entries if e['kind'] == 'resolved']
@@ -106,6 +111,133 @@ def run_update(meta, status, took, summary, counts, entries, failures, detail):
     if len(lines) == 1 and status == 'ok':
         lines[0] += ', no changes.'
     return '\n'.join(lines)
+
+
+# the subscription window
+
+def load(cfg, meta):
+    """Journal an agentTurn's window readings and token use, keep them in load.jsonl, and page credits drawn during the run."""
+    start, end_snap = meta['load_start'], lib.usage(cfg)
+    now_use, prev_use = session_usage(cfg, meta)
+    lib.journal(cfg, meta['run_id'], 'note', text=load_note(start, end_snap, now_use, prev_use))
+    with (lib.state_dir(cfg) / 'load.jsonl').open('a') as f:
+        f.write(json.dumps({'run_id': meta['run_id'], 'routine': meta['routine'], 'started_at': meta['started_at'], 'at': lib.iso(),
+                            'start': start, 'end': end_snap, 'session': now_use, 'previous_run': prev_use}) + '\n')
+    for provider, s in (start or {}).items():
+        before, after = s.get('credits'), (end_snap or {}).get(provider, {}).get('credits')
+        if before is not None and after is not None and after < before:
+            lib.alert(cfg, f'credits:{provider}', f'{cfg["brain"]} routine `{meta["routine"]}`: the {provider} credit balance fell by '
+                      f'{before - after:,.1f} during run `{meta["run_id"]}`, so the quota window is used up and credits are being drawn.')
+
+
+def session_usage(cfg, meta):
+    """Token use of this run's cron session so far, and of the routine's previous finished run; each None when OpenClaw cannot say."""
+    o = cfg['openclaw']
+
+    def cli(*args):
+        out = lib.run([o['bin'], *args], timeout=90)
+        return json.loads(out[out.find('{'):])
+
+    job = find_jobs(cfg).get(declaration_key(cfg, meta['routine']))
+    if not job:
+        return None, None
+    now_use = prev_use = None
+    try:
+        current = next((s for s in cli('sessions', '--json', '--agent', o['agent'], '--limit', '200').get('sessions', [])
+                        if s.get('key') == f'agent:{o["agent"]}:cron:{job["id"]}' and (s.get('sessionStartedAt') or 0) / 1000 >= meta['started_at'] - 600), None)
+        if current:
+            now_use = {'input': current.get('inputTokens'), 'output': current.get('outputTokens')}
+    except (Failed, OSError, ValueError):
+        pass
+    try:
+        runs = cli('cron', 'runs', '--id', job['id'], '--limit', '1', '--json').get('entries', [])
+        if runs:
+            prev_use = {**(runs[0].get('usage') or {}), 'seconds': round((runs[0].get('durationMs') or 0) / 1000), 'at': runs[0].get('runAtIso')}
+    except (Failed, OSError, ValueError):
+        pass
+    return now_use, prev_use
+
+
+def load_note(start, end, now_use, prev_use):
+    parts = []
+    if now_use:
+        parts.append(f'this run so far {now_use["input"] or 0:,} input and {now_use["output"] or 0:,} output tokens')
+    if start and end:
+        for provider, s in start.items():
+            e = end.get(provider, {})
+            for label, before in s['windows'].items():
+                parts.append(f'{provider} {label.lower()} window {before}% to {e.get("windows", {}).get(label)}%')
+            if s.get('credits') is not None and e.get('credits') is not None:
+                parts.append(f'{provider} credits {s["credits"] - e["credits"]:+.1f} used' if s['credits'] != e['credits'] else f'{provider} credits unchanged')
+    else:
+        parts.append('the quota windows could not be read ' + ('at the end' if start else 'at the start'))
+    if prev_use:
+        parts.append(f'previous run {prev_use.get("input_tokens", 0):,} input ({prev_use.get("cache_read_tokens", 0):,} cached) '
+                     f'and {prev_use.get("output_tokens", 0):,} output tokens in {prev_use["seconds"]}s')
+    return 'Load: ' + '; '.join(parts) + '.'
+
+
+def gate(cfg, rid, forced=False):
+    """The subscription guard before an agentTurn starts: True to start it, False when it defers or would run on credits."""
+    r = lib.routine(cfg, rid)
+    if r['kind'] != 'agentTurn':
+        return True
+    guard = cfg['window_guard']
+    provider = r['model'].split('/')[0]
+    snap = (lib.usage(cfg) or {}).get(provider)
+    windows = {k: v for k, v in (snap or {}).get('windows', {}).items() if v is not None}
+    if not windows:
+        return True  # unreadable: the run goes ahead, and its Load note says the windows could not be read
+    label, used = max(windows.items(), key=lambda kv: kv[1])
+    window = f'the {provider} {label.lower()} window'
+    escalate_after = guard['deferrable'].get(rid)
+    if used >= 100:
+        reason = f'{window} is used up, so the turn would run on credits'
+    elif escalate_after and used >= guard['defer_at']:
+        reason = f'{window} is {used}% used, at or above the {guard["defer_at"]}% threshold'
+    else:
+        routine_state(cfg, rid, deferred_runs=[])
+        return True
+    run_id = f'{rid}-{lib.stamp()}-{os.urandom(2).hex()}'
+    meta = {'run_id': run_id, 'routine': rid, 'workflow': r['workflow'], 'skill': r['skill'], 'kind': r['kind'],
+            'started_at': lib.now(), 'repo': cfg['maintenance_repo'], 'forced': forced}
+    lib.run_dir(cfg, run_id).mkdir(parents=True, exist_ok=True, mode=0o700)
+    lib.atomic(lib.run_dir(cfg, run_id) / 'run.json', meta)
+    deferred = lib.read_json(lib.state_dir(cfg) / 'routines' / f'{rid}.json', {}).get('deferred_runs', [])
+    deferred.append({'run_id': run_id, 'at': lib.iso(), 'window': f'{provider} {label.lower()}', 'used': used})
+    routine_state(cfg, rid, last_run_id=run_id, started_at=lib.iso(), deferred_runs=deferred)
+    if used >= 100:
+        lib.alert(cfg, f'credits:{provider}', f'{cfg["brain"]} routine `{rid}` did not start: {reason}. '
+                  f'Maintenance turns stay off credits until the window resets.')
+    try:
+        if escalate_after and len(deferred) >= escalate_after:
+            escalate(cfg, meta, deferred, guard)
+    except Failed as error:
+        lib.journal(cfg, run_id, 'problem', text=f'Deferral escalation failed: {error}')
+    end(cfg, meta, 'deferred', f'{reason}; the agent turn did not start')
+    return False
+
+
+def escalate(cfg, meta, deferred, guard):
+    """A deferrable routine deferred too many runs in a row: one needs-attention issue with the budget options."""
+    rid, window = meta['routine'], deferred[-1]['window']
+    maintenance = lib.window_deltas(cfg, lib.now() - 7 * lib.DAY, lib.now()).get(window, {})
+    moved = sum(maintenance.values())
+    lib.file_attention(
+        cfg, meta, f'{rid}:deferred', f'{cfg["brain"]} {rid} deferred {len(deferred)} runs in a row',
+        f'`{rid}` deferred its last {len(deferred)} runs: the shared {window} window was at or above {guard["defer_at"]}% used each time.',
+        "The window is shared by the agent's chat, its crons and every maintenance turn, so the routine cannot tell which use to cut; "
+        'only the owner can trade maintenance against the rest.',
+        [f'`{d["run_id"]}` at {d["at"]}: {d["window"]} window {d["used"]}% used' for d in deferred[-6:]]
+        + [f'Maintenance turns moved the {window} window {moved:g} points over the last 7 days'
+           + (' (' + ', '.join(f'{r} {p:g}' for r, p in sorted(maintenance.items())) + ')' if maintenance else '') + '.'],
+        [{'label': 'Raise the threshold', 'detail': f'set `window_guard.defer_at` in the brain-routines `config.json` above {guard["defer_at"]}, '
+          "leaving the agent's chat less of the window"},
+         {'label': 'Lower the page cap', 'detail': 'set `max_pages` in the brain-change-review `config.json` lower, so each review takes less of the window'},
+         {'label': 'Move the routines to another model', 'detail': 'set `model` of the deferrable routines in the routine manifest to a model '
+          'on another subscription, then sync the crons'}],
+        2 if moved * 2 >= deferred[-1]['used'] else 1,
+        'maintenance used at least half of the window' if moved * 2 >= deferred[-1]['used'] else 'most of the window went to use other than maintenance')
 
 
 def routine_state(cfg, rid, **fields):
@@ -182,6 +314,13 @@ def find_jobs(cfg):
     return {j['declarationKey']: j for j in json.loads(raw).get('jobs', []) if j.get('declarationKey')}
 
 
+TRIGGER = """const res = await exec({{ command: "{python} {script} gate {rid}" }});
+const out = String(res?.aggregated ?? "").trim().split("\\n").pop();
+const verdict = JSON.parse(out);
+if (typeof verdict.fire !== "boolean") throw new Error(out);
+return {{ fire: verdict.fire }};"""
+
+
 def desired(cfg, m, r):
     o = cfg['openclaw']
     timeout = r.get('timeout_seconds', cfg['timing']['default_timeout_seconds'])
@@ -190,6 +329,7 @@ def desired(cfg, m, r):
         'schedule': {'expr': r['schedule'], 'tz': m['timezone']},
         'delivery': 'none',
         'failureAlert': {'after': 1, 'to': 'channel:' + cfg['channels']['ops-alerts'], 'accountId': o['account'], 'cooldownMs': lib.DAY * 1000},
+        'trigger': TRIGGER.format(python=cfg['python_bin'], script=SCRIPT, rid=r['id']) if r['kind'] == 'agentTurn' else None,
     }
     if r['kind'] == 'command':
         spec['payload'] = {'kind': 'command', 'argv': [cfg['python_bin'], str(SCRIPT), 'run', r['id']],
@@ -214,6 +354,7 @@ def actual(job):
         'schedule': {'expr': job.get('schedule', {}).get('expr'), 'tz': job.get('schedule', {}).get('tz')},
         'delivery': job.get('delivery', {}).get('mode'),
         'failureAlert': {k: fa.get(k) for k in ('after', 'to', 'accountId', 'cooldownMs')},
+        'trigger': (job.get('trigger') or {}).get('script'),
         'payload': payload,
     }
 
@@ -229,12 +370,24 @@ def register(cfg, rid, spec):
     if p['kind'] == 'command':
         argv += ['--command-argv', json.dumps(p['argv']), '--command-cwd', p['cwd'], '--no-output-timeout-seconds', str(p['timeoutSeconds'])]
     else:
-        argv += ['--message', p['message'], '--model', p['model'], '--thinking', p['thinking']]
-    job = json.loads(lib.run(argv, timeout=90))['job']
+        argv += ['--message', p['message'], '--model', p['model'], '--thinking', p['thinking'], '--trigger-script', '-']
+    job = json.loads(lib.run(argv, timeout=90, input=spec['trigger']))['job']
     fa = spec['failureAlert']
     lib.run([o['bin'], 'cron', 'edit', job['id'], '--failure-alert', '--failure-alert-after', str(fa['after']),
              '--failure-alert-channel', 'discord', '--failure-alert-to', fa['to'], '--failure-alert-mode', 'announce',
              '--failure-alert-account-id', fa['accountId'], '--failure-alert-cooldown', f'{fa["cooldownMs"] // 3600000}h'], timeout=90)
+
+
+def cmd_force(cfg, rid):
+    """Run a routine now through the subscription guard, as its schedule would."""
+    if not gate(cfg, rid, forced=True):
+        print(json.dumps({'deferred': rid, 'run_update': f'#brain-{lib.routine(cfg, rid)["workflow"]}'}))
+        return 0
+    job = find_jobs(cfg).get(declaration_key(cfg, rid))
+    if not job:
+        raise Failed(f'{rid} has no cron; run routine.py sync')
+    print(lib.run([cfg['openclaw']['bin'], 'cron', 'run', job['id']], timeout=90))
+    return 0
 
 
 def cmd_sync(cfg, check):
@@ -284,6 +437,10 @@ def main():
     c.add_argument('--status', choices=('ok', 'partial', 'failed'), required=True)
     c.add_argument('--summary', default='')
     c.add_argument('--counts', default='{}', help='silent-tier counts as a JSON object')
+    c = sub.add_parser('gate', help="the subscription guard (an agentTurn cron's trigger): prints {\"fire\": true|false}")
+    c.add_argument('routine')
+    c = sub.add_parser('force', help='run a routine now through the subscription guard')
+    c.add_argument('routine')
     c = sub.add_parser('sync', help='register the routine manifest as crons')
     c.add_argument('--check', action='store_true', help='report drift without changing anything')
     c = sub.add_parser('status', help='print the lease and each routine state')
@@ -301,6 +458,11 @@ def main():
             raise Failed(f'unknown run {args.run_id}')
         end(cfg, meta, args.status, args.summary, json.loads(args.counts))
         return 0
+    if args.command == 'gate':
+        print(json.dumps({'fire': gate(cfg, args.routine)}))
+        return 0
+    if args.command == 'force':
+        return cmd_force(cfg, args.routine)
     if args.command == 'sync':
         return cmd_sync(cfg, args.check)
     sd = lib.state_dir(cfg)

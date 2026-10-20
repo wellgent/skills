@@ -1,5 +1,5 @@
 """Shared library of the brain routine framework: config, manifest, locks, run journal,
-Discord posts, alerts, the maintenance clone and needs-attention issues.
+Discord posts, alerts, the subscription window, the maintenance clone and needs-attention issues.
 
 One program for every brain. Everything brain-specific lives in config.json next to this
 skill and in the brain's routine manifest; the code is cross-checked against the shared core.
@@ -290,6 +290,40 @@ def alert(cfg, fingerprint, text):
         sent.pop(key)
     save_state(cfg, state)
     return error or 'sent'
+
+
+# the subscription window
+
+WINDOW_LABELS = {'168h': 'Week', '24h': 'Day'}
+
+
+def usage(cfg):
+    """The provider quota windows (percent used) and credit balance OpenClaw reports, or None when unreadable."""
+    try:
+        out = run([cfg['openclaw']['bin'], 'gateway', 'call', 'usage.status', '--json', '--timeout', '20000'], timeout=25)
+        data = json.loads(out[out.find('{'):])
+    except (Failed, OSError, ValueError):
+        return None
+    return {p.get('provider', '?'): {'windows': {WINDOW_LABELS.get(w['label'], w['label']): w.get('usedPercent') for w in p.get('windows', [])},
+                                     'credits': next((b.get('amount') for b in p.get('billing', []) if b.get('unit') == 'credits'), None)}
+            for p in data.get('providers', [])} or None
+
+
+def window_deltas(cfg, start, end):
+    """Points each agentTurn run that started in [start, end) moved each quota window: {"<provider> <window>": {routine: points}}."""
+    path = state_dir(cfg) / 'load.jsonl'
+    out = {}
+    for line in (path.read_text().splitlines() if path.exists() else []):
+        rec = json.loads(line)
+        if not start <= rec['started_at'] < end or not rec.get('start') or not rec.get('end'):
+            continue
+        for provider, s in rec['start'].items():
+            for label, before in s['windows'].items():
+                after = rec['end'].get(provider, {}).get('windows', {}).get(label)
+                if before is not None and after is not None and after >= before:  # a lower reading means the window reset
+                    per = out.setdefault(f'{provider} {label.lower()}', {})
+                    per[rec['routine']] = per.get(rec['routine'], 0) + after - before
+    return out
 
 
 # the maintenance clone

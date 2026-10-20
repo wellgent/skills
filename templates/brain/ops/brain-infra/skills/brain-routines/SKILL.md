@@ -1,6 +1,6 @@
 ---
 name: brain-routines
-description: "The framework every brain maintenance routine runs on: the routine manifest and its crons, the runner with its lease, heartbeat, run update and alerts, the apply script and its guards, and needs-attention issues with the reply loop. Use when building, registering, running or debugging a routine."
+description: "The framework every brain maintenance routine runs on: the routine manifest and its crons, the runner with its lease, heartbeat, run update and alerts, the subscription guard, the apply script and its guards, and needs-attention issues with the reply loop. Use when building, registering, running or debugging a routine."
 ---
 
 # Brain Routines
@@ -23,7 +23,7 @@ Each routine has:
 - Optional `timeout_seconds` and `enabled`.
 
 After changing the manifest, push it, wait for the published copy, then on the host run `python3 <published>/ops/brain-infra/skills/brain-routines/scripts/routine.py sync`.
-Sync makes the crons (declaration key `<brain>-routine-<id>`) match the manifest, removes crons whose routine left it, and links each routine's skill into the agent workspace.
+Sync makes the crons (declaration key `<brain>-routine-<id>`) match the manifest, with the subscription guard as each agentTurn cron's trigger, removes crons whose routine left it, and links each routine's skill into the agent workspace.
 `sync --check` reports drift without changing anything and exits 1 on drift.
 A new skill also goes on the main agent's skill allowlist and its workspace link is committed in the runtime repo.
 
@@ -50,12 +50,26 @@ Every run, of either kind, goes through the same lifecycle:
 
 - **Command job.** The cron runs `routine.py run <id>`, which does all three. The step gets `ROUTINE_ID`, `ROUTINE_RUN_ID`, `ROUTINE_RUN_DIR`, `ROUTINE_WORKFLOW` and `BRAIN_MAINTENANCE_REPO`, and can `import routinelib`. It reports by writing `$ROUTINE_RUN_DIR/result.json`: `{"status": "ok" | "partial", "summary": "<one line>", "counts": {"<silent-tier item>": n}}`. A non-zero exit is a failed run.
 - **agentTurn.** The turn runs `routine.py begin <id>` (prints the run id and run dir), builds its packet, judges, applies with `apply.py --run <run_id>`, and finishes with `routine.py end <run_id> --status ok|partial|failed --summary "<one line>" --counts '<json>'`. The turn ends with `NO_REPLY`; the run update is the only output.
+  Begin and end read the subscription quota windows, and end adds a `Load:` note with the window before and after, the credit balance change and the session's tokens, and appends the readings to `<state_dir>/load.jsonl`.
 
 ## Run update
 
-One message per run in the workflow channel: a status line (ok, partial or failed, with the duration and summary), silent-tier counts, each applied change with its commit link, the revert command for page deletions and moves, needs-attention items filed or resolved, notes, and alert sends that failed since the last update.
+One message per run in the workflow channel: a status line (ok, partial or failed with the duration, or deferred, and the summary), silent-tier counts, each applied change with its commit link, the revert command for page deletions and moves, needs-attention items filed or resolved, notes, and alert sends that failed since the last update.
 A run with nothing to report posts one line.
 The update is built from the run journal (`$ROUTINE_RUN_DIR/journal.jsonl`), which `apply.py` and the needs-attention helpers fill; a step adds to it with `routinelib.journal(cfg, run_id, 'note' | 'problem', text=...)`. A `problem` makes the run partial.
+
+## Subscription guard
+
+The agent's quota windows are shared by its chat, its crons and every maintenance agentTurn, so a turn checks them before it starts.
+Each agentTurn cron's trigger runs `routine.py gate <id>`, which reads the windows from OpenClaw (`gateway call usage.status`) and judges the most-used window of the routine's model provider, `window_guard` in `config.json` setting the rule:
+
+- **Credits.** A window at 100% means the turn would run on credits: no agentTurn starts, and `#ops-alerts` is paged. End also pages when the credit balance fell during a run.
+- **Deferral.** A routine in `deferrable` defers while the window is at or above `defer_at` percent used.
+- **Escalation.** `deferrable` maps each deferrable routine to the deferrals in a row that open a needs-attention issue: raise the threshold, lower the review's page cap, or move the routines to another model.
+
+A routine held back starts no agent session: its run update says why, it records a `deferred` run and the heartbeat, and its next scheduled run tries again.
+The deferrals in a row are in the routine's `deferred_runs` in `routine.py status`; a run that starts clears them.
+Windows that cannot be read let the turn start, and its `Load:` note says so.
 
 ## Alerts
 
@@ -95,5 +109,5 @@ Reconciler rescue issues (`reconciler-rescue:<branch>`, workflow health) carry n
 ## Operating
 
 - `routine.py status` prints the lease, the runs queued for it and each routine's last run.
-- Force a run with `openclaw cron run <job id>`; `openclaw cron runs <job id>` shows the history.
+- Force a run with `routine.py force <id>`, which runs the subscription guard first; `openclaw cron run <job id>` starts the turn without the guard. `openclaw cron runs <job id>` shows the history.
 - Run directories live in `<state_dir>/runs/` for 14 days, with `run.json` (its final `status` and `summary` once the run ends), `journal.jsonl`, the step's `result.json` and each apply output.
