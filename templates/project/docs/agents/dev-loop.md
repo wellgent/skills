@@ -38,6 +38,7 @@ No GitHub Actions run for this project.
 
 - **Only through `scripts/land <pr>`.** It refuses a PR that is not open or does not target `main` (exit 1) and a head SHA without a passing `check` status (exit 3).
   It squash-merges with `--match-head-commit` on that SHA and reads the merge back from `origin/main`.
+  When `gh pr merge` exits non-zero, it reads the PR back and lands only a PR that GitHub shows merged on that SHA.
 - **No up-to-date requirement.** A PR merges on its own green `check` and need not be rebased on the latest `main`.
   <Whether the repository ruleset also requires the `check` status on `main`, or why the plan does not allow it.>
 - **Restack only on a real conflict.** A restack that resolves a conflict sends the resolved hunks back to the verifier, which checks only those, and the new head gets its own `scripts/check`.

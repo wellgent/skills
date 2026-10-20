@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Lands one PR: squash-merges it onto main only when its exact head SHA carries a passing `check`
 # status from scripts/check, under --match-head-commit, then reads the merge back from origin.
+# A failed `gh pr merge` still lands when the PR reads back merged on that head.
 # The PR need not be up to date with main, and landing never waits on a production deploy.
 # Exit: 0 merged, 1 refused (not open, base not main, head moved, merge failed), 3 no passing
 # `check` on the head.
@@ -21,8 +22,12 @@ check=$(gh api "repos/$repo/commits/$head/status" \
   --jq '[.statuses[] | select(.context == "check")][0].state // "none"')
 [ "$check" = success ] || { echo "land: PR $pr head $head has no passing check status ($check); run scripts/check on it" >&2; exit 3; }
 
-gh pr merge "$pr" --repo "$repo" --squash --match-head-commit "$head" \
-  || { echo "land: merging PR $pr failed (a moved head refuses)" >&2; exit 1; }
+if ! gh pr merge "$pr" --repo "$repo" --squash --match-head-commit "$head"; then
+  read -r state merged_head < <(gh pr view "$pr" --repo "$repo" --json state,headRefOid \
+    --jq '[.state, .headRefOid] | @tsv') || true
+  [ "$state" = MERGED ] && [ "$merged_head" = "$head" ] \
+    || { echo "land: merging PR $pr failed (a moved head refuses)" >&2; exit 1; }
+fi
 
 merged=""
 for _ in $(seq 1 10); do

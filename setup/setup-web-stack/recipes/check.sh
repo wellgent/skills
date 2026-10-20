@@ -60,9 +60,10 @@ case $started_backend in
   *) fail "convex dev (the functions did not push)" ;;
 esac
 
-# The journeys port: one per slot from the top of the range, below any the verify skill picks.
+# The journeys port: one per slot from the top of the range, below any the verify skill picks,
+# and free of listeners and of other checkouts' claims.
 port=$((PORT_HIGH + 1 - $(basename "$HEAVY_RUN_HELD")))
-while lsof -ti "tcp:$port" -sTCP:LISTEN >/dev/null 2>&1; do
+until scripts/dev-server.sh free "$port"; do
   port=$((port - 1))
   [ "$port" -ge "$PORT_LOW" ] || cannot "no free journeys port from $PORT_LOW to $PORT_HIGH"
 done
