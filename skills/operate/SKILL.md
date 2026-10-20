@@ -1,6 +1,6 @@
 ---
 name: operate
-description: Run a brain request on a project through pstack - read the request issue, bring the brain, the project and the host up to date and prove the project's tools (Ready), write the run prompt, start the run in herdr with landing authority, then watch the request, answer the run's plan and stops or bring them to the requester, pause the run near the weekly usage limit, and check its note. Use for /operate <issue>, which also resumes a paused run, and /operate cost <session> to price a finished run.
+description: Run a brain request on a project through pstack - read the request issue, bring the brain, the project and the host up to date and prove the project's tools (Ready), write the run prompt, start the run in herdr with landing authority, then watch the request, answer the run's plan and stops or bring them to the requester, pause the run near the weekly usage limit, check its note and review the run. Use for /operate <issue>, which also resumes a paused run, and /operate cost <session> to price a finished run.
 argument-hint: "<request issue> | cost <session id | latest <checkout>>"
 disable-model-invocation: true
 ---
@@ -143,11 +143,24 @@ The requester picks the host and time.
 ## The note
 
 The run ends with its decision log and then its `/ketchup` note on the request.
-Check the note's claims against the project, and route the run's setup changes (see The setup): the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
+Check the note's claims against the project: the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
 Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, and no worktree or scratch tree the run created is left on the host; the project's teardown removes any that remain.
-Price the run session and this session with `scripts/cost` (see Cost).
-Then catch the requester up in `/ketchup`'s voice, with what the check found and both totals, and assign them on the request; closing it is their acceptance.
+Price the run session and this session with `scripts/cost` (see Cost), then review the run (see Run review).
+Then catch the requester up in `/ketchup`'s voice: what the check found, both totals, what the review fixed, and the review's calls as numbered questions, each with a recommendation. Assign them on the request; closing it is their acceptance, and their answers to the calls are applied before it closes.
 A watch exit 3 means the run ended without a note: read its pane or transcript, tell the requester what is known, and assign them.
+
+## Run review
+
+Every run ends with a review from outside it, so each run leaves the protocol and the setup better than it found them.
+
+1. **Read the run as evidence:** the decision log, the trail review's flags, the deviations the note lists, every stop and how it was answered, the `ready:` comment, cost, and any host load or usage limit the log records.
+2. **Judge it against the protocol:** Ready, the plan stop, units outside the approved plan, stop defaults, the review rule, `needs-human`, the final-tree check, cleanup and cost. For each, it held or it did not, with the evidence.
+3. **Sort every finding:**
+   - **Fix now**, with no ask, when it repairs setup code or makes it match a rule already decided: route the run's setup changes as The setup says, port them to wellgent/skills, and re-pin with `sync-brain`.
+   - **A call for the requester** when it adds or changes a rule, a budget, a model choice or a tool: the run lines, stop rules, slots, models, a candidate tool. Apply it once answered.
+   - **Project work** for a later run: a `scope:` addition if the requester wants it now, otherwise a line for the next request.
+   - **No change**, with the reason.
+4. **Post one `Run review` comment** on the request: what held, what did not, what was fixed with its commits, the calls, and the run's numbers (cost per PR, PRs landed, stops and how many reached the requester, deviations, wall time) beside those of the last closed `run` request's review.
 
 ## The setup
 
@@ -157,13 +170,13 @@ A project's run machinery is not the project's own: it comes from wellgent/skill
 - `scripts/check`, `scripts/dev-server.sh`, `scripts/worktree-setup.sh`, `scripts/worktree-teardown.sh`, `scripts/host-claims.sh`, `scripts/vercel-ignore.sh`, `scripts/preview`, their tests, the Playwright output helper and the advisory probe come from the `setup-web-stack` recipes, filled with the project's values; the stack's rules come from its catalog and `standards/web-products.md`.
 - `operate`, the setup skills and the templates are wellgent/skills itself; pstack is the port's (`michael-denyer/pstack-claude`).
 
-At the note check, diff those paths from the run's starting commit to the final main branch, and sort every change:
+In the run review, diff those paths from the run's starting commit to the final main branch, and sort every change:
 
 - **Project-local** when it states a fact of this repo (a port, a command name, a journey, a route): it stays in the project.
 - **Setup-wide** when it would hold for every project on the stack (a race in a recipe, a missing rule, a gap in a template): port it to wellgent/skills from its checkout, with the project's values turned back into the recipe's own, in a commit that names the request, before catching the requester up. Other projects take it at their next run's Ready.
 - **pstack's** when the fault is in pstack itself: an issue on the port's repository, linked in the catch-up.
 
-The catch-up names what was ported and where.
+The review names what was ported and where.
 
 ## Cost
 
