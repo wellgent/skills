@@ -16,7 +16,7 @@ Every brain value lives in `config.json` here and in the `brain-routines` `confi
 - **A drift sample**: up to `drift_sample` slice pages with no other trigger whose compiled truth pairs a past date with time-sensitive wording.
 
 `prep` picks a slice page when a trigger of the model fires: a terminal or in-place archived status, no interaction evidence for the trigger's window, a quiet open project or program, a retired tool with no news sources, a meeting whose subjects are all archived, or a knowledge page no live page links that has not changed for `knowledge_quiet` days.
-Ledger areas, `tasks/`, `archive/` (except restore checks), READMEs and the paths in `not_reviewed` are never judged.
+Ledger areas, the `unpruned` paths, `archive/` (except restore checks), READMEs and the paths in `not_reviewed` are never judged.
 A page with an open relevance needs-attention issue waits for the owner's reply instead.
 
 ## The routine `relevance-weekly`

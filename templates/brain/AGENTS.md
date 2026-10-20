@@ -13,7 +13,7 @@
 11. Write {{owner}}'s corrections about people, companies, projects, programs, decisions, or durable facts immediately when safe.
 12. Update existing pages before creating new ones.
 13. Put subject knowledge in the matching directory. Keep root files focused on navigation and conventions.
-14. Append `log.md` for brain-level operational events: schema, resolver and template changes, brain-wide source imports, batch migrations, recurring routine wiring, maintenance and repair passes, and repo-scale workflow changes. Routine signal captures, ordinary subject facts, task movement, and ledger imports belong on subject timelines, task pages, and the ledgers themselves.
+14. Append `log.md` for brain-level operational events: schema, resolver and template changes, brain-wide source imports, batch migrations, recurring routine wiring, maintenance and repair passes, and repo-scale workflow changes. Routine signal captures, ordinary subject facts, work movement, and ledger imports belong on subject timelines, the issue tracker, and the ledgers themselves.
 {{local}}
 
 ## Skill homing

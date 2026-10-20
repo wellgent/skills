@@ -1,6 +1,6 @@
 # Issue tracker: GitHub ({{tracker}})
 
-Planning issues for this brain live as GitHub issues on `{{tracker}}`. Use the `gh` CLI for all operations. The tracker is the working surface for `wayfinder` maps and for run requests to `/operate`; it holds in-flight planning state, not compiled truth. Brain pages remain canonical for decisions, project state and executable operational tasks (see "Handoff rules" below).
+Planning issues for this brain live as GitHub issues on `{{tracker}}`. Use the `gh` CLI for all operations. The tracker is the working surface for `wayfinder` maps and for run requests to `/operate`; it holds in-flight planning state, not compiled truth. Brain pages remain canonical for decisions and project state (see "Handoff rules" below).
 
 ## Conventions
 
