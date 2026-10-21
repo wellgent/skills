@@ -43,17 +43,25 @@ Example: a brain may treat `founder` as an alias of `person` when founder-specif
 
 Fork or extend a local pack instead of editing upstream base/recommended packs.
 
+## Where the pack lives
+
+The pack is `ops/schema-packs/<pack>/pack.json` in the brain repo. A change to it lands in one commit with the matching `schema.md`, `RESOLVER.md`, type notes and templates.
+The host engine loads the pack through a link into the published copy, so a pushed change is live once the reconciler fast-forwards.
+The daily doctor checks that link and opens a needs-attention issue for each page type the pack does not declare.
+
 ## Validation
 
-Before and after schema-pack changes:
+Validate before pushing. GBrain loads packs by name from its home directory and a thin client holds none of the brain's packs, so point a scratch home at the checkout:
 
 ```bash
-gbrain schema validate <pack-name>
-gbrain schema lint <pack-name>
-gbrain schema active --repo <brain-repo>
+mkdir -p /tmp/pack-check/.gbrain/schema-packs
+ln -sfn "$PWD/ops/schema-packs/<pack>" /tmp/pack-check/.gbrain/schema-packs/<pack>
+GBRAIN_HOME=/tmp/pack-check gbrain schema validate <pack>
+GBRAIN_HOME=/tmp/pack-check gbrain schema lint <pack>
+GBRAIN_HOME=/tmp/pack-check GBRAIN_SCHEMA_PACK=<pack> gbrain lint <changed dirs>
 ```
 
-When the installed version supports DB-aware lint/review commands, use them for live-brain checks before committing bulk changes.
+Removing or renaming a type retypes its pages in the same change.
 
 ## Approval boundary
 

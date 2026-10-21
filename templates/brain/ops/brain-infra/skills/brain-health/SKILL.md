@@ -1,6 +1,6 @@
 ---
 name: brain-health
-description: "The brain health workflow: the nightly derived-maintenance cycle, the daily purge, and the daily doctor with timeline repair, writer roster, entity lint, the brain's own checks, the routine deadman and the reconciler rollup, and the weekly retrieval eval. Use when reading a health run record or alert, debugging a health routine, or changing what the health workflow checks or repairs."
+description: "The brain health workflow: the nightly derived-maintenance cycle, the daily purge, and the daily doctor with timeline repair, schema pack, writer roster, entity lint, the brain's own checks, the routine deadman and the reconciler rollup, and the weekly retrieval eval. Use when reading a health run record or alert, debugging a health routine, or changing what the health workflow checks or repairs."
 ---
 
 # Brain Health
@@ -26,12 +26,13 @@ The three command jobs hold the reconciler's `sync.lock` for the whole run (mani
    - a dropped row is remembered for `timeline_memory_days`; one that comes back is kept and pages, since a writer regenerates it.
    The dropped rows are saved in the run directory as `timeline-dropped.json`.
 2. **Doctor.** `gbrain doctor --json --budget-ms 0` with the brain's skills directory and nightly-cadence freshness hours. The skills directory makes `resolver_health` and `skill_conformance` check the skill manifest and resolver. It pages on any `fail`, any non-ok check in `doctor.page` (`git_held_files`) and any check whose health is unknown at the entry budget. Checks in `doctor.ignore` (`harness_wiring`, `skill_currency`) are skipped by name. Other warnings are listed in one note of the run record.
-   A warning speaks only when it is new: the first run that sees it files one needs-attention issue (accept it, or look into it by hand), and the issue closes when the warning clears. The known warnings are in `<state_dir>/health/doctor-warnings.json`; the first run on a fresh state records the warnings it finds without filing.
-3. **Writer roster.** `brain-transport/scripts/writer-roster-check` from the published copy; each finding pages.
-4. **Entity lint.** The brain's `entity_lint` script, run with `bun` in the published copy. Pages that break the archive status rule (`status: archived` only inside `archive/`) are a counted note, left to the relevance workflow's archive moves. Every other lint error pages.
-5. **Brain checks.** Each of the brain's own checks in `checks` (a `name` and an `argv` whose script path is relative to the published copy) runs from the published copy; a non-zero exit pages every line it prints.
-6. **Deadman.** For every enabled manifest routine, the heartbeat `<state_dir>/heartbeats/<id>` must be newer than its last scheduled run that should have finished (schedule plus timeout, lease wait and `deadman_grace_seconds`). A missing or older heartbeat pages, and so does a manifest routine with no cron. A routine is not due before its cron was registered.
-7. **Reconciler.** Its `heartbeat_at` must be under `reconciler_stale_seconds` old, else it pages. `reconciler.py rollup --hours 24` becomes the daily reconciler note: publishes, imports, embeds, blocked ticks, alerts, rescues and restarts. Failed reconciler alert sends page.
+   A warning speaks only when it is new: the first run that sees it files one needs-attention issue (accept it, or look into it by hand), and the issue closes when the warning clears. `schema_pack_consistency` counts as one warning per undeclared page type, so each new type gets its own issue. The known warnings are in `<state_dir>/health/doctor-warnings.json`; the first run on a fresh state records the warnings it finds without filing.
+3. **Schema pack.** The pack `gbrain schema active` names must be `ops/schema-packs/<pack>/` in the published copy, loaded through the link `~/.gbrain/schema-packs/<pack>`, so a pushed pack change reaches the engine on fast-forward. A pack the brain does not carry, or an install that is not that link, pages.
+4. **Writer roster.** `brain-transport/scripts/writer-roster-check` from the published copy; each finding pages.
+5. **Entity lint.** The brain's `entity_lint` script, run with `bun` in the published copy. Pages that break the archive status rule (`status: archived` only inside `archive/`) are a counted note, left to the relevance workflow's archive moves. Every other lint error pages.
+6. **Brain checks.** Each of the brain's own checks in `checks` (a `name` and an `argv` whose script path is relative to the published copy) runs from the published copy; a non-zero exit pages every line it prints.
+7. **Deadman.** For every enabled manifest routine, the heartbeat `<state_dir>/heartbeats/<id>` must be newer than its last scheduled run that should have finished (schedule plus timeout, lease wait and `deadman_grace_seconds`). A missing or older heartbeat pages, and so does a manifest routine with no cron. A routine is not due before its cron was registered.
+8. **Reconciler.** Its `heartbeat_at` must be under `reconciler_stale_seconds` old, else it pages. `reconciler.py rollup --hours 24` becomes the daily reconciler note: publishes, imports, embeds, blocked ticks, alerts, rescues and restarts. Failed reconciler alert sends page.
 
 A finding pages through the framework: the run ends partial and `#ops-alerts` gets one alert a day listing the findings.
 A check that crashes becomes a finding and the others still run.

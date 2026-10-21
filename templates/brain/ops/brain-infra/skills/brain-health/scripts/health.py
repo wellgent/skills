@@ -3,7 +3,7 @@
 
   health.py nightly   the derived-maintenance dream phases
   health.py purge     hard-delete pages soft-deleted more than 72 h ago
-  health.py doctor    timeline repair, the full doctor, writer roster, entity lint, brain checks, deadman, reconciler rollup
+  health.py doctor    timeline repair, the full doctor, schema pack, writer roster, entity lint, brain checks, deadman, reconciler rollup
 
 A step reports through $ROUTINE_RUN_DIR/result.json. A finding it cannot settle is a journal
 problem: the run ends partial and the runner pages #ops-alerts. A step that cannot run exits 1.
@@ -160,16 +160,28 @@ def run_doctor(s):
     return f'doctor {len(warns)} warn' + (f', {len(paged)} paged' if paged else '')
 
 
+def warning_keys(c):
+    """One key per doctor warning, except one per undeclared page type, so a second new type is not hidden behind the first."""
+    if c['name'] != 'schema_pack_consistency':
+        return {c['name']: (c.get('message') or 'no message').strip()[:400]}
+    keys = {}
+    for src in (c.get('details') or {}).get('per_source', []):
+        for t in src.get('undeclared_types', []):
+            keys[f'{c["name"]}:{t["type"]}'] = (f'Source `{src["source_id"]}`: {t["count"]} page(s) use type `{t["type"]}`, which pack `{src["pack"]}` '
+                                                f'neither declares nor aliases. Declare it in `ops/schema-packs/{src["pack"]}/pack.json` or retype the pages.')
+    return keys or {c['name']: (c.get('message') or 'no message').strip()[:400]}
+
+
 def new_warnings(s, warns):
     """A doctor warning speaks once, when it is new: one needs-attention issue, closed again when it clears.
 
     The known warnings live in <state_dir>/health/doctor-warnings.json; the first run records what it finds without filing."""
     path = lib.state_dir(s.cfg) / 'health' / 'doctor-warnings.json'
     known = lib.read_json(path)
-    current = {c['name']: c for c in warns}
+    current = {k: m for c in warns for k, m in warning_keys(c).items()}
     if known is not None:
         for name in sorted(set(current) - set(known)):
-            message = (current[name].get('message') or 'no message').strip()[:400]
+            message = current[name]
             s.counts['new doctor warnings'] = s.counts.get('new doctor warnings', 0) + 1
             lib.file_attention(
                 s.cfg, s.meta, f'health-doctor:warn:{name}', f'{s.cfg["brain"]} health: the engine doctor has a new warning, {name}',
@@ -190,6 +202,26 @@ def new_warnings(s, warns):
                     lib.gh(s.cfg, 'issue', 'close', str(issue['number']), '--repo', s.cfg['github_repo'], '--reason', 'completed')
                     lib.journal(s.cfg, s.meta['run_id'], 'note', text=f'Closed <{issue["url"]}>: the warning cleared.')
     lib.atomic(path, {name: (known or {}).get(name, lib.iso()) for name in current})
+
+
+def schema_pack(s):
+    """The engine loads the brain's pack from the published copy, so a pushed pack change reaches it on fast-forward."""
+    code, report, err = s.gbrain_json(['schema', 'active', '--json'], timeout=120)
+    pack = (report or {}).get('pack')
+    if not pack:
+        s.problem('schema pack unresolved', f'`gbrain schema active` named no pack (exit {code}): {(err or "").strip()[-200:]}')
+        return 'schema pack unresolved'
+    installed = Path(os.environ.get('GBRAIN_HOME') or Path.home()) / '.gbrain' / 'schema-packs' / pack
+    tracked = s.published / 'ops' / 'schema-packs' / pack
+    if not tracked.is_dir():
+        s.problem(f'schema pack `{pack}` is not in the brain', f'The engine runs schema pack `{pack}`, which the brain does not carry at '
+                  f'`ops/schema-packs/{pack}/`, so its page types are not the ones the brain writes.')
+    elif installed.resolve() != tracked.resolve():
+        s.problem(f'schema pack `{pack}` is not the published copy', f'The engine loads schema pack `{pack}` from `{installed}`, which is not a link to '
+                  f'`{tracked}`, so pack changes pushed to the brain do not reach it. Move the directory aside and run `ln -s {tracked} {installed}`.')
+    else:
+        return f'schema pack {pack} {report.get("version", "")}'.strip()
+    return f'schema pack {pack} off'
 
 
 def roster(s):
@@ -334,7 +366,7 @@ def reconciler(s):
 
 def doctor(s):
     parts = []
-    for check in (timeline_repair, run_doctor, roster, entity_lint, brain_checks, deadman, reconciler):
+    for check in (timeline_repair, run_doctor, schema_pack, roster, entity_lint, brain_checks, deadman, reconciler):
         try:
             parts.append(check(s))
         except Failed as error:

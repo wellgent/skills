@@ -2,8 +2,8 @@
 name: brain-taxonomist
 version: 0.1.0-managed-gbrain
 description: |
-  Schema-pack-aware filing gate for new brain pages. Reads the active
-  GBrain schema pack instead of hardcoding directory tables, then recommends
+  Schema-pack-aware filing gate for new brain pages. Reads the brain's
+  schema pack from the checkout instead of hardcoding directory tables, then recommends
   the correct source path and page type before writes happen.
 triggers:
   - where does this brain page go
@@ -60,13 +60,7 @@ Do not use it for:
 1. Identify the primary subject: what future {{owner}} search would expect to find.
 2. Search for an existing page first.
 3. Read root `RESOLVER.md`, `schema.md`, and `skills/_brain-filing-rules.md`.
-4. Inspect the active schema pack:
-
-```bash
-gbrain schema show --json
-```
-
-If the runtime supports per-repo/source flags, pass the active repo/source explicitly.
+4. Read the brain's schema pack, `ops/schema-packs/<pack>/pack.json` in the checkout, with `<pack>` as `schema.md` names it. The host engine loads this file. `gbrain schema` on a thin client falls back to `gbrain-base`, so never file against it.
 
 5. Match the primary subject to an active `page_types[]` entry and its canonical `path_prefixes[]`.
 6. If multiple types fit, prefer the most specific active type whose prefix and semantics match the content.
