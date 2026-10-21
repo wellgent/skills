@@ -109,7 +109,7 @@ MSG
 
 - Run `git status` to confirm only intended files changed.
 - Run `find . -type f -not -path './.git/*' | sort` to spot-check the structure.
-- Run GBrain lint on syncable pages only; whole-repo lint flags repo-control and `ops/` support files that sync intentionally excludes.
+- Leave page lint to the host. A thin client lints against the default `gbrain-base` pack and flags every brain-specific type; the daily alignment lints and repairs each changed page against the brain's pack, and the doctor reports undeclared types.
 - After any rename or move, grep for stale references, for example `grep -r "old/path" .`.
 - Check formatting conventions before staging.
 {{local}}
