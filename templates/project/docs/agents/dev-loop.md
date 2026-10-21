@@ -70,6 +70,7 @@ No GitHub Actions run for this project.
   Agents nest at most two levels deep (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `.claude/settings.json`).
 - **Fix rounds** on a verifier's defect list, restacks and one-site mechanical moves run one effort step below the role sheet.
 - **A stop runs leaves first:** `ListAgents`, stop every descendant, then the parent, then `ListAgents` again until it is empty.
+- **Environments.** No session prints or writes a deployment's whole environment (`convex env list`, `vercel env pull`), since a printed one lands in its transcript on disk: it reads the one value it needs into a variable, or uses the host's own login.
 - **Deletes.** A delete through a variable is written `rm -f "${VAR:?}"/...`, or with a literal path, so Claude Code's possibly-empty-variable prompt never holds an unattended session.
 
 ## Advisories
