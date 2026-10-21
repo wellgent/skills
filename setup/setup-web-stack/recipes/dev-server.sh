@@ -300,6 +300,14 @@ case "$CMD" in
     for file in "$prefix"*; do
       [[ ${file#"$prefix"} =~ ^[0-9]+\.(pid|log|log\.mark)$ ]] && rm -f -- "$file"
     done
+    # So do its Playwright output directories, /tmp/<project>-<suite>-<checkout> from
+    # e2e/support/output-dir.ts. A suite name holds no hyphen, so another checkout's stay.
+    name=$(basename "$REPO_ROOT")
+    for dir in "/tmp/${PROJECT}-"*"-$name"; do
+      suite=${dir#"/tmp/${PROJECT}-"}
+      suite=${suite%"-$name"}
+      [[ -d $dir && $suite =~ ^[a-z0-9]+$ ]] && rm -rf -- "$dir"
+    done
     echo "torn down: no server or convex dev of this checkout runs"
     ;;
   free)

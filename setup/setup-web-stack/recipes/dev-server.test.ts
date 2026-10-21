@@ -521,7 +521,7 @@ sleep 1
     expect(devServerIn(worktree, ["free", freePort]).status).toBe(0);
   }, 30_000);
 
-  test("teardown removes the checkout's pid and log files and keeps another checkout's", () => {
+  test("teardown removes the checkout's pid and log files and Playwright output, and keeps another checkout's", () => {
     const worktree = newWorktreeCheckout();
     const own = `/tmp/<project name>-dev-${basename(worktree)}-${freePort}`;
     const other = `/tmp/<project name>-dev-${basename(worktree)}-u1-${freePort}`;
@@ -529,14 +529,24 @@ sleep 1
     for (const file of files) {
       writeFileSync(file, "999999\n");
     }
+    const ownOutput = `/tmp/<project name>-journeys-${basename(worktree)}`;
+    const otherOutput = `/tmp/<project name>-journeys-u1-${basename(worktree)}`;
+    const dirs = [ownOutput, otherOutput];
+    for (const dir of dirs) {
+      mkdirSync(dir, { recursive: true });
+    }
     try {
       const teardown = devServerIn(worktree, ["teardown"]);
 
       expect(teardown.status, teardown.stderr).toBe(0);
       expect(files.map((file) => existsSync(file))).toEqual([false, false, false, true]);
+      expect(dirs.map((dir) => existsSync(dir))).toEqual([false, true]);
     } finally {
       for (const file of files) {
         rmSync(file, { force: true });
+      }
+      for (const dir of dirs) {
+        rmSync(dir, { force: true, recursive: true });
       }
     }
   }, 30_000);
