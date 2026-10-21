@@ -16,7 +16,7 @@ labels: run
 
 ## Proof
 
-<What the run shows to prove the done check: a test run, a live URL, a preview to open.>
+<What the run shows to prove the done check: a test run, a command's output, a live URL, a preview to open. Never screenshots or recordings: the requester opens the preview or the live URL.>
 
 ## Known
 

@@ -103,6 +103,7 @@ Sort every question:
 - **Answer it** when the request, the brain (the map the request came from, decisions on subject pages) or the project's own records settle it, or when it is reversible and the run's default is sound.
 - **Escalate it** when it is a product or preference call only the requester can make, the review of a change to layout, look and feel or functionality on its preview, an irreversible action the constraints do not authorize, or work outside what the request asks for. A bug fix, or a fix that makes the UI match the project's design records, is not escalated: it lands on its verifier's pass.
 
+A review on a preview goes to the requester as the preview URL and what changed, never as screenshots.
 To escalate, catch the requester up in this session in `/ketchup`'s voice: how many calls wait on them, then each call with your recommendation and why, and what the run does without an answer.
 Assign the requester on the request, so the call shows in their open `run` issues, and wait for their answer.
 
@@ -144,7 +145,7 @@ The requester picks the host and time.
 
 The run ends with its decision log and then its `/ketchup` note on the request.
 Check the note's claims against the project: the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
-Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, and no worktree or scratch tree the run created is left on the host; the project's teardown removes any that remain.
+Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, and no worktree, scratch tree, evidence directory or log the run created is left on the host; the project's teardown removes any worktree that remains, and the operator deletes the rest. Nothing the run uploaded for evidence (a gist, an attachment) is left either.
 Price the run session and this session with `scripts/cost` (see Cost), then review the run (see Run review).
 Then catch the requester up in `/ketchup`'s voice: what the check found, both totals, what the review fixed, and the review's calls as numbered questions, each with a recommendation. Assign them on the request; closing it is their acceptance, and their answers to the calls are applied before it closes.
 A watch exit 3 means the run ended without a note: read its pane or transcript, tell the requester what is known, and assign them.
