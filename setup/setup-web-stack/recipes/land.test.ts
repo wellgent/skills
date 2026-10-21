@@ -2,6 +2,7 @@
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -79,7 +80,10 @@ afterEach(() => {
   rmSync(scratch, { force: true, recursive: true });
 });
 
-const landAfterFailedMerge = (afterMerge: object) => {
+const landAfterFailedMerge = (
+  afterMerge: object,
+  env: Record<string, string> = {},
+) => {
   const run = spawnSync("bash", [land, "1496"], {
     cwd: checkout,
     encoding: "utf8",
@@ -87,6 +91,7 @@ const landAfterFailedMerge = (afterMerge: object) => {
       ...process.env,
       AFTER_MERGE: JSON.stringify(afterMerge),
       PATH: `${hostBin}:${process.env.PATH}`,
+      ...env,
     },
   });
   return { status: run.status, stderr: run.stderr, stdout: run.stdout };
@@ -134,5 +139,67 @@ describe("scripts/land when gh pr merge fails", () => {
       "land: merging PR 1496 failed (a moved head refuses)",
     );
     expect(run.stdout).not.toContain("merged as");
+  });
+});
+
+// scripts/production-live answers from a list of commits, one per call, and
+// repeats the last one once the list runs out.
+const productionServes = (...commits: Array<string>) => {
+  const calls = join(scratch, "production-calls");
+  writeFileSync(calls, "0");
+  mkdirSync(join(checkout, "scripts"), { recursive: true });
+  const script = join(checkout, "scripts", "production-live");
+  writeFileSync(
+    script,
+    `#!/usr/bin/env bash
+commits=(${commits.join(" ")})
+n=$(cat ${JSON.stringify(calls)})
+echo $((n + 1)) > ${JSON.stringify(calls)}
+[ "$n" -lt \${#commits[@]} ] || n=$((\${#commits[@]} - 1))
+echo "\${commits[$n]}"
+`,
+  );
+  chmodSync(script, 0o755);
+};
+
+const merged = { baseRefName: "main", headRefOid: HEAD, state: "MERGED" };
+
+describe("scripts/land on a project with scripts/production-live", () => {
+  test("production on main's tip lets the merge go ahead", () => {
+    productionServes(mergeCommit);
+    const run = landAfterFailedMerge({
+      ...merged,
+      mergeCommit: { oid: mergeCommit },
+    });
+
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stdout).not.toContain("waiting for production");
+  });
+
+  test("the merge waits until production reaches main's tip", () => {
+    productionServes(OTHER_HEAD, mergeCommit);
+    const run = landAfterFailedMerge(
+      { ...merged, mergeCommit: { oid: mergeCommit } },
+      { LAND_DEPLOY_POLL_S: "1", LAND_DEPLOY_WAIT_S: "30" },
+    );
+
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stdout).toContain(
+      `land: waiting for production to run main's tip ${mergeCommit}`,
+    );
+  });
+
+  test("production behind main past the wait is a stop, and nothing merges", () => {
+    productionServes(OTHER_HEAD);
+    const run = landAfterFailedMerge(
+      { ...merged, mergeCommit: { oid: mergeCommit } },
+      { LAND_DEPLOY_WAIT_S: "0" },
+    );
+
+    expect(run.status).toBe(4);
+    expect(run.stderr).toContain(
+      `land: production runs ${OTHER_HEAD}, not main's tip ${mergeCommit}`,
+    );
+    expect(existsSync(join(scratch, "merge-ran"))).toBe(false);
   });
 });

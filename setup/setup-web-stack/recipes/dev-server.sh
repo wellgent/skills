@@ -294,6 +294,12 @@ case "$CMD" in
       "$0" stop "$port"
     fi
     convex_stop
+    # The checkout's per-run files go with it. Only port-numbered names match, so a checkout whose
+    # name another's starts with keeps that other's files.
+    prefix="/tmp/${PROJECT:?}-dev-$(basename "$REPO_ROOT")-"
+    for file in "$prefix"*; do
+      [[ ${file#"$prefix"} =~ ^[0-9]+\.(pid|log|log\.mark)$ ]] && rm -f -- "$file"
+    done
     echo "torn down: no server or convex dev of this checkout runs"
     ;;
   free)

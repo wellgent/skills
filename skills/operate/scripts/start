@@ -26,6 +26,11 @@ ws=$(herdr workspace list | jq -r --arg l "$label" '.. | objects | select(.label
 out=$(herdr tab create --workspace "$ws" --cwd "$cwd" --label "$session" --no-focus)
 pane=$(jq -r '.result.root_pane.pane_id // (.. | objects | .pane_id? // empty)' <<<"$out" | head -1)
 [ -n "$pane" ] || die "herdr created no pane in workspace $ws"
+# herdr drops a pane's name when a new Claude session shows up in it (a nested claude a run starts
+# for a test), so the watch finds the run by this pane when the name stops resolving.
+state="${XDG_STATE_HOME:-$HOME/.local/state}/operate"
+mkdir -p "$state"
+echo "$pane" >"$state/$session.pane"
 
 # herdr types the start command into the pane's shell and a terminal line holds 1024 bytes,
 # so the command carries a pointer to the prompt file, and the run reads the rest from it.

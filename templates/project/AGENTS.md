@@ -9,7 +9,7 @@
   No GitHub Actions run for this project.
 - **Verification.** A verifier reruns no suite: it drives the changed surface, reads the diff and the test changes, and takes the head's `check` status as an input.
 - **Landing.** Work lands only through `scripts/land <pr>`, which squash-merges a PR onto `main` when its exact head carries a passing `check`; `main` stays linear.
-  A run merges only under the landing authority its prompt grants, restacks only on a real conflict and never waits on a production deploy.
+  A run merges only under the landing authority its prompt grants, restacks only on a real conflict, and never deploys production by hand.
   When `scripts/check` cannot run (exit 2), landing pauses and the run posts a stop.
 - **Agents.** No agent sleeps or polls inside its own turn, every spawn passes `model`, and a stop runs leaves first; [docs/agents/dev-loop.md](docs/agents/dev-loop.md) under "Agents" has the full rules.
 - **Tests** run only through the package scripts, never the test runner directly: the scripts take one of the host's heavy-run slots through `scripts/slot`.

@@ -521,6 +521,22 @@ sleep 1
     expect(devServerIn(worktree, ["free", freePort]).status).toBe(0);
   }, 30_000);
 
+  test("teardown removes the checkout's pid and log files and keeps another checkout's", () => {
+    const worktree = newWorktreeCheckout();
+    const own = `/tmp/<project name>-dev-${basename(worktree)}-${freePort}`;
+    const other = `/tmp/<project name>-dev-${basename(worktree)}-u1-${freePort}`;
+    const files = [`${own}.pid`, `${own}.log`, `${own}.log.mark`, `${other}.log`];
+    for (const file of files) writeFileSync(file, "999999\n");
+    try {
+      const teardown = devServerIn(worktree, ["teardown"]);
+
+      expect(teardown.status, teardown.stderr).toBe(0);
+      expect(files.map((file) => existsSync(file))).toEqual([false, false, false, true]);
+    } finally {
+      for (const file of files) rmSync(file, { force: true });
+    }
+  }, 30_000);
+
   test("serve-build and start on another port refuse while a serve-build of the checkout runs, and keep its build", () => {
     givenServableCheckout(checkout);
     const served = devServer("serve-build", freePort);

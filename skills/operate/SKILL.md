@@ -168,7 +168,7 @@ Every run ends with a review from outside it, so each run leaves the protocol an
 A project's run machinery is not the project's own: it comes from wellgent/skills, and a fix to it belongs there first.
 
 - `AGENTS.md`, `docs/agents/dev-loop.md`, `scripts/land` and `scripts/slot` come from `templates/project/`, written by `setup-project`.
-- `scripts/check`, `scripts/dev-server.sh`, `scripts/worktree-setup.sh`, `scripts/worktree-teardown.sh`, `scripts/host-claims.sh`, `scripts/vercel-ignore.sh`, `scripts/preview`, their tests, the Playwright output helper and the advisory probe come from the `setup-web-stack` recipes, filled with the project's values; the stack's rules come from its catalog and `standards/web-products.md`.
+- `scripts/check`, `scripts/dev-server.sh`, `scripts/worktree-setup.sh`, `scripts/worktree-teardown.sh`, `scripts/host-claims.sh`, `scripts/vercel-ignore.sh`, `scripts/preview`, `scripts/production-live`, their tests, the Playwright output helper and the advisory probe come from the `setup-web-stack` recipes, filled with the project's values; the stack's rules come from its catalog and `standards/web-products.md`.
 - `operate`, the setup skills and the templates are wellgent/skills itself; pstack is the port's (`michael-denyer/pstack-claude`).
 
 In the run review, diff those paths from the run's starting commit to the final main branch, and sort every change:
