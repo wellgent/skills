@@ -145,7 +145,7 @@ The requester picks the host and time.
 
 The run ends with its decision log and then its `/ketchup` note on the request.
 Check the note's claims against the project: the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
-Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, and no worktree, scratch tree, evidence directory or log the run created is left on the host; the project's teardown removes any worktree that remains, and the operator deletes the rest. Nothing the run uploaded for evidence (a gist, an attachment) is left either.
+Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, `git branch` shows no local branch of a pull request the run landed, and no worktree, scratch tree, evidence directory or log the run created is left on the host; the project's teardown removes any worktree that remains, and the operator deletes the rest. Nothing the run uploaded for evidence (a gist, an attachment) is left either.
 Price the run session and this session with `scripts/cost` (see Cost), then review the run (see Run review).
 Then catch the requester up in `/ketchup`'s voice: what the check found, both totals, what the review fixed, and the review's calls as numbered questions, each with a recommendation. Assign them on the request; closing it is their acceptance, and their answers to the calls are applied before it closes.
 A watch exit 3 means the run ended without a note: read its pane or transcript, tell the requester what is known, and assign them.

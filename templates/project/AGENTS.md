@@ -14,7 +14,7 @@
 - **Agents.** No agent sleeps or polls inside its own turn, every spawn passes `model`, and a stop runs leaves first; [docs/agents/dev-loop.md](docs/agents/dev-loop.md) under "Agents" has the full rules.
 - **Tests** run only through the package scripts, never the test runner directly: the scripts take one of the host's heavy-run slots through `scripts/slot`.
 - **Deletes.** A delete through a variable is written `rm -f "${VAR:?}"/...`, or with a literal path.
-- **Cleanup.** Before a run posts its note, it tears down every worktree and scratch tree it created with `<worktree teardown command>`, so `git worktree list` shows only the main checkout.
+- **Cleanup.** Before a run posts its note, it tears down every worktree and scratch tree it created with `<worktree teardown command>`, so `git worktree list` shows only the main checkout, and deletes the local branch of each pull request it landed.
 - **Production.** Sessions work on their own dev environment per [docs/agents/dev-loop.md](docs/agents/dev-loop.md). A production read or write, a deploy, a data deletion and a message to a user are stops: each goes to the request issue, or to the person in the chat, and waits for the answer.
 
 ## Must-read
