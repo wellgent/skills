@@ -2,7 +2,8 @@
 # watch <request issue> [<after comment id>]
 # Run from the brain's checkout. Waits on the run request and the run's herdr session, and returns
 # with one reason, so the operator session that started it in the background acts on it:
-#   exit 0  new comments after the given one (default: the newest one now), printed in full
+#   exit 0  new comments after the given one (default: the newest one now), printed in full; the
+#           operator's own (opening with **Operator) are skipped
 #   exit 3  the run's session is gone with no new comment
 #   exit 4  this host's weekly usage is at or above WATCH_WEEKLY_LIMIT percent (default 90; off disables)
 #   exit 5  the run's session has done nothing for WATCH_IDLE_MINUTES (default 30) with no new comment
@@ -45,7 +46,8 @@ blind_file="${XDG_STATE_HOME:-$HOME/.local/state}/operate/usage-unreadable-since
 while :; do
   # A failed GitHub call (a 5xx, a dropped connection) is retried on the next round.
   if all=$(comments 2>/dev/null); then
-    new=$(jq --argjson after "$after" '[.[] | select(.id > $after)]' <<<"$all")
+    # The operator's own comments open with **Operator and never need its answer.
+    new=$(jq --argjson after "$after" '[.[] | select(.id > $after and (.body | startswith("**Operator") | not))]' <<<"$all")
     if [ "$(jq length <<<"$new")" -gt 0 ]; then
       jq -r '.[] | "=== comment \(.id) by \(.author) at \(.at) \(.url)\n\(.body)\n"' <<<"$new"
       exit 0

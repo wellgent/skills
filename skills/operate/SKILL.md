@@ -70,7 +70,7 @@ bash <this skill's directory>/scripts/watch <n> <ready: comment id>
 
 It returns with one reason, printed:
 
-- **Exit 0**: every comment newer than the given one (default: the newest now). Handle each: the plan, a stop, a confirmation, the hand-back or the note.
+- **Exit 0**: every comment newer than the given one (default: the newest now), skipping the operator's own. Handle each: the plan, a stop, a confirmation, the hand-back or the note.
 - **Exit 3**: the run's session is gone with no new comment (see The note).
 - **Exit 4**: this host's weekly usage is at 90% or above: pause the run (see Pause).
 - **Exit 5**: the run's session has done nothing for 30 minutes with no new comment. Read its pane (`herdr agent read <session> --source visible`) and act on what holds it: a five-hour usage limit waits for its reset, then the run is told in its pane to carry on; anything else is handled like a stop.
