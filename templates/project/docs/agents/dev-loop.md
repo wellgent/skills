@@ -92,6 +92,7 @@ Every branch is worked in its own worktree with its own dev environment, so para
 - **Set up:** `<worktree setup command>`, run once in a new linked worktree. <What it creates: dependencies, env file, own dev backend, seed data.>
 - **Tear down:** `<worktree teardown command>`, run inside the worktree once its work is pushed. <What it stops and removes.>
 - **A run cleans up after itself.** Before a run posts its note, it tears down every worktree and scratch tree it created, so `git worktree list` shows only the main checkout and no run directory remains.
+  The scratch under pstack's run store (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/orchestrate/<run>/scratch/`) goes too, since a verifier's captures there can hold a token in plain text.
 - **Main checkout:** <the backend the main checkout keeps for the human's interactive work>.
 
 ## Host tools
