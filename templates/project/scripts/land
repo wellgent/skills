@@ -4,7 +4,7 @@
 # A failed `gh pr merge` still lands when the PR reads back merged on that head.
 # The PR need not be up to date with main. On a project with scripts/production-live, the merge
 # waits until production runs main's tip, so two production deploys never overlap; after
-# LAND_DEPLOY_WAIT_S (default 1200) it gives up, which is a stop: never deploy production by hand.
+# LAND_DEPLOY_WAIT_S (default 1800) it gives up, which is a stop: never deploy production by hand.
 # Exit: 0 merged, 1 refused (not open, base not main, head moved, merge failed), 3 no passing
 # `check` on the head, 4 production not on main's tip in time.
 set -euo pipefail
@@ -25,7 +25,7 @@ check=$(gh api "repos/$repo/commits/$head/status" \
 [ "$check" = success ] || { echo "land: PR $pr head $head has no passing check status ($check); run scripts/check on it" >&2; exit 3; }
 
 if [ -x scripts/production-live ]; then
-  wait_s=${LAND_DEPLOY_WAIT_S:-1200}
+  wait_s=${LAND_DEPLOY_WAIT_S:-1800}
   poll_s=${LAND_DEPLOY_POLL_S:-15}
   [ "$poll_s" -ge 1 ] || poll_s=1
   waited=0
