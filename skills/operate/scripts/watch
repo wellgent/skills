@@ -38,7 +38,9 @@ session="op-${name:0:$((28 - ${#issue}))}-$issue"
 active_at=$(date +%s)
 last_seq=""
 usage_at=0
-usage_failed=""
+# The start of an unreadable streak lives in a host file, so a watch restarted after each comment
+# keeps counting the streak instead of starting it again.
+blind_file="${XDG_STATE_HOME:-$HOME/.local/state}/operate/usage-unreadable-since"
 
 while :; do
   # A failed GitHub call (a 5xx, a dropped connection) is retried on the next round.
@@ -67,19 +69,26 @@ while :; do
   if [ "$weekly_limit" != off ] && [ $((now - usage_at)) -ge "$usage_every" ]; then
     usage_at=$now
     if usage=$(bash "$here/usage" 2>&1); then
-      usage_failed=""
+      rm -f "$blind_file"
       weekly=$(jq -r '.seven_day.percent' <<<"$usage")
       if jq -e --argjson limit "$weekly_limit" '.seven_day.percent >= $limit' >/dev/null <<<"$usage"; then
         echo "watch: weekly usage on $(hostname -s) is at ${weekly}% (limit ${weekly_limit}%), resets at $(jq -r '.seven_day.resets_at' <<<"$usage")" >&2
         exit 4
       fi
-    elif [ -z "$usage_failed" ]; then
-      # Said once per failing streak; the read is retried on the next usage round.
-      usage_failed=$now
-      echo "watch: weekly usage unreadable, retrying: $usage" >&2
-    elif [ $((now - usage_failed)) -ge "$blind_s" ]; then
-      echo "watch: weekly usage on $(hostname -s) unreadable for $(( (now - usage_failed) / 60 )) minutes: $usage" >&2
-      exit 6
+    else
+      since=$(cat "$blind_file" 2>/dev/null || true)
+      case $since in ''|*[!0-9]*)
+        # Said once per failing streak; the read is retried on the next usage round.
+        since=$now
+        mkdir -p "${blind_file%/*}" && echo "$since" >"$blind_file"
+        echo "watch: weekly usage unreadable, retrying: $usage" >&2 ;;
+      esac
+      if [ $((now - since)) -ge "$blind_s" ]; then
+        # The operator reads the pane now, and the next exit 6 comes a full window later.
+        echo "$now" >"$blind_file"
+        echo "watch: weekly usage on $(hostname -s) unreadable for $(( (now - since) / 60 )) minutes: $usage" >&2
+        exit 6
+      fi
     fi
   fi
   sleep "$interval"
