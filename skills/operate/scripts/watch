@@ -2,8 +2,9 @@
 # watch <request issue> [<after comment URL or id>]
 # Run from the brain's checkout. Waits on the run request and the run's herdr session, and returns
 # with one reason, so the operator session that started it in the background acts on it:
-#   exit 0  new comments after the given one (default: the newest one now), printed in full; the
-#           operator's own (opening with **Operator) are skipped
+#   exit 0  new comments after the given one (default: the newest one now), printed in full once the
+#           newest is WATCH_SETTLE_SECONDS old (default 90), so a follow-up posted right after a stop
+#           arrives with it; the operator's own (opening with **Operator or scope: **Operator) are skipped
 #   exit 3  the run's session is gone with no new comment
 #   exit 4  this host's weekly usage is at or above WATCH_WEEKLY_LIMIT percent (default 90; off disables)
 #   exit 5  the run's session has done nothing for WATCH_IDLE_MINUTES (default 30) with no new comment
@@ -20,6 +21,7 @@ issue=${issue##*/}
 case $issue in *[!0-9]*|"") die "issue must be a number or an issue URL, got: $1" ;; esac
 interval=${WATCH_INTERVAL:-60}
 weekly_limit=${WATCH_WEEKLY_LIMIT:-90}
+settle_s=${WATCH_SETTLE_SECONDS:-90}
 usage_every=${WATCH_USAGE_INTERVAL:-300}
 idle_s=$(( ${WATCH_IDLE_MINUTES:-30} * 60 ))
 blind_s=$(( ${WATCH_USAGE_BLIND_MINUTES:-30} * 60 ))
@@ -51,9 +53,12 @@ blind_file="${XDG_STATE_HOME:-$HOME/.local/state}/operate/usage-unreadable-since
 while :; do
   # A failed GitHub call (a 5xx, a dropped connection) is retried on the next round.
   if all=$(comments 2>/dev/null); then
-    # The operator's own comments open with **Operator and never need its answer.
-    new=$(jq --argjson after "$after" '[.[] | select(.id > $after and (.body | startswith("**Operator") | not))]' <<<"$all")
+    # The operator's own comments open with **Operator, or scope: **Operator, and never need its answer.
+    new=$(jq --argjson after "$after" '[.[] | select(.id > $after and (.body | test("^(scope: )?\\*\\*Operator") | not))]' <<<"$all")
     if [ "$(jq length <<<"$new")" -gt 0 ]; then
+      # A run can post a stop and then amend it; wait until the newest has been quiet for the settle time.
+      age=$(jq 'now - (map(.at | fromdateiso8601) | max) | floor' <<<"$new")
+      if [ "$age" -lt "$settle_s" ]; then sleep $((settle_s - age)); continue; fi
       jq -r '.[] | "=== comment \(.id) by \(.author) at \(.at) \(.url)\n\(.body)\n"' <<<"$new"
       exit 0
     fi

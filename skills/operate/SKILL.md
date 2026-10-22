@@ -70,7 +70,7 @@ bash <this skill's directory>/scripts/watch <n> <ready: comment URL>
 
 It returns with one reason, printed:
 
-- **Exit 0**: every comment newer than the given one (default: the newest now), skipping the operator's own. Handle each: the plan, a stop, a confirmation, the hand-back or the note.
+- **Exit 0**: every comment newer than the given one (default: the newest now), skipping the operator's own, once the newest has been quiet for 90 seconds, so a stop and its amendment arrive together. Handle each: the plan, a stop, a confirmation, the hand-back or the note.
 - **Exit 3**: the run's session is gone with no new comment (see The note).
 - **Exit 4**: this host's weekly usage is at 90% or above: pause the run (see Pause).
 - **Exit 5**: the run's session has done nothing for 30 minutes with no new comment. Read its pane (`herdr agent read <session> --source visible`) and act on what holds it: a five-hour usage limit waits for its reset, then the run is told in its pane to carry on; anything else is handled like a stop.
@@ -144,7 +144,7 @@ The requester picks the host and time.
 ## The note
 
 The run ends with its decision log and then its `/ketchup` note on the request.
-Check the note's claims against the project: the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch.
+Check the note's claims against the project: the pull requests it names are merged, and the done check's commands that run on this host pass on the main branch, with the check and the journeys through `bash <this skill's directory>/scripts/ready --smoke <owner>/<repo>`, since the journeys need the worktree backend and port that `scripts/check` gives them.
 Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, `git branch` shows no local branch of a pull request the run landed, and no worktree, scratch tree, evidence directory or log the run created is left on the host; the project's teardown removes any worktree that remains, and the operator deletes the rest. Nothing the run uploaded for evidence (a gist, an attachment) is left either.
 Price the run session and this session with `scripts/cost` (see Cost), then review the run (see Run review).
 Then catch the requester up in `/ketchup`'s voice: what the check found, both totals, what the review fixed, and the review's calls as numbered questions, each with a recommendation. Assign them on the request; closing it is their acceptance, and their answers to the calls are applied before it closes.
