@@ -53,7 +53,7 @@ The model only judges; `core.py` does every write.
 2. Run `scripts/core.py align --run <run_id>` from this skill. It prints JSON.
    When `differs` is false, run its `end` command and end the turn with `NO_REPLY`.
 3. Otherwise judge each finding from its evidence and `question`. A finding's `target` says whether it concerns the brain or the workspace.
-   - **departure** - promote when the change is an improvement every brain should carry and holds nothing brain-specific; revert when it is a slip, brain-specific, or contradicts the rest of the core; settle by hand when it belongs in a new placeholder.
+   - **departure** - promote when the change is an improvement every brain should carry and holds nothing brain-specific; revert when it is a slip, brain-specific, or contradicts the rest of the core; settle by hand when it belongs in a new placeholder. Only the core's owner brain (`config.json` `owner`) is offered promote; in any other brain, an improvement every brain should carry is settled by hand and raised with the owner.
    - **conflict** - take the core text when the colliding local lines are trivial or restated by the core change; merge by hand when they carry brain facts.
    - **unfilled** - read the brain for each placeholder value the core file needs and pass them as `values`; recommend writing it by hand when a value cannot be found.
    - **drift** - sync, unless a cron differs on purpose (for example, disabled during an incident).
@@ -71,7 +71,7 @@ The reply loop runs the owner's chosen option at the start of the next run.
 Each file action takes `--target workspace` for a workspace file; the brain is the default.
 
 - `core.py revert <path>` - restores the core text: the target's newest aligned version of the file, brought to the core head with its values and local-slot lines, where colliding lines give way to the core.
-- `core.py promote <path>` - writes the target's text into the core template, turns placeholder values back into placeholders, and commits it to the core as the maintenance writer; every brain then takes it as a core change.
+- `core.py promote <path>` - writes the target's text into the core template, turns placeholder values back into placeholders, and commits it to the core as the maintenance writer; every brain then takes it as a core change. Only the owner brain promotes, and only its maintenance writer has write access to the core repository; every other brain consumes the core.
 - `core.py add <path> <values json>` - writes a new core file with the given values.
 - `core.py crons` - runs `routine.py sync`.
 - A "by hand" option closes the issue; the next run files it again while the finding lasts.
@@ -81,6 +81,6 @@ Every write is one commit by the maintenance writer, listed in the run record wi
 ## Operating
 
 - The core clone lives in `<state_dir>/core/` and is fetched at every run; `promote` commits and pushes from it.
-- `config.json` holds the core repository, its branch, the core root of each target, the base file and `settle_minutes`.
+- `config.json` holds the core repository, its branch, its owner brain, the core root of each target, the base file and `settle_minutes`.
 - Fingerprints are `core-check:file:<path>` for brain files, `core-check:workspace:<path>` for workspace files and `core-check:crons` for cron drift.
 - A manual cross-check from any checkout: `setup/setup-brain/core-check brain <checkout>` or `core-check workspace <workspace checkout>` in the core repository.

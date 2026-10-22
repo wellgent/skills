@@ -2,6 +2,7 @@
   "repo": "git@github.com:wellgent/skills.git",
   "web": "https://github.com/wellgent/skills",
   "branch": "main",
+  "owner": "jarospm/jbrain",
   "targets": {
     "brain": "templates/brain",
     "workspace": "templates/workspace"

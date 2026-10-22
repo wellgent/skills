@@ -481,6 +481,11 @@ class Aligner:
         self.shared = None
         self.run_id = None
 
+    @property
+    def owns_core(self):
+        """Only the core's owner brain promotes to it; every other brain consumes it."""
+        return self.cfg['github_repo'] == self.cfg['core'].get('owner')
+
     def settled(self, rel):
         window = self.cfg['core'].get('settle_minutes', 30) * 60
         latest = max(self.core.changed_at(rel), self.co.changed_at(rel))
@@ -643,7 +648,7 @@ class Aligner:
         if restored:
             options.append({'label': f'Revert {self.who} to the core text', 'detail': f'restores the core lines with the values of {self.who} (the diff above)',
                             'action': {'type': 'command', 'argv': self.argv('revert', rel)}})
-        if text is not None and restored:
+        if text is not None and restored and self.owns_core:
             options.append({'label': f'Promote the text of {self.who} to the core', 'detail': 'commits it to the core repository, from where every brain takes it',
                             'action': {'type': 'command', 'argv': self.argv('promote', rel)}})
         options.append({'label': 'Settle it by hand', 'detail': 'for example a new placeholder in the core; closes this issue, and the next run files it again if the file still departs',
@@ -651,7 +656,8 @@ class Aligner:
         return self.finding('departure', rel, title, finding,
                             f'A change to a core file in {self.who} is either a core improvement or a local mistake, and only the owner decides which.',
                             [f'Core head: [{self.core.head[:7]}]({self.core.link(self.core.head)})', f'Diff:\n\n```diff\n{shown}\n```'],
-                            options, 1, f'Is the change in {self.who} an improvement every brain should carry (promote) or a slip to undo (revert)?')
+                            options, 1, f'Is the change in {self.who} an improvement every brain should carry (promote) or a slip to undo (revert)?' if self.owns_core
+                            else f'Is the change in {self.who} a slip to undo (revert), or one to raise with the core owner {self.cfg["core"].get("owner")} (settle by hand)?')
 
     def conflict(self, rel, text, since):
         restored = self.restored(rel)
@@ -1002,6 +1008,8 @@ def promoted(aligner, rel):
 def cmd_promote(cfg, rel, target):
     meta = lib.current_run(cfg)
     aligner = action_aligner(cfg, target)
+    if not aligner.owns_core:
+        raise Failed(f'only {cfg["core"].get("owner")} promotes to the shared core; {cfg["github_repo"]} reverts or settles by hand')
     core = aligner.core
     new = promoted(aligner, rel)
     name = lib.clone_git(cfg, 'config', 'user.name')
