@@ -49,6 +49,7 @@ A project with a `convex/` directory also takes the [Convex branch](./convex.md)
 ### 4. Sign-off, previews and CI
 
 Copy [`recipes/check.sh`](recipes/check.sh) to `scripts/check`, and on a Vercel project [`recipes/vercel-ignore.sh`](recipes/vercel-ignore.sh), [`recipes/preview.sh`](recipes/preview.sh) and [`recipes/production-live.sh`](recipes/production-live.sh), filled as the catalog describes; route every test script through `scripts/slot`.
+Every file copied from a recipe goes through the project's formatter once filled, since the filled values change its line lengths.
 Each recipe with a test beside it in `recipes/` (`<name>.test.ts`, and [`recipes/land.test.ts`](recipes/land.test.ts) for `scripts/land`) copies with its script to `scripts/<name>.test.ts`, filled with the same values, and runs in the project's Vitest under the node environment its first line sets.
 An agent-run project gets no GitHub Actions workflow, and an existing `.github/workflows/check.yml` is deleted.
 Only a project with contributors outside runs gets [`check.yml`](./check.yml), with the build-time secrets its check reads as repository secrets (`gh secret set`), each named in the report when only the owner holds its value.

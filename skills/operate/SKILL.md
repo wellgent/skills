@@ -22,7 +22,7 @@ The body is frozen once a run starts: every change, from the operator or the req
 ## 1. Read the request
 
 `gh issue view <n> --json title,body,author,url,labels,comments` on the brain's tracker (`git remote get-url origin` in the brain).
-Every section present, the label `run` present (add it when missing), and no comment starting `run:` on the issue, which marks a run already started.
+Every section present, the label `run` present (add it when missing), and no `run:` comment from the operator on the issue, which marks a run already started.
 The one exception is a paused run: when the newest `run:` comment is followed by a comment from the run headed `Hand-back`, this is its resume (see Resume).
 
 ## 2. Check the project
@@ -40,7 +40,7 @@ A run starts on the newest `operate`, the newest pstack release, the newest stac
 3. `setup-project` with `latest` on the project, from the wellgent/skills checkout at `~/repos/wellgent-skills` pulled first: pstack at the version its marketplace serves on this host (a host change, no commit), every stack pin at its source's newest commit, and the project's docs on the current templates. A change to the repository goes on a branch `ready/<n>` as one PR, signed off with `scripts/check` in its own worktree, and lands through `scripts/land`; its sign-off is the smoke test.
 4. Without a change, `bash <this skill's directory>/scripts/ready --smoke <owner>/<repo>`: a fresh worktree of `origin/main`, its Set up command, `scripts/check --dry`, then its Tear down.
 
-Comment on the request `ready: <hostname>, main at <sha>`, then what moved (the `operate` pin, pstack, each pin, the docs, with old and new) and the smoke's duration; the run starts from that commit.
+Comment on the request `**Operator:** ready: <hostname>, main at <sha>`, then what moved (the `operate` pin, pstack, each pin, the docs, with old and new) and the smoke's duration; the run starts from that commit.
 Anything that fails in Ready, a blocked check, a failed update or a red smoke, stops here: no run starts. Leave the failed PR open, catch the requester up in `/ketchup`'s voice with what failed and a recommendation, assign them, and wait for their call.
 On a resume, Ready moves nothing: run `ready --smoke`, report what is behind in the `ready:` comment, and start only when it passes.
 
@@ -61,7 +61,7 @@ A start that stops at a startup prompt (folder trust, a login) is answered in th
 
 ## 6. Record and watch
 
-Comment on the request: `run: <session> started on <hostname> at <UTC time>`, or on a resume `run: <session> resumed on <hostname> at <UTC time> from <hand-back URL>`.
+Comment on the request: `**Operator:** run: <session> started on <hostname> at <UTC time>`, or on a resume `**Operator:** run: <session> resumed on <hostname> at <UTC time> from <hand-back URL>`.
 Start the watch in the background from the `ready:` comment's URL, then end the turn: a run can post its plan before the `run:` comment, and the watch then prints both.
 
 ```bash

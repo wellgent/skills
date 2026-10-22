@@ -30,6 +30,7 @@ No GitHub Actions run for this project.
   2 could not run: no `gh` auth, the backend would not start, or no slot dir.
   Exit 2 is infrastructure, not code.
 - **Check before push.** The implementer runs `scripts/check` on its commit before the PR is reviewed, and `scripts/check` is what pushes a signed-off head.
+  `scripts/check` pushes to and finds the PR by the local branch name, so a fix round works on the PR's own branch: its worktree checks out that branch, after any other local copy of it is deleted.
   A head pushed any other way has no `check` status and cannot land.
 - **Dry run.** `scripts/check --dry` runs the same steps on any checked-out commit, a detached HEAD or `main` included, and pushes and posts nothing.
   `/operate`'s Ready runs it in a fresh worktree as the smoke test before a run starts.
