@@ -42,7 +42,7 @@ Product work on a project runs through pstack, started from this brain with `/op
 
 - A **run request** is one issue on this tracker labelled `run`, in the shape of the "Run request" issue template: the project as `owner/repo`, the goal, a done check that passes or fails, the proof, what is known, constraints. It names no host; the run starts on whichever host `/operate` runs on.
 - `/operate <issue>` starts the run as its own herdr session in the project checkout and stays the run's operator. The run merges what its verifier passes and posts its stops and its note on the request; the operator answers each stop the request and the brain settle, and assigns the requester for the calls that are theirs and once it has checked the note. Open issues labelled `run` and assigned to you are the calls and checked notes waiting for you.
-- A wayfinder map whose route reaches work on a project ends in run requests, one per run, linked from the map; the map stays the record of what to do, the request the record of one run.
+- A wayfinder map whose route reaches work on a project ends in run requests, one per run, each a child issue of the map titled `Run: <repo name> - <goal>` per `docs/agents/issue-tracker.md`; the map stays the record of what to do, the request the record of one run.
 - `/operate cost <session id>` prices a finished run from its transcript on this host.
 {{local}}
 
