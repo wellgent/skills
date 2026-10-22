@@ -39,6 +39,7 @@ Pins from `mattpocock/skills` and from this repo are removed with their `.claude
 npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill <name> ...]
 ```
 
+- `<sha>` is the full 40-character commit: the CLI fails to install from a short one.
 - Pass every `--skill <name>` as its own pair of arguments: with `-y`, a list the CLI cannot parse installs the whole source without an error.
 - A skill locked at the pin (`ref` in `skills-lock.json`) is skipped; one at another commit, or with no `ref`, is removed and added again at the pin. `npx skills update` rewrites lock entries wrongly, so updates go through `add` and `remove` only.
 - Layout: real directories under `.agents/skills/<name>`, a relative link `.claude/skills/<name>` → `../../.agents/skills/<name>`. The CLI writes no link and `remove` deletes one, so after every add: `mkdir -p .claude/skills && ln -sfn ../../.agents/skills/<name> .claude/skills/<name>`. `skills-lock.json` is committed with them.

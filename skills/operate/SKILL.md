@@ -37,7 +37,7 @@ A run starts on the newest `operate`, the newest pstack release, the newest stac
 
 1. `bash <this skill's directory>/scripts/sync-brain <brain checkout>` pins `operate` at the newest wellgent/skills commit that touches it, with the run request template and the `run` label. When it moved the pin, read the new `SKILL.md` and carry on from this step under it.
 2. `bash <this skill's directory>/scripts/ready <owner>/<repo>` from the brain: the brain and the project at their remote heads, each check under "Host tools" in the project's `docs/agents/dev-loop.md`, the host's pstack version and every stack pin against upstream. Exit 1 is blocked, exit 3 is behind.
-3. `setup-project` with `latest` on the project, from the wellgent/skills checkout at `~/repos/wellgent-skills` pulled first: pstack at the version its marketplace serves on this host (a host change, no commit), every stack pin at its source's newest commit, and the project's docs on the current templates. A change to the repository goes on a branch `ready/<n>` as one PR, signed off with `scripts/check` in its own worktree, and lands through `scripts/land`; its sign-off is the smoke test.
+3. `setup-project` with `latest` on the project, from the wellgent/skills checkout at `~/repos/wellgent-skills` pulled first: pstack at the version its marketplace serves on this host (a host change, no commit), every stack pin at its source's newest commit, and the project's docs on the current templates. A change to the repository goes on a branch `ready/<n>` as one PR, signed off with `scripts/check` in its own worktree, and lands through `scripts/land`; its sign-off is the smoke test, and Ready ends only once `scripts/production-live` prints its merge commit, since every landing of the run waits for production to run `main`'s tip. A production deploy of it that fails stops Ready: read its build log for the cause, and a redeploy of that commit is the requester's call.
 4. Without a change, `bash <this skill's directory>/scripts/ready --smoke <owner>/<repo>`: a fresh worktree of `origin/main`, its Set up command, `scripts/check --dry`, then its Tear down.
 
 Comment on the request `**Operator:** ready: <hostname>, main at <sha>`, then what moved (the `operate` pin, pstack, each pin, the docs, with old and new) and the smoke's duration; the run starts from that commit.
@@ -76,7 +76,7 @@ It returns with one reason, printed:
 - **Exit 5**: the run's session has done nothing for 30 minutes with no new comment. Read its pane (`herdr agent read <session> --source visible`) and act on what holds it: a five-hour usage limit waits for its reset, then the run is told in its pane to carry on; anything else is handled like a stop.
 - **Exit 6**: this host's weekly usage has been unreadable for 30 minutes. Read the weekly percentage from the run's status line in its pane; at 90% or above pause the run, otherwise restart the watch.
 
-Restart it after each return, from the newest comment id it printed or that this session posted, until the note is handled.
+Restart it after each return, from the newest comment id it printed, or from the id it started from when it printed none, until the note is handled. Never restart it from a comment this session posted: the watch skips the operator's own comments, and a run comment posted just before the operator's would go unread.
 This session stays open for the run's whole length; a closed operator leaves the run's stops unread.
 
 ## Talking to the run
