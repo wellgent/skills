@@ -57,7 +57,7 @@ No GitHub Actions run for this project.
 - **The server log counts.** A screen works only when the app's server log shows no error the browser console misses (a failed hydration, an uncaught exception) since the verifier started it.
 - **Previews.** <What the host builds from git pushes, and how a PR labelled `preview` gets its preview: the command, where the URL is posted, and the preview backend it gets with the PR's own functions and the seed. How an agent opens a protected preview, with no secret written to a file.>
   A change to layout, look and feel or functionality waits for the product's owner to review its preview before it lands.
-  A bug fix, or a fix that makes the UI match the project's design records, lands on its verifier's pass, labelled `preview`, and the run's note lists it.
+  A bug fix, or a fix that makes the UI match `DESIGN.md` or `PRODUCT.md`, lands on its verifier's pass, labelled `preview`, and the run's note lists it.
   The verifier's screenshots are its own evidence: they stay in its evidence directory and are never committed, pushed or posted.
 
 ## Agents

@@ -202,7 +202,8 @@ Project rules an agent consults are in `AGENTS.md`, `PRODUCT.md` and `docs/agent
   - `AGENTS.md`, loaded by every session: the rules for every session, the must-read list, where things live, and the rule table `/correct` keeps.
   - `docs/agents/dev-loop.md`, the stack facts: the check command, the sign-off and landing scripts, previews, the critical journeys, worktrees, running the app, the design-system commands, pending checks, deviations.
   - `PRODUCT.md`: what the product does, for whom, and the product rules a change must keep.
-  - `DESIGN.md`, where there are screens: the design system and the kit map.
+  - `DESIGN.md` with its sidecar `.impeccable/design.json`, where there are screens: the design system and the kit map.
+    With `PRODUCT.md` it is the project's whole design context, the artifacts impeccable reads, and the project holds no other design doc.
   - `.agents/playbooks/`, optional: project playbooks that extend pstack's bundled ones with After, Before and In lines, never Replace.
 
   Promotion litmus: any line that should read identically in every project belongs to the template, and project files hold what is true of this repo.

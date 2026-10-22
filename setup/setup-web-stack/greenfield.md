@@ -13,7 +13,7 @@ pnpm create next-app@latest . --typescript --app --src-dir --tailwind --import-a
 - `create-next-app` writes `AGENTS.md` and `CLAUDE.md` as files; keep `AGENTS.md`, replace `CLAUDE.md` with the symlink the instructions-file convention prescribes, and let `next dev` maintain its managed rules block in `AGENTS.md`
 
 - pnpm as package manager (commit `pnpm-lock.yaml`); package scripts stay the command interface
-- Tailwind CSS v4 for styling: tokens in the global stylesheet, component-level composition over one-off utility sprawl, design decisions recorded in the project's docs
+- Tailwind CSS v4 for styling: tokens in the global stylesheet, component-level composition over one-off utility sprawl, design decisions recorded in `DESIGN.md`
 - Cache Components on for greenfield per the standard (the user can decline)
 
 ## Then equip it
