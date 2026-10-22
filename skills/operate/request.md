@@ -1,6 +1,7 @@
 ---
 name: Run request
 about: Work for /operate to run on a project through pstack; once the run starts the body stays as written and every change is a comment starting `scope:`
+title: "Run: "
 labels: run
 ---
 
