@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# watch <request issue> [<after comment id>]
+# watch <request issue> [<after comment URL or id>]
 # Run from the brain's checkout. Waits on the run request and the run's herdr session, and returns
 # with one reason, so the operator session that started it in the background acts on it:
 #   exit 0  new comments after the given one (default: the newest one now), printed in full; the
@@ -15,7 +15,7 @@ die() { echo "watch: $*" >&2; exit 1; }
 for tool in gh jq herdr; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
 here=$(cd "$(dirname "$0")" && pwd)
 
-issue=${1:?usage: watch <request issue> [<after comment id>]}
+issue=${1:?usage: watch <request issue> [<after comment URL or id>]}
 issue=${issue##*/}
 case $issue in *[!0-9]*|"") die "issue must be a number or an issue URL, got: $1" ;; esac
 interval=${WATCH_INTERVAL:-60}
@@ -26,7 +26,10 @@ blind_s=$(( ${WATCH_USAGE_BLIND_MINUTES:-30} * 60 ))
 case $weekly_limit in off|[0-9]|[0-9][0-9]|100) ;; *) die "WATCH_WEEKLY_LIMIT must be a percent or off, got: $weekly_limit" ;; esac
 
 comments() { gh issue view "$issue" --json comments --jq '[.comments[] | {id: (.url | sub(".*issuecomment-"; "") | tonumber), author: .author.login, at: .createdAt, url, body}]'; }
+# The id is the number in the comment's URL (issuecomment-<n>), never GraphQL's node id (IC_...).
 after=${2:-$(comments | jq 'map(.id) | max // 0')}
+after=${after##*issuecomment-}
+case $after in *[!0-9]*|"") die "the comment must be its URL or the number in it, got: $2" ;; esac
 
 # The session name follows start: op-<repo>-<issue>, cut to herdr's 32 characters.
 repo=$(gh issue view "$issue" --json body --jq '.body' | sed -n 's/^- \*\*Repo:\*\* *\([^ ]*\).*/\1/p' | head -1)
