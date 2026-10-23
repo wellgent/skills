@@ -89,6 +89,12 @@ Each journey has one browser test, and `scripts/check` runs them all.
 - <journey, as the user's goal> → `<test file>`
 - **Journey tests:** `<command that runs them all>`
 
+## Environments
+
+- **Production:** <the domain, what builds and deploys it, and where its configuration lives>.
+- **Previews:** <what a preview deployment gets and where its configuration comes from>.
+- **Dev:** <the backend each worktree gets, and how its tools are held to it>.
+
 ## Worktrees
 
 Every branch is worked in its own worktree with its own dev environment, so parallel sessions share no server, port or data.
@@ -129,6 +135,12 @@ What a run needs on its host beyond the checkout, each with the check `/operate`
 Blocking checks still red on `main`, each joining the check command once green:
 
 - <check> - <what gets it green>
+
+## Not docs
+
+Markdown in the repository that is product content or a vendor-generated file, skipped by `scripts/check-docs`:
+
+- `<path prefix>`: <what it is>
 
 ## Deviations
 

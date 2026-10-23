@@ -85,7 +85,7 @@ Scripts (pnpm shape; adapt the `check` chain for npm):
   "test": "scripts/slot vitest run",
   "test:journeys": "scripts/slot sh -c 'playwright install chromium && playwright test --config e2e/journeys/playwright.config.ts \"$@\"' sh",
   "audit:prod": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit-prod.ts",
-  "check": "scripts/slot sh -c 'pnpm typecheck && pnpm lint && pnpm lint:format && pnpm knip && pnpm lint:deps && pnpm test && pnpm build'"
+  "check": "scripts/slot sh -c 'scripts/check-docs && pnpm typecheck && pnpm lint && pnpm lint:format && pnpm knip && pnpm lint:deps && pnpm test && pnpm build'"
 }
 ```
 

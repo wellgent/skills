@@ -17,9 +17,10 @@ How we run product work with agents at [Wellgent](https://wellgent.ai), publishe
   - **setup-project** - enables the pstack plugin at project scope, pins the project's stack skills by commit, lays down the local sign-off and landing scripts, `AGENTS.md` and `docs/agents/dev-loop.md` from the templates, and offers pstack's verification skill. It names no stack. It is also where the plugin pin moves, on purpose.
   - **setup-web-stack** - the stack setup for a web product: a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling and known-good configs, the sign-off and preview scripts, the journey tests and the Convex branch.
   - **setup-web-product** - the golden path for a new web product, each stage deferred to its installer.
-- [`templates/project/`](templates/project/) - `AGENTS.md`, `docs/agents/dev-loop.md` and the `slot` and `land` scripts as the setup scaffolds them into a project.
+- [`templates/project/`](templates/project/) - `AGENTS.md`, `docs/agents/dev-loop.md` and the `slot`, `land` and `check-docs` scripts as the setup scaffolds them into a project.
 - [`templates/brain/`](templates/brain/) - the shared core for brains: the placeholder-bearing reference copy, at brain paths, of every file all brains carry. That is the tracker docs, the core brain skills and conventions, `brain-transport`, and the shared `AGENTS.md` sections. Each brain keeps its own concrete copies; its [README](templates/brain/README.md) indexes the placeholders.
 - [`templates/workspace/`](templates/workspace/) - the brain section of an agent runtime workspace's `AGENTS.md`, cross-checked the same way.
+- [`standards/project-docs.md`](standards/project-docs.md) - the docs every project carries, where each fact goes, and what never lives in a project.
 - [`standards/web-products.md`](standards/web-products.md) - the stack doctrine for web products: frontend, toolchain, hosting, data layer, checks, design, version control, skills.
 
 ## What belongs here

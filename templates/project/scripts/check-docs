@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Fails when the project's markdown leaves the project-docs set: a standing doc missing, CLAUDE.md
+# not a link to AGENTS.md, a tracked markdown file outside the set, or a topic guide AGENTS.md does
+# not name. Skipped: .agents/, .claude/ and the paths the "## Not docs" section of
+# docs/agents/dev-loop.md lists, each as a "- `<path prefix>`" line.
+# Exit: 0 the docs follow the set, 1 with every deviation listed.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+loop=docs/agents/dev-loop.md
+fail=0
+deviation() { echo "check-docs: $*" >&2; fail=1; }
+
+for f in README.md AGENTS.md PRODUCT.md GLOSSARY.md "$loop"; do
+  [ -f "$f" ] || deviation "$f is missing"
+done
+[ -L CLAUDE.md ] && [ "$(readlink CLAUDE.md)" = AGENTS.md ] || deviation "CLAUDE.md is not a link to AGENTS.md"
+
+exempt=()
+if [ -f "$loop" ]; then
+  while IFS= read -r p; do exempt+=("$p"); done < <(
+    awk '/^## /{on=($0=="## Not docs")} on && /^- `/{s=$0; sub(/^- `/,"",s); sub(/`.*/,"",s); print s}' "$loop"
+  )
+fi
+
+while IFS= read -r f; do
+  case "$f" in
+    README.md | AGENTS.md | CLAUDE.md | PRODUCT.md | GLOSSARY.md | DESIGN.md | "$loop") continue ;;
+    .agents/* | .claude/*) continue ;;
+    docs/adr/*/* | docs/agents/*/*) ;;
+    docs/adr/[0-9][0-9][0-9][0-9]-*.md) continue ;;
+    docs/agents/*.md)
+      grep -qF "$f" AGENTS.md || deviation "$f is a topic guide AGENTS.md does not name"
+      continue
+      ;;
+  esac
+  for p in ${exempt[@]+"${exempt[@]}"}; do
+    [[ $f == "$p"* ]] && continue 2
+  done
+  deviation "$f is outside the docs set"
+done < <(git ls-files '*.md' '*.mdx')
+
+exit "$fail"

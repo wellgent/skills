@@ -184,7 +184,7 @@ The catalog keeps rationale (what each skill is for and where it is named), neve
 **Where agent-facing content lives** - two axes decide it, ownership and form.
 Ownership: vendor-owned content arrives by pin or managed copy and is replaced wholesale on update, so nothing project-owned may live inside a pinned directory; project-owned content is scaffolded once and then belongs to the repo.
 Form: a skill is a procedure an agent invokes, and the harness fixes its home under `.agents/skills/`; a doc is what an agent consults, and `docs/agents/` is the project's home for agent-facing docs, with `AGENTS.md` as the entry.
-Project rules an agent consults are in `AGENTS.md`, `PRODUCT.md` and `docs/agents/`; procedures an agent runs are skills; anything vendor-owned is a pin or a marked managed file wherever it sits.
+Project rules an agent consults are in the docs set of [project-docs.md](project-docs.md); procedures an agent runs are skills; anything vendor-owned is a pin or a marked managed file wherever it sits.
 
 **Custom skill homing** - three homes:
 
@@ -198,19 +198,12 @@ Project rules an agent consults are in `AGENTS.md`, `PRODUCT.md` and `docs/agent
 
 - **The process is pstack's**: planning, build, review, verification, pull requests, shipping and retro run inside the project through the plugin, started from the brain by `/operate`.
   pstack names no stack; this document carries every stack rule.
-- **A project's own surface**, scaffolded from [`templates/project/`](../templates/project/) and then project-owned:
-  - `AGENTS.md`, loaded by every session: the rules for every session, the must-read list, where things live, and the rule table `/correct` keeps.
-  - `docs/agents/dev-loop.md`, the stack facts: the check command, the sign-off and landing scripts, previews, the critical journeys, worktrees, running the app, the design-system commands, pending checks, deviations.
-  - `PRODUCT.md`: what the product does, for whom, and the product rules a change must keep.
-  - `DESIGN.md` with its sidecar `.impeccable/design.json`, where there are screens: the design system and the kit map.
-    With `PRODUCT.md` it is the project's whole design context, the artifacts impeccable reads, and the project holds no other design doc.
-  - `.agents/playbooks/`, optional: project playbooks that extend pstack's bundled ones with After, Before and In lines, never Replace.
+- **A project's own surface**, scaffolded from [`templates/project/`](../templates/project/) and then project-owned: the docs set in [project-docs.md](project-docs.md), and `.agents/playbooks/`, optional, with project playbooks that extend pstack's bundled ones with After, Before and In lines, never Replace.
 
   Promotion litmus: any line that should read identically in every project belongs to the template, and project files hold what is true of this repo.
-  A product rule lives in `PRODUCT.md`; rationale lives in pull request bodies and pstack's decision trail.
 - **What this stack puts in those files** (Next.js with Convex; a project without one of them drops its lines):
   - Must-read list: `convex/_generated/ai/guidelines.md` and the `convex-authz` checklist when touching Convex code; `convex-reviewer` before a Convex diff goes into a pull request; `convex-migrate` when a change touches the schema of a populated table; `web-design-guidelines` when a change touches a screen; `vercel-react-best-practices` when a change renders or fetches data in React; `find-docs` for a library API.
-  - `docs/agents/dev-loop.md`: `agent-browser` and `next-dev-loop` under "Running the app", with the check "`get_errors` returns nothing for the routes exercised"; the design-system lint and the impeccable scanner under "Design system".
+  - `docs/agents/dev-loop.md`: `agent-browser` and `next-dev-loop` under "Running the app", with the check "`get_errors` returns nothing for the routes exercised"; the design-system lint and the impeccable scanner under "Design system"; `convex/_generated/` under "Not docs".
 - **Tracker labels**: one taxonomy across projects - `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human` and `wontfix` on every project tracker, `run` on the brain's.
   Per-project freedom is topical labels only.
 
