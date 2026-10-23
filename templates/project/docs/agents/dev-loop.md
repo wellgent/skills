@@ -9,6 +9,8 @@ The rest of the process is pstack's.
 
 The check command blocks on every step it runs: <the steps, in order>.
 
+- **`scripts/check-docs`** runs first. It fails on a standing doc missing, `CLAUDE.md` not a link to `AGENTS.md`, a tracked markdown file outside the docs set, or a topic guide `AGENTS.md` does not name; it skips `.agents/`, `.claude/` and the paths "Not docs" lists.
+
 - **Slots:** every test run takes one of the host's heavy-run slots: the test scripts, the check command and every browser suite run through `scripts/slot`, which waits for a free slot and holds it while the command runs.
   A test run inside a run that already holds a slot, such as the tests inside the check command, uses that slot.
   The cap is `HEAVY_RUN_SLOTS` from the environment, 2 when unset.
