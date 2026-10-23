@@ -131,6 +131,7 @@ What a run needs on its host beyond the checkout, each with the check `/operate`
 
 - **Design-system lint:** `<command>`
 - **Design scanner:** `<command>`
+- **Design doctor:** `<command>` reports drift between `PRODUCT.md`, `DESIGN.md` and the sidecar. A pull request that edits `DESIGN.md` refreshes the sidecar in the same pull request. `design-sidecar-stale` reads file times, so it counts only when `DESIGN.md`'s last commit is later than the sidecar's (`git log -1 --format=%ct -- <file>`).
 
 ## Pending checks
 
