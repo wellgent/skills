@@ -23,7 +23,8 @@ Every step converges on a state, so a re-run changes only what is behind.
    Set it on the shared dev deployment and as the project's default for dev and preview deployments (`convex env default set CRONS off --type dev`, and `--type preview`); production leaves it unset.
 4. **Seed.** An idempotent internal function that creates the test identities `docs/agents/dev-loop.md` lists under "Seeded test identities", and stores what the project's crons would produce on a deployment that runs none.
 5. **Default environment variables.** Set the Convex project's defaults for dev and for preview deployments (the sign-in keys, the dev-OTP switch and `CRONS`), so a fresh deployment, local and preview ones included, can sign in.
-   `pnpm exec convex env default set <NAME> --type dev --project <team>:<project>` sets one with the host's login; generate the sign-in keys fresh, never copy production's.
+   `pnpm exec convex env default set <NAME> --type dev --project <team>:<project> -- <value>` sets one with the host's login; generate the sign-in keys fresh, never copy production's.
+   The value goes after `--`: `JWT_PRIVATE_KEY` is a PEM that starts with dashes, and without `--` the CLI reads it as an option and prints it in its error.
    This writes to the Convex project: the operator does it, or the owner where the operator has no access.
 6. **Vercel builds** (projects deployed through Vercel). Copy [`recipes/vercel-build.sh`](recipes/vercel-build.sh) to `scripts/vercel-build.sh` and point `buildCommand` in `vercel.json` at it.
    The production deploy key goes in Vercel's Production environment and the preview deploy key in its Preview environment, both as `CONVEX_DEPLOY_KEY`, with no `NEXT_PUBLIC_CONVEX_URL` there.

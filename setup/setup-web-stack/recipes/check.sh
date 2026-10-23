@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Signs off the checked-out commit of a PR branch: under one of the host's heavy-run slots it runs
-# the frozen install, `pnpm run check` and the journey tests against this worktree's local Convex
-# backend, and only on a pass pushes HEAD to origin/<branch> and posts the `check` commit status
-# on that exact SHA. The verifier and scripts/land read that status.
+# the frozen install, `pnpm run check` and the journey tests, where the project has them, against
+# this worktree's local Convex backend, and only on a pass pushes HEAD to origin/<branch> and posts
+# the `check` commit status on that exact SHA. The verifier and scripts/land read that status.
 # --dry runs the same steps on any checked-out commit, detached or main included, and pushes and
 # posts nothing: the smoke test /operate's Ready runs in a fresh worktree.
 # Exit: 0 passed and posted, 1 refused or failed, 2 could not run (no gh auth, the backend would
@@ -61,13 +61,16 @@ case $started_backend in
 esac
 
 # The journeys port: one per slot from the top of the range, below any the verify skill picks,
-# and free of listeners and of other checkouts' claims.
-port=$((PORT_HIGH + 1 - $(basename "$HEAVY_RUN_HELD")))
-until scripts/dev-server.sh free "$port"; do
-  port=$((port - 1))
-  [ "$port" -ge "$PORT_LOW" ] || cannot "no free journeys port from $PORT_LOW to $PORT_HIGH"
-done
-JOURNEYS_PORT=$port pnpm run test:journeys || fail "pnpm run test:journeys"
+# and free of listeners and of other checkouts' claims. A project with no approved journey has no
+# test:journeys script, and the step is skipped.
+if node -e 'process.exit(require("./package.json").scripts?.["test:journeys"] ? 0 : 1)'; then
+  port=$((PORT_HIGH + 1 - $(basename "$HEAVY_RUN_HELD")))
+  until scripts/dev-server.sh free "$port"; do
+    port=$((port - 1))
+    [ "$port" -ge "$PORT_LOW" ] || cannot "no free journeys port from $PORT_LOW to $PORT_HIGH"
+  done
+  JOURNEYS_PORT=$port pnpm run test:journeys || fail "pnpm run test:journeys"
+fi
 
 [ "$(git rev-parse HEAD)" = "$sha" ] && [ -z "$(git status --porcelain)" ] \
   || fail "the worktree changed while check ran; run it again on the commit to sign off"
