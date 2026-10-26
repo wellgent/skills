@@ -46,7 +46,7 @@ No GitHub Actions run for this project.
   <Whether the repository ruleset also requires the `check` status on `main`, or why the plan does not allow it.>
 - **Restack only on a real conflict.** A restack that resolves a conflict sends the resolved hunks back to the verifier, which checks only those, and the new head gets its own `scripts/check`.
 - **Production deploys one at a time.** <What a push to `main` deploys>.
-  On a project with `scripts/production-live`, `scripts/land` merges only once production runs `main`'s tip, so two production deploys never overlap; after 30 minutes it exits 4, which is a stop.
+  On a project with `scripts/production-live`, `scripts/land` merges only once production runs `main`'s tip, or once the production build of the tip has failed while production serves an ancestor of it, so two production deploys never overlap and the PR that fixes a failed build can land; after 30 minutes it exits 4, which is a stop.
   `scripts/production-live` prints the commit production serves and does not wait: a production step that needs a landing live reads it every 30 seconds in one bash loop until it prints the landed commit, and past 30 minutes it is a stop.
   Nobody deploys production by hand: production comes only from the host's own build of `main`.
   A failed production deploy is reported and fixed as the run's next PR.

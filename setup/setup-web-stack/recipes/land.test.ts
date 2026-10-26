@@ -30,11 +30,14 @@ const git = (cwd: string, ...args: Array<string>) => {
 
 // A checkout whose origin `main` holds the squash commit GitHub made, and a
 // `gh` on PATH that answers from one PR record: open on HEAD until
-// `gh pr merge` runs, which always fails, and AFTER_MERGE once it has.
+// `gh pr merge` runs, which always fails, and AFTER_MERGE once it has. Any
+// other commit's statuses are TIP_STATUSES, newest first, and that read fails
+// when STATUSES_FAIL is set.
 let scratch: string;
 let checkout: string;
 let hostBin: string;
 let mergeCommit: string;
+let baseCommit: string;
 beforeEach(() => {
   scratch = realpathSync(mkdtempSync(join(tmpdir(), "land-")));
   const origin = join(scratch, "origin.git");
@@ -49,6 +52,7 @@ beforeEach(() => {
   mergeCommit = git(checkout, "rev-parse", "HEAD");
   git(checkout, "push", "-q", "origin", "HEAD:main");
   git(checkout, "reset", "-q", "--hard", "HEAD~1");
+  baseCommit = git(checkout, "rev-parse", "HEAD");
 
   const merged = join(scratch, "merge-ran");
   const gh = join(hostBin, "gh");
@@ -65,6 +69,9 @@ case "\${args[0]} \${args[1]}" in
   "repo view") answer '{"nameWithOwner": "owner/repo"}' ;;
   "api repos/owner/repo/commits/${HEAD}/status")
     answer '{"statuses": [{"context": "check", "state": "success"}]}' ;;
+  "api repos/owner/repo/commits/"*"/statuses")
+    [ -z "\${STATUSES_FAIL:-}" ] || { echo "HTTP 502" >&2; exit 1; }
+    answer "\${TIP_STATUSES:-[]}" ;;
   "pr merge") touch ${JSON.stringify(merged)}; echo "GraphQL: something went wrong" >&2; exit 1 ;;
   "pr view")
     if [ -e ${JSON.stringify(merged)} ]; then answer "$AFTER_MERGE"
@@ -200,6 +207,103 @@ describe("scripts/land on a project with scripts/production-live", () => {
     expect(run.stderr).toContain(
       `land: production runs ${OTHER_HEAD}, not main's tip ${mergeCommit}`,
     );
+    expect(existsSync(join(scratch, "merge-ran"))).toBe(false);
+  });
+
+  test("a failed production build of main's tip lets the merge go ahead", () => {
+    productionServes(baseCommit);
+    const run = landAfterFailedMerge(
+      { ...merged, mergeCommit: { oid: mergeCommit } },
+      {
+        LAND_DEPLOY_WAIT_S: "0",
+        TIP_STATUSES: JSON.stringify([
+          { context: "check", state: "success" },
+          { context: "Vercel", state: "failure" },
+          { context: "Vercel", state: "pending" },
+        ]),
+      },
+    );
+
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stderr).toContain(
+      `land: the production build of main's tip ${mergeCommit} failed (failure); production serves ${baseCommit}`,
+    );
+    expect(existsSync(join(scratch, "merge-ran"))).toBe(true);
+  });
+
+  test("an errored production build of main's tip lets the merge go ahead", () => {
+    productionServes(baseCommit);
+    const run = landAfterFailedMerge(
+      { ...merged, mergeCommit: { oid: mergeCommit } },
+      {
+        LAND_DEPLOY_WAIT_S: "0",
+        TIP_STATUSES: JSON.stringify([{ context: "Vercel", state: "error" }]),
+      },
+    );
+
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stderr).toContain(
+      `land: the production build of main's tip ${mergeCommit} failed (error); production serves ${baseCommit}`,
+    );
+  });
+
+  test("a production build of main's tip still pending keeps the wait, and past it nothing merges", () => {
+    productionServes(baseCommit);
+    const run = landAfterFailedMerge(
+      { ...merged, mergeCommit: { oid: mergeCommit } },
+      {
+        LAND_DEPLOY_WAIT_S: "0",
+        TIP_STATUSES: JSON.stringify([
+          { context: "Vercel", state: "pending" },
+          { context: "Vercel", state: "failure" },
+        ]),
+      },
+    );
+
+    expect(run.status).toBe(4);
+    expect(run.stderr).not.toContain("production build of main's tip");
+    expect(existsSync(join(scratch, "merge-ran"))).toBe(false);
+  });
+
+  test("a failed production build of main's tip keeps the wait when production serves no ancestor of it", () => {
+    productionServes(OTHER_HEAD);
+    const run = landAfterFailedMerge(
+      { ...merged, mergeCommit: { oid: mergeCommit } },
+      {
+        LAND_DEPLOY_WAIT_S: "0",
+        TIP_STATUSES: JSON.stringify([{ context: "Vercel", state: "failure" }]),
+      },
+    );
+
+    expect(run.status).toBe(4);
+    expect(run.stderr).not.toContain("production build of main's tip");
+    expect(existsSync(join(scratch, "merge-ran"))).toBe(false);
+  });
+
+  test("main's tip with no production build status keeps the wait, and past it nothing merges", () => {
+    productionServes(baseCommit);
+    const run = landAfterFailedMerge(
+      { ...merged, mergeCommit: { oid: mergeCommit } },
+      {
+        LAND_DEPLOY_WAIT_S: "0",
+        TIP_STATUSES: JSON.stringify([{ context: "check", state: "success" }]),
+      },
+    );
+
+    expect(run.status).toBe(4);
+    expect(run.stderr).not.toContain("production build of main's tip");
+    expect(existsSync(join(scratch, "merge-ran"))).toBe(false);
+  });
+
+  test("an unreadable production build status of main's tip keeps the wait, and past it nothing merges", () => {
+    productionServes(baseCommit);
+    const run = landAfterFailedMerge(
+      { ...merged, mergeCommit: { oid: mergeCommit } },
+      { LAND_DEPLOY_WAIT_S: "0", STATUSES_FAIL: "1" },
+    );
+
+    expect(run.status).toBe(4);
+    expect(run.stderr).not.toContain("production build of main's tip");
     expect(existsSync(join(scratch, "merge-ran"))).toBe(false);
   });
 });
