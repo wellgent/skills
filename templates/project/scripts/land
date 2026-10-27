@@ -2,13 +2,18 @@
 # Lands one PR: squash-merges it onto main only when its exact head SHA carries a passing `check`
 # status from scripts/check, under --match-head-commit, then reads the merge back from origin.
 # A failed `gh pr merge` still lands when the PR reads back merged on that head.
-# The PR need not be up to date with main. On a project with scripts/production-live, the merge
-# waits until production runs main's tip, so two production deploys never overlap, or until the
-# newest `Vercel` commit status of main's tip is failure or error while production serves an
-# ancestor of the tip, so the PR that fixes a failed build can land. After LAND_DEPLOY_WAIT_S
-# (default 1800) it gives up, which is a stop: never deploy production by hand.
-# Exit: 0 merged, 1 refused (not open, base not main, head moved, merge failed), 3 no passing
-# `check` on the head, 4 production not on main's tip in time.
+# The head must hold main's tip, so the tree that lands is the tree `check` passed: a head behind
+# main is refused until main is merged into the branch and scripts/check signs off the new head.
+# On a project with scripts/production-live, the merge waits until production runs main's tip, so
+# two production deploys never overlap, or until the newest `Vercel` commit status of main's tip
+# is failure or error while production serves an ancestor of the tip, so the PR that fixes a
+# failed build can land. After the merge it waits until production runs the merge commit, so a
+# failed production build of it is known at once. Each wait gives up after LAND_DEPLOY_WAIT_S
+# (default 1800), which is a stop: never deploy production by hand.
+# Exit: 0 merged (and live, with scripts/production-live), 1 refused (not open, base not main,
+# head moved, merge failed), 3 no passing `check` on the head, 4 production not on main's tip in
+# time, nothing merged, 5 head behind main's tip, nothing merged, 6 merged but its production build
+# failed, so main is red, 7 merged but production not on it in time.
 set -euo pipefail
 
 [ $# -eq 1 ] && [[ $1 =~ ^[0-9]+$ ]] || { echo "usage: scripts/land <pr number>" >&2; exit 1; }
@@ -26,17 +31,23 @@ check=$(gh api "repos/$repo/commits/$head/status" \
   --jq '[.statuses[] | select(.context == "check")][0].state // "none"')
 [ "$check" = success ] || { echo "land: PR $pr head $head has no passing check status ($check); run scripts/check on it" >&2; exit 3; }
 
+wait_s=${LAND_DEPLOY_WAIT_S:-1800}
+poll_s=${LAND_DEPLOY_POLL_S:-15}
+[ "$poll_s" -ge 1 ] || poll_s=1
+
+# The newest `Vercel` commit status of a commit, or none when it has none or the read fails.
+vercel_build() {
+  gh api "repos/$repo/commits/$1/statuses" \
+    --jq '[.[] | select(.context == "Vercel")][0].state // "none"' 2>/dev/null || echo none
+}
+
 if [ -x scripts/production-live ]; then
-  wait_s=${LAND_DEPLOY_WAIT_S:-1800}
-  poll_s=${LAND_DEPLOY_POLL_S:-15}
-  [ "$poll_s" -ge 1 ] || poll_s=1
   waited=0
   while :; do
     git fetch -q origin main
     tip=$(git rev-parse origin/main)
     live=$(scripts/production-live 2>&1) && [ "$live" = "$tip" ] && break
-    build=$(gh api "repos/$repo/commits/$tip/statuses" \
-      --jq '[.[] | select(.context == "Vercel")][0].state // "none"' 2>/dev/null) || build=none
+    build=$(vercel_build "$tip")
     if { [ "$build" = failure ] || [ "$build" = error ]; } && git merge-base --is-ancestor "$live" "$tip" 2>/dev/null; then
       echo "land: the production build of main's tip $tip failed ($build); production serves $live" >&2
       break
@@ -50,6 +61,12 @@ if [ -x scripts/production-live ]; then
     waited=$((waited + poll_s))
   done
 fi
+
+git fetch -q origin main
+tip=$(git rev-parse origin/main)
+behind=$(gh api "repos/$repo/compare/$tip...$head" --jq .behind_by) \
+  || { echo "land: cannot compare PR $pr head $head with main's tip $tip" >&2; exit 1; }
+[ "$behind" = 0 ] || { echo "land: PR $pr head $head is $behind commit(s) behind main's tip $tip; merge main into the branch, run scripts/check on the new head, then land it" >&2; exit 5; }
 
 if ! gh pr merge "$pr" --repo "$repo" --squash --match-head-commit "$head"; then
   read -r state merged_head < <(gh pr view "$pr" --repo "$repo" --json state,headRefOid \
@@ -70,3 +87,23 @@ git fetch -q origin main
 git merge-base --is-ancestor "$merged" origin/main \
   || { echo "land: merge commit $merged is not on origin/main" >&2; exit 1; }
 echo "land: PR $pr merged as $merged on origin/main (head $head)"
+
+if [ -x scripts/production-live ]; then
+  waited=0
+  while :; do
+    live=$(scripts/production-live 2>&1) && [ "$live" = "$merged" ] && break
+    build=$(vercel_build "$merged")
+    if [ "$build" = failure ] || [ "$build" = error ]; then
+      echo "land: the production build of $merged failed ($build); production serves ${live:-nothing readable}. main is red: fix it before anything else lands" >&2
+      exit 6
+    fi
+    if [ "$waited" -ge "$wait_s" ]; then
+      echo "land: PR $pr is merged, but production runs ${live:-nothing readable}, not $merged, after $((waited / 60)) min. This is a stop: never deploy production by hand" >&2
+      exit 7
+    fi
+    [ "$waited" -gt 0 ] || echo "land: waiting for production to run $merged"
+    sleep "$poll_s"
+    waited=$((waited + poll_s))
+  done
+  echo "land: production runs $merged"
+fi

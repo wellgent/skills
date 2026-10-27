@@ -160,8 +160,8 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
   A merge commit carries no content, so the default branch never gets one.
 - **Work lands through pull requests**: a run works on a branch in its own worktree, opens a pull request, and lands it under the landing authority its prompt grants once its independent verifier passes.
 - **One gate**: `scripts/land <pr>` (from [`templates/project/scripts/land`](../templates/project/scripts/land)) merges only on a passing `check` status on the exact head, `gh pr merge --squash --match-head-commit`, and reads the merge back.
-  A pull request need not be up to date with `main`; it restacks only on a real conflict, and there is no CI run on `main`, so the production deploy is the only build `main` gets.
-  Where the plan allows required status checks, the repository ruleset requires `check` too, with no up-to-date requirement; no plan is upgraded for it.
+  A pull request lands only on a head that holds `main`'s tip, so the tree that lands is the tree `check` passed; there is no CI run on `main`, so the production deploy is the only build `main` gets, and `scripts/land` waits for it and exits non-zero when it fails.
+  Where the plan allows required status checks, the repository ruleset requires `check` too, with no up-to-date requirement, since `scripts/land` holds that rule; no plan is upgraded for it.
   When `scripts/check` cannot run, landing pauses and the run notifies the owner; building and verifying go on.
   Never a merge-commit button, never a `git pull` that merges.
 - **Repo settings**: squash and rebase merging on, merge commits off, head branches deleted on merge.

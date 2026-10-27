@@ -39,15 +39,17 @@ No GitHub Actions run for this project.
 
 ## Landing
 
-- **Only through `scripts/land <pr>`.** It refuses a PR that is not open or does not target `main` (exit 1) and a head SHA without a passing `check` status (exit 3).
+- **Only through `scripts/land <pr>`.** It refuses a PR that is not open or does not target `main` (exit 1), a head SHA without a passing `check` status (exit 3) and a head behind `main`'s tip (exit 5).
   It squash-merges with `--match-head-commit` on that SHA and reads the merge back from `origin/main`.
   When `gh pr merge` exits non-zero, it reads the PR back and lands only a PR that GitHub shows merged on that SHA.
-- **No up-to-date requirement.** A PR merges on its own green `check` and need not be rebased on the latest `main`.
+- **The head holds `main`'s tip.** The tree that lands is the tree `check` passed, so two PRs green on their own bases never break `main` together.
+  A PR behind `main` merges `main` into its branch and its new head gets its own `scripts/check` before it lands.
+  A merge that resolves a conflict sends the resolved hunks back to the verifier, which checks only those.
   <Whether the repository ruleset also requires the `check` status on `main`, or why the plan does not allow it.>
-- **Restack only on a real conflict.** A restack that resolves a conflict sends the resolved hunks back to the verifier, which checks only those, and the new head gets its own `scripts/check`.
 - **Production deploys one at a time.** <What a push to `main` deploys>.
   On a project with `scripts/production-live`, `scripts/land` merges only once production runs `main`'s tip, or once the production build of the tip has failed while production serves an ancestor of it, so two production deploys never overlap and the PR that fixes a failed build can land; after 30 minutes it exits 4, which is a stop.
-  `scripts/production-live` prints the commit production serves and does not wait: a production step that needs a landing live reads it every 30 seconds in one bash loop until it prints the landed commit, and past 30 minutes it is a stop.
+  After the merge it returns only once production runs the merge commit, so a step after a landing needs no wait of its own: exit 6 means the merge's production build failed and `main` is red, exit 7 that production did not reach it in 30 minutes, which is a stop.
+  `scripts/production-live` prints the commit production serves and does not wait.
   Nobody deploys production by hand: production comes only from the host's own build of `main`.
   A failed production deploy is reported and fixed as the run's next PR.
 - **When `scripts/check` cannot run** (exit 2), landing pauses and the run posts a stop on its request.
