@@ -73,7 +73,7 @@ It returns with one reason, printed:
 - **Exit 0**: every comment newer than the given one (default: the newest now), skipping the operator's own, once the newest has been quiet for 90 seconds, so a stop and its amendment arrive together. Handle each: the plan, a stop, a confirmation, the hand-back or the note.
 - **Exit 3**: the run's session is gone with no new comment (see The note).
 - **Exit 4**: this host's weekly usage is at 90% or above: pause the run (see Pause).
-- **Exit 5**: the run's session has done nothing for 30 minutes with no new comment. Read its pane (`herdr agent read <session> --source visible`) and act on what holds it: a five-hour usage limit waits for its reset, then the run is told in its pane to carry on; anything else is handled like a stop.
+- **Exit 5**: the run's session has done nothing for 30 minutes with no new comment, while nobody is assigned on the request. Read its pane (`herdr agent read <session> --source visible`) and act on what holds it: a five-hour usage limit waits for its reset, then the run is told in its pane to carry on; anything else is handled like a stop.
 - **Exit 6**: this host's weekly usage has been unreadable for 30 minutes. Read the weekly percentage from the run's status line in its pane; at 90% or above pause the run, otherwise restart the watch.
 
 Restart it after each return, from the newest comment id it printed, or from the id it started from when it printed none, until the note is handled. Never restart it from a comment this session posted: the watch skips the operator's own comments, and a run comment posted just before the operator's would go unread.

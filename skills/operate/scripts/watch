@@ -7,7 +7,9 @@
 #           arrives with it; the operator's own (opening with **Operator or scope: **Operator) are skipped
 #   exit 3  the run's session is gone with no new comment
 #   exit 4  this host's weekly usage is at or above WATCH_WEEKLY_LIMIT percent (default 90; off disables)
-#   exit 5  the run's session has done nothing for WATCH_IDLE_MINUTES (default 30) with no new comment
+#   exit 5  the run's session has done nothing for WATCH_IDLE_MINUTES (default 30) with no new comment,
+#           while nobody is assigned on the request (an assignee is the requester holding a call the
+#           run waits on, so its quiet is expected)
 #   exit 6  the weekly usage has been unreadable for WATCH_USAGE_BLIND_MINUTES (default 30)
 #   exit 1  a usage error
 # Exits 3 to 6 print a one-line reason. A failed GitHub call or usage read while waiting is retried.
@@ -77,7 +79,9 @@ while :; do
   now=$(date +%s)
   status=$(jq -r '.result.agent.agent_status // "unknown"' <<<"$agent")
   seq=$(jq -r '.result.agent.state_change_seq // ""' <<<"$agent")
-  if [ "$status" = working ] || [ "$seq" != "$last_seq" ]; then active_at=$now; fi
+  # The operator assigns the requester while a call is theirs: the run waits on it, so quiet is not idle.
+  assigned=$(gh issue view "$issue" --json assignees --jq '.assignees | length' 2>/dev/null || echo 0)
+  if [ "$status" = working ] || [ "$seq" != "$last_seq" ] || [ "${assigned:-0}" -gt 0 ]; then active_at=$now; fi
   last_seq=$seq
   if [ $((now - active_at)) -ge "$idle_s" ]; then
     echo "watch: $session has been $status for $(( (now - active_at) / 60 )) minutes and request $issue has no comment after $after" >&2
