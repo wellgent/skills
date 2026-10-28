@@ -36,6 +36,7 @@ No GitHub Actions run for this project.
   A head pushed any other way has no `check` status and cannot land.
 - **Dry run.** `scripts/check --dry` runs the same steps on any checked-out commit, a detached HEAD or `main` included, and pushes and posts nothing.
   `/operate`'s Ready runs it in a fresh worktree as the smoke test before a run starts.
+- **One at a time.** `scripts/check` runs in the foreground, one at a time per worktree: a second run in the same worktree breaks both, since the dev server refuses a second instance in one checkout.
 
 ## Landing
 
