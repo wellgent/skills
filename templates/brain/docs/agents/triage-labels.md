@@ -29,8 +29,8 @@ When a skill asks for a category and neither `defect` nor `change` fits, apply `
 ## Other axes
 
 `wayfinder:*` records the *type* of a ticket on a wayfinder map (`map`, `research`, `prototype`, `grilling`, `task`).
-Triage labels record *whether the issue is real and who acts next*.
-Both apply to the same issue without conflict: a wayfinder child ticket can carry `wayfinder:task`, `effort` and `ready-for-agent` at once.
+A map and its tickets carry their `wayfinder:` label and no other: they are decisions, not implementation work, so they get no category or state label.
+On a wayfinder ticket the assignee says whose move it is: a session's claim, or the owner's when the ticket waits on them.
 
 `run` marks a run request for `/operate`, assigned to the requester while a call or a checked note waits for them.
 
@@ -39,8 +39,7 @@ Both apply to the same issue without conflict: a wayfinder child ticket can carr
 
 `eval-candidate` marks an issue about a lookup that missed; the weekly retrieval eval verifies it as a candidate, comments the outcome and removes the label (`ops/brain-infra/skills/brain-health/eval/EVAL.md`).
 
-Triage is the entry path for ad-hoc issues that arrive outside a map.
-Wayfinder children are already scoped by the map, so they need triage only when their state is in question.
+Triage is the entry path for ad-hoc issues that arrive outside a map; maps and their tickets are never triaged.
 
 ## Brain adaptations
 
