@@ -44,7 +44,7 @@ No GitHub Actions run for this project.
   It squash-merges with `--match-head-commit` on that SHA and reads the merge back from `origin/main`.
   When `gh pr merge` exits non-zero, it reads the PR back and lands only a PR that GitHub shows merged on that SHA.
 - **The head holds `main`'s tip.** The tree that lands is the tree `check` passed, so two PRs green on their own bases never break `main` together.
-  A PR behind `main` merges `main` into its branch and its new head gets its own `scripts/check` before it lands.
+  A PR behind `main` merges `main` into its branch with `git merge --no-ff origin/main`, since fleet hosts set `merge.ff=only`, and its new head gets its own `scripts/check` before it lands.
   A merge that resolves a conflict sends the resolved hunks back to the verifier, which checks only those.
   <Whether the repository ruleset also requires the `check` status on `main`, or why the plan does not allow it.>
 - **Production deploys one at a time.** <What a push to `main` deploys>.
