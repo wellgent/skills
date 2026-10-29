@@ -12,6 +12,8 @@ The command steps live in `scripts/health.py`; health values live in `config.jso
 ## Routines
 
 - **`health-nightly`** runs the `gbrain dream` phases in `nightly_phases` on the published copy. A phase passes only when its own entry reads `ok`; any other result fails the run.
+  It then applies the engine's safe frontmatter fixes (silent): `gbrain repair frontmatter` previews the files the engine holds or reads only by guessing, and each `safe` item, a value quoted as the engine already reads it, is fixed with `gbrain frontmatter validate --fix` in the maintenance clone and committed on its own with `Op: REPAIR <path>`, ledger areas included, since the fix changes no value.
+  Interpretive items are left alone, a file the safe pass cannot fix stays a doctor warning, and a failed repair makes the run partial.
 - **`health-purge`** runs `gbrain pages purge-deleted --yes`, hard-deleting pages soft-deleted more than 72 h ago.
 - **`health-doctor`** runs the checks below in order and writes one run record holding all of them.
 - **`health-eval`** is the weekly agentTurn that verifies retrieval eval candidates, promotes them into a new set version and scores the set with `gbrain eval gate --qrels`. Its steps, the set and its alerts are in `eval/EVAL.md`.

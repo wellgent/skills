@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Brain health workflow steps, each a command routine under brain-routines.
 
-  health.py nightly   the derived-maintenance dream phases
+  health.py nightly   the derived-maintenance dream phases, then the safe frontmatter repair
   health.py purge     hard-delete pages soft-deleted more than 72 h ago
   health.py doctor    timeline repair, the full doctor, schema pack, writer roster, entity lint, brain checks, deadman, reconciler rollup
 
@@ -86,7 +86,60 @@ def nightly(s):
             done.append(f'{d.get("total_orphans", 0)} orphans of {d.get("total_linkable", 0)} linkable pages')
         else:
             done.append(phase)
+    fixed = frontmatter_repair(s)
+    if fixed:
+        done.append(f'{fixed} frontmatter file(s) repaired')
     s.finish(', '.join(done))
+
+
+def frontmatter_repair(s):
+    """The engine's safe frontmatter fixes, made in the maintenance clone, one commit per file; return the count, or None on failure.
+
+    `repair frontmatter` previews which files the engine holds or reads only by guessing; a `safe` item quotes a value as the
+    engine already reads it, so the page means the same. `frontmatter validate --fix` (without --include-ambiguous) applies
+    exactly those fixes to the clone's file. Interpretive items stay out, and a file the safe pass cannot fix stays a doctor warning."""
+    code, report, err = s.gbrain_json(['repair', 'frontmatter', '--source', s.rc['source_id'], '--json'], timeout=600, name='frontmatter')
+    if code or report is None:
+        s.problem('frontmatter preview failed', f'Frontmatter repair: the preview failed (exit {code}): {(err or "").strip()[-200:]}')
+        return None
+    prefix = s.rc['source_id'] + ':'
+    safe = {}
+    for result in report.get('results', []):
+        for item in result.get('listing', []):
+            if item.get('class') == 'safe' and item.get('item', '').startswith(prefix):
+                safe.setdefault(item['item'][len(prefix):], []).append(item.get('detail', ''))
+    repo = Path(s.cfg['maintenance_repo'])
+    commits, unfixed = [], []
+    try:
+        for rel, details in sorted(safe.items()):
+            if not (repo / rel).is_file():
+                unfixed.append(rel)
+                continue
+            code, out, _ = s.gbrain_json(['frontmatter', 'validate', str(repo / rel), '--fix', '--json'], timeout=120)
+            changed = lib.clone_git(s.cfg, 'status', '--porcelain=v1', '--untracked-files=all').splitlines()
+            if code or not out or out.get('files_fixed') != 1 or [line[3:] for line in changed] != [rel]:
+                lib.clone_git(s.cfg, 'checkout', '--quiet', '--', '.')
+                lib.clone_git(s.cfg, 'clean', '-fdq')
+                unfixed.append(rel)
+                continue
+            lib.clone_git(s.cfg, 'add', '--', rel)
+            scope = rel.split('/', 1)[0] if '/' in rel else 'brain'
+            lib.clone_git(s.cfg, 'commit', '--quiet', '-m', f'{scope}: quote frontmatter the engine reads only by guessing',
+                          '-m', f'Routine: {s.meta["routine"]} ({s.meta["run_id"]})\nOp: REPAIR {rel}\nReason: ' + '; '.join(details))
+            commits.append(rel)
+        if commits:
+            lib.push_clone(s.cfg)  # rebases onto origin, so the shas are read after it
+            shas = lib.clone_git(s.cfg, 'log', f'-{len(commits)}', '--format=%H').splitlines()[::-1]
+            commits = list(zip(commits, shas))
+    except Failed as error:
+        s.problem('frontmatter repair failed', f'Frontmatter repair: {error}')
+        return None
+    for rel, sha in commits:
+        s.note(f'Frontmatter of `{rel}` quoted by the safe repair: {lib.commit_url(s.cfg, sha)} (`git revert {sha[:12]}`).')
+    if unfixed:
+        s.note('The safe frontmatter repair left ' + ', '.join(f'`{r}`' for r in unfixed) + ' for the doctor to report.')
+    s.counts['frontmatter files repaired'] = len(commits)
+    return len(commits)
 
 
 # purge
