@@ -25,7 +25,7 @@ Use when working in a {{brain}} checkout, or when a task involves {{brain}}/GBra
 - Off the brain host, people and their tools read the brain only through its thin client: a personal read-only OAuth client against the brain's HTTP endpoint, as Reaching the engine describes.
 - Writes go through Git: a push to `main` on GitHub from a checkout, or an on-box writer clone through `gbrain git commit-push`.
 - SSH to the brain host is for host administration. One-shot `gbrain` commands over SSH stay allowed there (doctor, repairs, the GBrain upgrade lane). A stdio `gbrain serve` over SSH is never allowed, for anyone: it runs a second persistence consumer next to the host's own, which GBrain's doctor flags as `two_consumers_on_host`.
-- From 2026-11-05 the host's `~/.local/bin/gbrain` launcher refuses `gbrain serve` without `--http` inside an SSH session and points at the thin client.
+- An agent that finds its MCP entry or a script running `gbrain serve` over SSH to the brain host switches it to the thin client, set up as Reaching the engine describes with the person's own client credentials.
 
 ## Checkout write flow
 
