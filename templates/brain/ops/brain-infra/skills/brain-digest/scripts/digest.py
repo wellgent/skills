@@ -44,8 +44,8 @@ RAW = [(re.compile(r'https?://'), 'a raw URL'), (re.compile(r'\b(?=[0-9a-f]*[a-f
        (re.compile(r'\b[\w.-]+/[\w./-]+\.(?:md|json|py)\b'), 'a file path'), (re.compile(r'\brevert\b', re.I), 'a revert instruction'),
        (re.compile(r'[{}`]'), 'markup')]
 YES = re.compile(r'^\W*(yes|y|ok|okay|sure|agreed|approve[d]?|go ahead|do it|recommended|fine)\b', re.I)
-KIND_WORDS = {'archive move': 'Moved to the archive', 'restore': 'Restored from the archive', 'page deletion': 'Deleted',
-              'span deletion': 'Removed text from', 'filing move': 'Refiled', 'edit': 'Edited', 'other': 'Changed'}
+KIND_WORDS = {'archive move': 'moved {} to the archive', 'restore': 'restored {} from the archive', 'page deletion': 'deleted {}',
+              'span deletion': 'removed text from {}', 'filing move': 'refiled {}', 'edit': 'edited {}', 'other': 'changed {}'}
 # How upstream's changelog marks a release: in its bold headline, or in the lead paragraph.
 RELEASE = re.compile(r'^## \[([^\]]+)\](?:[^\n\d]*(\d{4}-\d{2}-\d{2}))?[^\n]*\n(.*?)(?=^## \[|\Z)', re.M | re.S)
 SECURITY_HEADLINE = re.compile(r'\bsecurity\b|vulnerab|\bCVE-\d|\badvisor(?:y|ies)\b|escalation'
@@ -55,6 +55,13 @@ DEFAULT_ON = re.compile(r'\b(?:on|enabled) by default\b|\bdefault-on\b', re.I)
 
 
 # helpers
+
+LINK = re.compile(r'\[([^\]]*)\]\(<?[^)>]*>?\)')
+
+
+def visible(text):
+    """The characters Discord shows: a link shows its text, not its URL."""
+    return len(LINK.sub(r'\1', text))
 
 def git(cfg, *args, timeout=180):
     return lib.clone_git(cfg, *args, timeout=timeout)
@@ -236,13 +243,22 @@ def done(runs):
     return out
 
 
-def health(cfg, runs, start, own):
-    """Anything off in the window: runs that failed or ran partly, deferrals, alerts that could not be sent."""
+def health(cfg, runs, start, own, edition='daily'):
+    """Anything off in the window: runs that failed or ran partly, deferrals, alerts that could not be sent.
+
+    The weekly edition reports a routine only while its last run in the window is still not ok; the daily digests
+    already reported the problems a later run cleared."""
     routines = manifest_routines(cfg)
+    last = {}
+    for meta, _ in runs:
+        if not meta.get('forced') and meta.get('status') and meta['started_at'] >= last.get(meta['routine'], (0, None))[0]:
+            last[meta['routine']] = (meta['started_at'], meta['status'])
     facts = []
     for meta, entries in runs:
         if meta['routine'] == own or meta.get('status') in (None, 'ok') or meta.get('forced'):
             continue  # a forced or test run speaks only through the content it changed
+        if edition == 'weekly' and last.get(meta['routine'], (0, 'ok'))[1] == 'ok':
+            continue
         r = routines.get(meta['routine'], {})
         problems = [clip(e['text'], 240) for e in entries if e['kind'] == 'problem'][:2]
         facts.append({'routine': meta['routine'], 'title': r.get('title', meta['routine']), 'status': meta['status'],
@@ -417,8 +433,14 @@ def build(cfg, run_id, own, end, edition=None):
     part('changes', changes, cfg, start, end)
     packet['changes'] = (packet['changes'] or []) + outside_changes(cfg, runs)
     part('needs_you', attention, cfg, start)
+    packet['still_open'] = []
+    if edition == 'daily' and packet['needs_you']:
+        packet['still_open'] = [{'number': i['number'], 'url': i['url']} for i in packet['needs_you'] if not i['new']]
+        packet['needs_you'] = [i for i in packet['needs_you'] if i['new']]
+        for k, i in enumerate(packet['needs_you'], 1):
+            i['item'] = k
     packet['done'] = done(runs)
-    packet['health'] = health(cfg, runs, start, own)
+    packet['health'] = health(cfg, runs, start, own, edition)
     packet['watch'], packet['watch_facts'] = [], {}
     if edition == 'weekly':
         packet['watch'], watch_problems, packet['watch_facts'] = watch(cfg, start)
@@ -427,7 +449,26 @@ def build(cfg, run_id, own, end, edition=None):
     needs = packet['needs_you'] or []
     packet['news'] = bool(edition == 'weekly' or packet['changes'] or packet['done'] or packet['health']
                           or any(i['new'] for i in needs) or packet['needs_you'] is None)
+    packet['limits'] = limits(packet)
     return packet
+
+
+def limits(p):
+    """The sentence limits the narrative writes to. The weekly edition shares what the screen leaves after the fixed
+    parts among its sentences, so a narrative within the limits fits on one screen the first time."""
+    out = {'gist_chars': NARR['gist_chars'], 'item_chars': NARR['item_chars'],
+           'items': NARR['items_weekly' if p['edition'] == 'weekly' else 'items_daily'], 'health_chars': NARR['health_chars']}
+    if p['edition'] != 'weekly':
+        return out
+    out['items'] = min(out['items'], max(1, len(p.get('changes') or [])))
+    empty = {'needs_you': {}, 'changed': [{'text': '', 'commits': [], 'link': c['sha']} for c in (p.get('changes') or [])[:out['items']]],
+             'done': {}, 'health': ''}
+    fixed = sum(visible(m) for m in pack(render(p, empty))) + (out['health_chars'] if p.get('health') else 0)
+    slots = len(p.get('needs_you') or []) + (out['items'] if p.get('changes') else 0)
+    if slots:
+        share = max(NARR['min_sentence_chars'], (NARR['screen_chars'] - fixed) // slots)
+        out['gist_chars'], out['item_chars'] = min(out['gist_chars'], share), min(out['item_chars'], share)
+    return out
 
 
 def cmd_gather(cfg, args):
@@ -474,14 +515,15 @@ def check(p, n):
             if pattern.search(text):
                 errors.append(f'{where} carries {what}; name pages by title and leave links to the render')
 
+    lim = p.get('limits') or limits(p)
     needs = {str(i['number']): i for i in p.get('needs_you') or []}
     gists = n.get('needs_you') or {}
     for num in needs:
-        plain(f'needs_you {num}', gists.get(num), NARR['gist_chars'])
+        plain(f'needs_you {num}', gists.get(num), lim['gist_chars'])
     errors += [f'needs_you {num} is not an open needs-attention issue' for num in gists if num not in needs]
     shas = {c['sha'] for c in p.get('changes') or []}
     items = n.get('changed') or []
-    cap = NARR['items_weekly' if p['edition'] == 'weekly' else 'items_daily']
+    cap = lim['items']
     if not isinstance(items, list) or len(items) > cap:
         errors.append(f'changed needs a list of at most {cap} items')
         items = []
@@ -490,7 +532,7 @@ def check(p, n):
         if not isinstance(item, dict):
             errors.append(f'changed item {k} is not an object')
             continue
-        plain(f'changed item {k}', item.get('text'), NARR['item_chars'])
+        plain(f'changed item {k}', item.get('text'), lim['item_chars'])
         cited = [s[:7] for s in item.get('commits') or []]
         if not cited:
             errors.append(f'changed item {k} cites no commits')
@@ -503,40 +545,48 @@ def check(p, n):
     missing = sorted(shas - covered)
     if missing:
         errors.append('every change in the window belongs to one item; missing: ' + ', '.join(missing[:30]) + (' ...' if len(missing) > 30 else ''))
-    answers = {str(x['number']) for x in p.get('done') or []}
-    for num in answers:
-        plain(f'done {num}', (n.get('done') or {}).get(num), NARR['gist_chars'])
+    if p['edition'] != 'weekly':
+        for num in {str(x['number']) for x in p.get('done') or []}:
+            plain(f'done {num}', (n.get('done') or {}).get(num), lim['gist_chars'])
     if p.get('health'):
-        plain('health', n.get('health'), NARR['health_chars'])
+        plain('health', n.get('health'), lim['health_chars'])
     elif n.get('health'):
         errors.append('health is empty when nothing is off')
     if not errors and p['edition'] == 'weekly':
-        size = sum(len(m) for m in pack(render(p, n)))
+        size = sum(visible(m) for m in pack(render(p, n)))
         if size > NARR['screen_chars']:
             errors.append(f'the weekly edition renders to {size} characters; fit it on one screen ({NARR["screen_chars"]}) with fewer, shorter items')
     return errors
 
 
 def fallback(p):
-    """Sentences from the facts, for when the agent's narrative is missing or invalid."""
+    """Sentences from the facts, for when the agent's narrative is missing or invalid: one item per workflow and kind
+    of change, largest first, with the page count and the first few titles."""
+    lim = p.get('limits') or limits(p)
     groups = {}
     for c in p.get('changes') or []:
         groups.setdefault((c['workflow'], c['kind']), []).append(c)
+    ranked = sorted(groups.items(), key=lambda kv: -len(kv[1]))
+    cap = lim['items']
+    if len(ranked) > cap:
+        rest = [c for _, group in ranked[cap - 1:] for c in group]
+        ranked = ranked[:cap - 1] + [(('', 'rest'), rest)]
     changed = []
-    for (wf, kind), group in groups.items():
-        titles = ', '.join(dict.fromkeys(c['title'] for c in group))
-        changed.append({'text': clip(f'{KIND_WORDS[kind]} by the {wf} workflow: {titles}.', NARR['item_chars']),
-                        'commits': [c['sha'] for c in group], 'link': group[0]['sha']})
-    cap = NARR['items_weekly' if p['edition'] == 'weekly' else 'items_daily']
-    if len(changed) > cap:
-        rest = [c for item in changed[cap - 1:] for c in item['commits']]
-        changed = changed[:cap - 1] + [{'text': 'Other maintenance changes.', 'commits': rest, 'link': rest[0]}]
+    for (wf, kind), group in ranked:
+        titles = list(dict.fromkeys(c['title'] for c in group))
+        if kind == 'rest':
+            workflows = ' and '.join(sorted({c['workflow'] for c in group}))
+            text = f'{len(titles)} more page(s) changed by the {workflows} workflows.'
+        else:
+            named = ', '.join(titles[:3]) + (f' and {len(titles) - 3} more' if len(titles) > 3 else '')
+            text = f'The {wf} workflow {KIND_WORDS[kind].format(named)}.'
+        changed.append({'text': clip(text, lim['item_chars']), 'commits': [c['sha'] for c in group], 'link': group[0]['sha']})
     verbs = {'partial': 'ran only partly', 'failed': 'failed', 'deferred': 'was deferred'}
     health = '; '.join(f'{f["title"]} {verbs.get(f["status"], f["status"])}' + (f': {f["problems"][0]}' if f['problems'] else f': {f["summary"]}' if f['summary'] else '')
                        for f in p.get('health') or [])
-    return {'needs_you': {str(i['number']): clip(i['finding'], NARR['gist_chars']) for i in p.get('needs_you') or []},
+    return {'needs_you': {str(i['number']): clip(LINK.sub(r'\1', i['finding']), lim['gist_chars']) for i in p.get('needs_you') or []},
             'changed': changed, 'done': {str(x['number']): f'You chose {x["label"].lower()}.' for x in p.get('done') or []},
-            'health': clip(health[0].upper() + health[1:], NARR['health_chars']) if health else ''}
+            'health': clip(health[0].upper() + health[1:], lim['health_chars']) if health else ''}
 
 
 def render(p, n):
@@ -558,6 +608,9 @@ def render(p, n):
             lines.append(f'{i["item"]}. {(n.get("needs_you") or {}).get(str(i["number"]), "")}{rec} [#{i["number"]}](<{i["url"]}>)')
         lines.append('-# Reply here with the item and your answer: `1: yes` takes the recommended option, `2: option 3` another one.')
         blocks.append('\n'.join(lines))
+    if p.get('still_open'):
+        links = ', '.join(f'[#{i["number"]}](<{i["url"]}>)' for i in p['still_open'])
+        blocks.append(f'-# {len(p["still_open"])} still open from earlier digests: {links}. Monday\'s edition lists them in full.')
     by_sha = {c['sha']: c for c in p.get('changes') or []}
     if n.get('changed'):
         lines = ['**Changed**']
@@ -565,7 +618,10 @@ def render(p, n):
             c = by_sha.get((item.get('link') or '')[:7])
             lines.append(f'- {item["text"]}' + (f' [{clip(c["title"], 60)}](<{c["link"]}>)' if c else ''))
         blocks.append('\n'.join(lines))
-    if p.get('done'):
+    if p.get('done') and p['edition'] == 'weekly':
+        numbers = ', '.join(f'#{x["number"]}' for x in p['done'])
+        blocks.append(f'**Done:** {len(p["done"])} of your answers applied this week ({numbers}).')
+    elif p.get('done'):
         lines = ['**Done**']
         lines += [f'- {(n.get("done") or {}).get(str(x["number"]), "")} [#{x["number"]}](<{x["url"]}>)' for x in p['done']]
         blocks.append('\n'.join(lines))

@@ -18,6 +18,7 @@
     "items_daily": 8,
     "items_weekly": 6,
     "health_chars": 300,
-    "screen_chars": 2800
+    "screen_chars": 2800,
+    "min_sentence_chars": 80
   }
 }
