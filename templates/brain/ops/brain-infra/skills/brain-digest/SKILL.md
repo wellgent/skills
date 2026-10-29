@@ -44,7 +44,7 @@ Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain
 ## What the digest reports
 
 1. **Needs you**: the open `needs-attention` issues, oldest first, numbered, each with its sentence, the recommended option parsed from the issue and the issue link, then how to reply. A daily digest lists only the items new in its window and puts the older open ones on one line of issue links; the weekly edition lists every open item.
-2. **Changed**: the maintenance writer's commits in the window, and changes routines recorded in other repositories (the agent workspace, the shared core), one link per item to the page on the main branch, or to its last version for a deleted page.
+2. **Changed**: the maintenance writer's commits in the window and changes routines recorded in other repositories (the agent workspace, the shared core), one link per item to the page on the main branch, or to its last version for a deleted page. Mechanical repairs (`Op: REPAIR`) are a silent tier: they never appear here and are no news.
 3. **Done**: the answers the workflows applied in the window; on the weekly edition one line with their count and issue numbers.
 4. **Health**: one line, only when a routine run failed, ran partly or was deferred in the window, or an alert could not be sent. The weekly edition names a routine only while its last run in the week has not ended ok.
 

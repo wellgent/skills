@@ -160,6 +160,8 @@ def changes(cfg, start, end):
                 files[parts[1]] = (parts[0][0], parts[2] if len(parts) > 2 else None)
         routine = re.search(r'^Routine: (\S+)', body, re.M)
         op = re.search(r'^Op: (\w+) (\S+)', body, re.M)
+        if op and op.group(1) == 'REPAIR':
+            continue  # mechanical repair is a silent tier
         reason = re.search(r'^Reason: (.+)$', body, re.M)
         rid = routine.group(1) if routine else None
         path = op.group(2) if op else next(iter(files), '')
