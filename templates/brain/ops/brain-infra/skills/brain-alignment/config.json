@@ -14,10 +14,5 @@
   "semantic_hits": 10,
   "neighbour_cap": 30,
   "diff_chars": 10000,
-  "lint_ignore": ["type-undeclared", "huge-page"],
-  "judge_miss": {
-    "window_days": 14,
-    "lookback_days": 28,
-    "threshold": 0.1
-  }
+  "lint_ignore": ["type-undeclared", "huge-page"]
 }

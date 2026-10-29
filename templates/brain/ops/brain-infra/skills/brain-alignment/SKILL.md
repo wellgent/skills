@@ -1,6 +1,6 @@
 ---
 name: brain-alignment
-description: "The daily alignment of the brain: each day's changed pages judged against their one-hop links, backlinks and semantic neighbours, with guarded edits, needs-attention flags and judge-miss tracking. Use when running the alignment-daily routine, or when debugging or tuning the alignment."
+description: "The daily alignment of the brain: each day's changed pages judged against their one-hop links, backlinks and semantic neighbours, with guarded edits and needs-attention flags. Use when running the alignment-daily routine, or when debugging or tuning the alignment."
 ---
 
 # Brain Alignment
@@ -26,7 +26,7 @@ Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain
    3. Write the verdict list to the packet's `verdicts_file` as `{"verdicts": [...]}`; the formats are below.
    4. Run the packet's `apply` command and read its output. The batch is done when that command has run, whatever it applied or refused.
       Its commit links are the receipt: the reconciler indexes every push, so the batch needs no further verification.
-5. **Finish.** `alignment.py finish --run <run_id>` checks judge misses and runs `routine.py end`, which writes the run record.
+5. **Finish.** `alignment.py finish --run <run_id>` runs `routine.py end`, which writes the run record.
    The status is `ok` by default: refused verdicts, flags and pages left in the queue are normal outcomes the run record holds.
    Pass `--status failed --summary "<what broke>"` only when a command failed and the run could not finish its batches.
 6. End the turn with `NO_REPLY`; the run posts nothing.
@@ -65,14 +65,6 @@ There is no edit cap.
 `<state_dir>/alignment/state.json` holds the cursor (the last commit prep read) and the queue.
 `next` hands out batches oldest first and stops at `max_pages` pages per run or once the run has used `budget_seconds`; everything left carries to the next run, and the run record says how many pages carried over.
 A page that goes `max_attempts` batches without an apply leaves the queue and makes the run partial.
-
-## Judge misses
-
-A **judge miss** is a maintenance edit whose span another writer reverts or rewrites within 14 days.
-`scripts/judge_misses.py` reads them from Git for every workflow, from the `Routine:` and `Op:` lines `apply.py` writes into each commit, and `finish` writes `<state_dir>/judge-misses.json` for the digest's weekly edition.
-A merge commit is never a writer's edit: the check reads the commits a merge brings in, each under its own author, and only those made on top of the maintenance edit.
-When the alignment's own rate over the last 28 days passes 10%, `finish` files a needs-attention issue with the missed edits: option 1 keeps the routine as it is, option 2 holds the alignment writes.
-While writes are held, runs judge and report but apply nothing, and an open issue offers the release (`alignment.py hold --off`).
 
 ## Operating
 

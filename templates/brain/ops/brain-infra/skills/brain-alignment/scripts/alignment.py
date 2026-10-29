@@ -8,9 +8,9 @@ The alignment-daily agent turn runs, in order:
   alignment.py next --run <run_id>               the next batch packet, or {"done": true} at the page cap
   alignment.py apply --run <run_id> <verdicts>   the batch's verdicts through the alignment guards and apply.py
   ... next and apply until done ...
-  alignment.py finish --run <run_id>             judge misses, then routine.py end
+  alignment.py finish --run <run_id>             the run summary, then routine.py end
 
-Owner replies to needs-attention issues run `apply-option <proposal>` and `hold --on|--off`.
+Owner replies to needs-attention issues run `apply-option <proposal>`.
 Everything zero-LLM: Git in the maintenance clone, `gbrain lint` and `gbrain query`.
 """
 import argparse
@@ -30,7 +30,6 @@ sys.path[:0] = [str(FRAMEWORK), str(SCRIPTS)]
 import routinelib as lib  # noqa: E402
 from routinelib import Failed  # noqa: E402
 import apply as applylib  # noqa: E402
-import judge_misses  # noqa: E402
 
 CONF = json.loads((SKILL_DIR / 'config.json').read_text())
 RID = CONF['routine']
@@ -51,7 +50,7 @@ def alignment_dir(cfg):
 
 
 def load_state(cfg):
-    return lib.read_json(alignment_dir(cfg) / 'state.json', {'cursor': None, 'queue': {}, 'held': False})
+    return lib.read_json(alignment_dir(cfg) / 'state.json', {'cursor': None, 'queue': {}})
 
 
 def save_state(cfg, state):
@@ -198,7 +197,7 @@ def cmd_prep(cfg, args):
     rec.update(new=len(changed), carried=len(queue) - len(changed), base=base, head=head)
     save_run(cfg, meta['run_id'], rec)
     print(json.dumps({'queued': len(queue), 'changed_since_last_run': len(changed), 'carried_over': len(queue) - len(changed),
-                      'batches_estimate': math.ceil(min(len(queue), CONF['max_pages']) / CONF['batch_size']), 'held': bool(state.get('held')),
+                      'batches_estimate': math.ceil(min(len(queue), CONF['max_pages']) / CONF['batch_size']),
                       'next': f'{CMD} next --run {meta["run_id"]}'}, indent=2))
     return 0
 
@@ -509,12 +508,6 @@ def cmd_apply(cfg, args):
                  'action': proposal_action(cfg, run_id, fp, n, o['verdict']) if o.get('verdict') else {'type': 'close'}}
                 for n, o in enumerate(v['options'], 1)])
         passed.append(v)
-    writes = [v for v in passed if v.get('op') in ('UPDATE', 'ADD', 'DELETE')]
-    if state.get('held') and writes:
-        lib.journal(cfg, run_id, 'note', text=f'Batch {args.batch}: writes are held, so {len(writes)} edit verdict(s) were judged and not applied.')
-        passed = [v for v in passed if v not in writes]
-        for v in writes:
-            refused.append({'verdict': v, 'reason': 'held: alignment writes are held by the owner'})
     result = applylib.Applier(cfg, meta).apply(passed) if passed else {'applied': [], 'rejected': [], 'flagged': [], 'noop': 0}
     for path in targets:
         state['queue'].pop(path, None)
@@ -570,58 +563,13 @@ def cmd_apply_option(cfg, args):
     return 0
 
 
-def cmd_hold(cfg, args):
-    state = load_state(cfg)
-    state['held'] = args.on
-    save_state(cfg, state)
-    print(json.dumps({'note': 'Alignment writes are held: verdicts are judged and reported, nothing is applied.' if args.on
-                      else 'Alignment writes are released: the next run applies verdicts again.'}))
-    return 0
-
-
 # the run summary
-
-def miss_check(cfg, meta, report):
-    wf = report['workflows'].get(meta['workflow'])
-    if not wf or not wf['misses'] or wf['rate'] <= CONF['judge_miss']['threshold']:
-        return
-    misses = [m for m in report['misses'] if m['workflow'] == meta['workflow']]
-    key = hashlib.sha1(' '.join(sorted(m['commit'] for m in misses)).encode()).hexdigest()[:12]
-    lib.file_attention(
-        cfg, meta, f'{RID}:judge-miss:{key}',
-        f'{cfg["brain"]} daily alignment: judge-miss rate {wf["rate"]:.0%} over {wf["edits"]} edits',
-        f'{wf["misses"]} of the {wf["edits"]} edits the alignment made in the last {report["lookback_days"]} days were reverted or rewritten '
-        f'by another writer within {report["window_days"]} days, over the {CONF["judge_miss"]["threshold"]:.0%} threshold.',
-        'A miss means the judge got a page wrong in a way a person or agent had to correct; only the owner can say whether the rubric or the evidence rule needs to change.',
-        [f'{m["op"]} `{m["path"]}` {m["url"]} - {m["by_author"]} {m["how"]} in {m["by_url"]}' for m in misses[:20]],
-        [{'label': 'Keep the routine as it is', 'detail': 'the misses are isolated corrections', 'action': {'type': 'close'}},
-         {'label': 'Hold the alignment writes', 'detail': 'runs keep judging and reporting but apply nothing until released',
-          'action': {'type': 'command', 'argv': ['scripts/alignment.py', 'hold', '--on']}}],
-        1 if wf['misses'] < 3 else 2,
-        'a single miss in a small sample is noise' if wf['misses'] < 3 else 'repeated misses point at the rubric')
-
 
 def cmd_finish(cfg, args):
     meta = lib.current_run(cfg, args.run)
     run_id = meta['run_id']
     rec = run_record(cfg, run_id)
     state = load_state(cfg)
-    try:
-        report = judge_misses.compute(cfg, CONF)
-        wf = report['workflows'].get(meta['workflow'], {'edits': 0, 'misses': 0, 'open': 0, 'rate': 0.0})
-        lib.journal(cfg, run_id, 'note', text=f'Judge misses, last {report["lookback_days"]} days: {wf["misses"]} of {wf["edits"]} alignment edits '
-                    f'({wf["rate"]:.0%}), {wf["open"]} still inside the {report["window_days"]}-day window.')
-        miss_check(cfg, meta, report)
-    except Failed as error:
-        lib.journal(cfg, run_id, 'problem', text=f'Judge-miss check failed: {error}')
-    if state.get('held'):
-        lib.file_attention(
-            cfg, meta, f'{RID}:held', f'{cfg["brain"]} daily alignment writes are held',
-            'The daily alignment judges and reports, but applies no edit.',
-            'The owner chose to hold the alignment writes; only the owner releases them.',
-            ['The hold was set through a judge-miss needs-attention option.'],
-            [{'label': 'Release the hold', 'detail': 'the next run applies verdicts again',
-              'action': {'type': 'command', 'argv': ['scripts/alignment.py', 'hold', '--off']}}], 1)
     judged = sum(len(b['targets']) for b in rec['batches'] if b.get('applied'))
     applied = sum(b.get('commits', 0) for b in rec['batches'])
     rejected = sum(b.get('rejected', 0) for b in rec['batches'])
@@ -658,14 +606,10 @@ def main():
     c.add_argument('--summary', default='')
     c = sub.add_parser('apply-option')
     c.add_argument('proposal')
-    c = sub.add_parser('hold')
-    g = c.add_mutually_exclusive_group(required=True)
-    g.add_argument('--on', dest='on', action='store_true')
-    g.add_argument('--off', dest='on', action='store_false')
     args = p.parse_args()
     cfg = lib.config()
     return {'prep': cmd_prep, 'next': cmd_next, 'apply': cmd_apply, 'finish': cmd_finish,
-            'apply-option': cmd_apply_option, 'hold': cmd_hold}[args.command](cfg, args)
+            'apply-option': cmd_apply_option}[args.command](cfg, args)
 
 
 if __name__ == '__main__':

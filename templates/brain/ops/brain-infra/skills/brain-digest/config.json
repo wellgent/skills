@@ -5,7 +5,6 @@
   "max_window_days": 7,
   "areas": {{digest_areas}},
   "ledger": {{digest_ledger}},
-  "judge_miss_max_age_hours": 36,
   "watch": {
     "eval_move": 0.03,
     "window_near_points": 10,

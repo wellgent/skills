@@ -27,11 +27,10 @@ sys.dont_write_bytecode = True  # routines write nothing into the published copy
 SCRIPTS = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPTS.parent
 SKILLS = SKILL_DIR.parent
-sys.path[:0] = [str(SKILLS / 'brain-routines' / 'scripts'), str(SKILLS / 'brain-alignment' / 'scripts')]
+sys.path[:0] = [str(SKILLS / 'brain-routines' / 'scripts')]
 import routinelib as lib  # noqa: E402
 from routinelib import Failed  # noqa: E402
 import routine as runner  # noqa: E402
-import judge_misses  # noqa: E402
 
 CONF = json.loads((SKILL_DIR / 'config.json').read_text())
 NARR = CONF['narrative']
@@ -100,6 +99,12 @@ def manifest_routines(cfg):
     return {r['id']: r for r in lib.manifest(cfg)['routines']}
 
 
+def workflow_of(cfg, rid):
+    """The workflow of a commit's routine id."""
+    r = manifest_routines(cfg).get(rid)
+    return r['workflow'] if r else rid.split('-', 1)[0]
+
+
 # gather
 
 def page_title(cfg, ref, path):
@@ -158,7 +163,7 @@ def changes(cfg, start, end):
             link, title = f'{web}/{parent}/{path}', page_title(cfg, parent, path)
         else:
             link, title = f'{web}/{cfg.get("branch", "main")}/{to}', page_title(cfg, sha, to)
-        out.append({'sha': sha[:7], 'at': int(ct), 'routine': rid, 'workflow': judge_misses.workflow_of(cfg, rid) if rid else 'other',
+        out.append({'sha': sha[:7], 'at': int(ct), 'routine': rid, 'workflow': workflow_of(cfg, rid) if rid else 'other',
                     'kind': kind, 'path': path, 'to': to if to != path else None, 'title': title, 'link': link,
                     'subject': body.splitlines()[0] if body.strip() else '',
                     'reason': clip(reason.group(1), 400) if reason else '',
@@ -238,7 +243,7 @@ def health(cfg, runs, start, own):
     for meta, entries in runs:
         if meta['routine'] == own or meta.get('status') in (None, 'ok') or meta.get('forced'):
             continue  # a forced or test run speaks only through the content it changed
-        r = routines.get(meta['routine']) or next((x for x in routines.values() if meta['routine'] in x.get('aliases', [])), {})
+        r = routines.get(meta['routine'], {})
         problems = [clip(e['text'], 240) for e in entries if e['kind'] == 'problem'][:2]
         facts.append({'routine': meta['routine'], 'title': r.get('title', meta['routine']), 'status': meta['status'],
                       'at': meta['started_at'], 'summary': clip(meta.get('summary', ''), 240), 'problems': problems,
@@ -364,17 +369,6 @@ def watch(cfg, start):
                 if used is not None and used >= near:
                     lines.append(f'Subscription use is near the maintenance threshold: the {provider} {label.lower()} window is {used:g}% used, '
                                  f'and the deferrable routines wait from {cfg["window_guard"]["defer_at"]}%.')
-    # judge misses
-    try:
-        report = lib.read_json(lib.state_dir(cfg) / judge_misses.REPORT)
-        if not report or lib.now() - parse_iso(report['computed_at']) > CONF['judge_miss_max_age_hours'] * 3600:
-            report = judge_misses.compute(cfg, json.loads((SKILLS / 'brain-alignment' / 'config.json').read_text()))
-        for wf, s in sorted((report.get('workflows') or {}).items()):
-            if s['edits'] and s['rate'] > report['threshold']:
-                lines.append(f'Judge misses are above {report["threshold"]:.0%} for {wf}: another writer corrected {s["misses"]} of its '
-                             f'{s["edits"]} edits within {report["window_days"]} days.')
-    except (Failed, OSError, ValueError, KeyError) as error:
-        problems.append(f'judge misses: {error}')
     # pages per area
     try:
         before_ref = git(cfg, 'rev-list', '-1', f'--before={lib.iso(start)}', rev(cfg)) or None

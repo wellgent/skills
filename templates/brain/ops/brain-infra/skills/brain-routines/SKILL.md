@@ -21,7 +21,7 @@ Each routine has:
 - `id`, `title` (the routine's plain name in alerts and the digest), `workflow`, `kind` (`command` or `agentTurn`), `schedule` (a 5-field cron expression), `skill` (the skill directory under `ops/brain-infra/skills/` that owns its code), `model` (`null` for command jobs).
 - Command jobs: `run`, the step argv with its script path relative to the skill directory, and optional `sync_lock: true` to hold the reconciler's sync lock around the whole step.
 - agentTurns: `thinking` (the effort, by the routing rule: high for writes, highest for deletions, merges and judges).
-- Optional `timeout_seconds`, `enabled`, and `aliases`: other routine ids its maintenance commits carry, so judge misses count them under its workflow.
+- Optional `timeout_seconds` and `enabled`.
 
 After changing the manifest, push it, wait for the published copy, then on the host run `python3 <published>/ops/brain-infra/skills/brain-routines/scripts/routine.py sync`.
 Sync makes the crons (declaration key `<brain>-routine-<id>`) match the manifest, with the subscription guard as each agentTurn cron's trigger, removes crons whose routine left it, and links each routine's skill into the agent workspace.

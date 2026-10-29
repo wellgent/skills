@@ -56,7 +56,6 @@ It carries the same sections over the week, at most `items_weekly` change items,
 - the GBrain version: this brain's engine against upstream's latest stable release, from `gbrain check-update --json` on the host, shown when it is `engine_far_releases` releases behind or the range holds a security fix, with the security fixes and new default-on features in the range named; the packet's `watch_facts` keeps the numbers and why a quiet line stayed quiet. Upgrades stay manual, through the GBrain lane;
 - search quality: the weekly search check did not run, failed, or moved by `eval_move` or more;
 - subscription use within `window_near_points` of the `brain-routines` deferral threshold;
-- judge misses above the threshold for any workflow, from `<state_dir>/judge-misses.json`, recomputed when older than `judge_miss_max_age_hours`;
 - pages per area, ledger areas included, for an area that moved by `area_change_pages` pages and `area_change_share` of its size.
 
 A data source that cannot be read becomes a line under the header and a journal problem, so the run ends partial and pages `#ops-alerts`.
