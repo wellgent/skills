@@ -3,6 +3,7 @@
   "doctor": {
     "page": ["git_held_files"],
     "ignore": ["harness_wiring", "skill_currency"],
+    "known_warnings": {{doctor_known_warnings}},
     "env": {
       "GBRAIN_CYCLE_FRESHNESS_WARN_HOURS": "26",
       "GBRAIN_CYCLE_FRESHNESS_FAIL_HOURS": "52"

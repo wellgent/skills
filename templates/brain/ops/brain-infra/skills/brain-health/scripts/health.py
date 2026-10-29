@@ -175,10 +175,12 @@ def warning_keys(c):
 def new_warnings(s, warns):
     """A doctor warning speaks once, when it is new: one needs-attention issue, closed again when it clears.
 
-    The known warnings live in <state_dir>/health/doctor-warnings.json; the first run records what it finds without filing."""
+    Warnings on the brain's `doctor.known_warnings` list never speak. The warnings seen so far live in
+    <state_dir>/health/doctor-warnings.json; the first run records what it finds without filing."""
     path = lib.state_dir(s.cfg) / 'health' / 'doctor-warnings.json'
+    listed = set(s.hc['doctor']['known_warnings'])
     known = lib.read_json(path)
-    current = {k: m for c in warns for k, m in warning_keys(c).items()}
+    current = {k: m for c in warns if c['name'] not in listed for k, m in warning_keys(c).items()}
     if known is not None:
         for name in sorted(set(current) - set(known)):
             message = current[name]
@@ -192,7 +194,7 @@ def new_warnings(s, warns):
                   'action': {'type': 'close'}},
                  {'label': 'Look into it by hand', 'detail': 'close this issue once it is settled', 'action': {'type': 'close'}}],
                 2, 'a new warning usually means something changed in the brain or the engine')
-        cleared = set(known) - set(current)
+        cleared = {k for k in set(known) - set(current) if k.split(':')[0] not in listed}
         if cleared:
             for issue in lib.open_attention(s.cfg, 'health'):
                 fp = lib._parse_comment('fingerprint', issue['body'])
