@@ -55,3 +55,4 @@ The index:
 
 A deviation is settled one of three ways: promote the brain's change to the core, turn the differing text into a placeholder, or revert the brain's copy.
 Each brain runs this cross-check daily in its `brain-core` workflow, for the brain and for its main agent's workspace: core changes flow into each with its values, and a departure becomes a needs-attention issue offering those settlements.
+The same workflow compares the skills a brain pins from mattpocock/skills with upstream, and a pinned skill that changed upstream becomes one needs-attention issue to bump or hold the pins.

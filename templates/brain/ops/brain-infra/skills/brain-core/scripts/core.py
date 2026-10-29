@@ -10,6 +10,7 @@ Needs-attention option actions (run by the reply loop from this skill directory)
   core.py promote <path> [--target T]            make the target's text of one file the core text
   core.py add <path> <values json> [--target T]  write a new core file with the given placeholder values
   core.py crons                                  make the crons match the manifest
+  core.py pins bump|hold <source@sha>...         move the pinned skills to an upstream head, or hold them at their pins
 
 There are two targets, each with its own core root: the brain, written from its maintenance
 clone, and the main agent's workspace, written from the workspace's maintenance clone and
@@ -18,6 +19,8 @@ at its head commit. A file that matches an older core version is behind: the cor
 that version is merged in with the target's values and committed. A file that matches no core
 version since the target's recorded base commit has departed from the core and becomes a finding.
 A target's base commit is recorded in the brain whenever the whole target matches a new core head.
+The skills the brain pins from the sources in config.json `pins` are compared with upstream, and a
+pinned skill that changed upstream since its pin is a finding until the owner bumps or holds it.
 """
 import argparse
 import bisect
@@ -720,6 +723,187 @@ def drift_finding(cfg, drift):
             'recommended': 1, 'question': 'Is any drift a deliberate runtime change the manifest should take instead?'}
 
 
+# the pinned skills
+
+LOCK = 'skills-lock.json'
+PIN_DIFF_LINES = 60
+
+
+def pin_hold_file(cfg):
+    return lib.state_dir(cfg) / 'core-pins.json'
+
+
+def pinned(brain, source):
+    """The brain's skills pinned from one source, from its skills lock: {name: lock entry}."""
+    lock = json.loads(brain.text(LOCK) or '{}')
+    return {name: e for name, e in sorted(lock.get('skills', {}).items()) if e.get('source') == source}
+
+
+def upstream(cfg, source, path):
+    return json.loads(lib.gh(cfg, 'api', f'repos/{source}/{path}', timeout=120))
+
+
+def skill_changes(cfg, source, pins, head, since=None):
+    """What changed upstream for each pinned skill between its pin (or `since`) and `head`.
+
+    {name: {'ref', 'gone', 'renamed_to', 'files', 'patch'}} for each skill whose directory changed.
+    """
+    compares, out = {}, {}
+    for name, e in pins.items():
+        ref = since or e.get('ref')
+        if not ref:
+            out[name] = {'ref': None, 'gone': False, 'renamed_to': None, 'files': ['(no pin recorded)'], 'patch': ''}
+            continue
+        if ref == head:
+            continue
+        if ref not in compares:
+            compares[ref] = upstream(cfg, source, f'compare/{ref}...{head}').get('files', [])
+        path = e['skillPath']
+        folder = path.rsplit('/', 1)[0] + '/'
+        hits = [f for f in compares[ref] if f['filename'].startswith(folder) or (f.get('previous_filename') or '').startswith(folder)]
+        if not hits:
+            continue
+        own = next((f for f in hits if path in (f['filename'], f.get('previous_filename'))), None)
+        renamed = own and own['status'] == 'renamed' and own.get('previous_filename') == path
+        out[name] = {'ref': ref, 'gone': bool(own and own['status'] == 'removed') or bool(renamed),
+                     'renamed_to': own['filename'] if renamed else None,
+                     'files': [f['filename'] for f in hits], 'patch': (own or {}).get('patch', '')}
+    return out
+
+
+def pins_finding(cfg, brain):
+    """One finding for every pinned skill that changed upstream since its pin, unless the owner held that upstream head."""
+    held = lib.read_json(pin_hold_file(cfg), {}) or {}
+    evidence, specs, gone = [], [], []
+    for source in cfg['core'].get('pins', []):
+        pins = pinned(brain, source)
+        if not pins:
+            continue
+        head = upstream(cfg, source, 'commits/main')['sha']
+        changes = skill_changes(cfg, source, pins, head)
+        if not changes:
+            continue
+        if held.get(source) and not skill_changes(cfg, source, {n: pins[n] for n in changes}, head, since=held[source]):
+            continue  # nothing new upstream since the owner chose to hold
+        specs.append(f'{source}@{head}')
+        evidence.append(f'`{source}` head: [{head[:7]}](https://github.com/{source}/commit/{head})')
+        for name, c in changes.items():
+            pin = f'[{c["ref"][:7]}](https://github.com/{source}/compare/{c["ref"]}...{head})' if c['ref'] else 'no recorded pin'
+            if c['renamed_to']:
+                what = f'moved upstream to `{c["renamed_to"]}`'
+            elif c['gone']:
+                what = 'removed upstream'
+            else:
+                what = f'{len(c["files"])} file(s) changed: ' + ', '.join(f'`{f}`' for f in c['files'][:8]) + (' ...' if len(c['files']) > 8 else '')
+            if c['renamed_to'] or c['gone']:
+                gone.append(name)
+            line = f'`{name}` (pinned at {pin}): {what}'
+            patch = c['patch'].splitlines()
+            if patch:
+                shown = '\n'.join('  ' + p for p in patch[:PIN_DIFF_LINES] + ([f'... {len(patch) - PIN_DIFF_LINES} more lines in the compare'] if len(patch) > PIN_DIFF_LINES else []))
+                line += f'\n\n  <details><summary>SKILL.md diff</summary>\n\n  ```diff\n{shown}\n  ```\n\n  </details>'
+            evidence.append(line)
+    if not specs:
+        return None
+    names = ', '.join(s.split('@')[0] for s in specs)
+    detail = 'moves every pinned skill still upstream to the head above, through `npx skills`, in one maintenance commit'
+    if gone:
+        detail += '; ' + ', '.join(f'`{n}`' for n in gone) + ' keeps its pin and is settled by hand'
+    options = [{'label': 'Bump the pins', 'detail': detail, 'action': {'type': 'command', 'argv': ['scripts/core.py', 'pins', 'bump', *specs]}},
+               {'label': 'Hold the pins', 'detail': 'keeps them; the next upstream change to a pinned skill asks again',
+                'action': {'type': 'command', 'argv': ['scripts/core.py', 'pins', 'hold', *specs]}},
+               {'label': 'Settle it by hand', 'detail': 'for example a renamed skill the core setup must learn; closes this issue, and the next run files it again while the pins lag',
+                'action': {'type': 'close'}}]
+    return {'id': 'pins', 'type': 'pins', 'path': LOCK, 'fingerprint': f'{ROUTINE}:pins', 'specs': specs,
+            'title': f'{cfg["brain"]} core: pinned skills changed upstream in {names}',
+            'finding': f'{len(evidence) - len(specs)} skill(s) the brain pins from {names} changed upstream since their pins in `{LOCK}`.',
+            'why': 'A pinned skill changes how every agent in the brain works, so a newer upstream version is the owner\'s call.',
+            'evidence': evidence, 'options': options, 'recommended': 1,
+            'question': 'Do the upstream changes fit how this brain uses the skills (bump), or would one of them break a convention the brain relies on (hold)?'}
+
+
+def refresh_pins_issue(cfg, meta, f, recommended, reason):
+    """Point the open pins issue at the newest upstream head; True when one is open."""
+    for issue in lib.open_attention(cfg, 'core'):
+        if lib._parse_comment('fingerprint', issue['body']) != f['fingerprint']:
+            continue
+        options = (lib._parse_comment('options', issue['body']) or {}).get('options', [])
+        if options and options[0].get('action', {}).get('argv', [])[3:] == f['specs']:
+            return issue['url']
+        body = lib.attention_body(meta, f['fingerprint'], f['finding'], f['why'], f['evidence'], f['options'], recommended, reason)
+        lib.gh(cfg, 'issue', 'edit', str(issue['number']), '--repo', cfg['github_repo'], '--title', f['title'], '--body-file', '-', input=body)
+        lib.gh(cfg, 'issue', 'comment', str(issue['number']), '--repo', cfg['github_repo'], '--body-file', '-',
+               input=f'Upstream moved: the evidence and options now name {", ".join(f"`{s}`" for s in f["specs"])}.\n\n{lib.MARKER}')
+        lib.journal(cfg, meta['run_id'], 'attention', url=issue['url'], title=f['title'], new=False)
+        return issue['url']
+    return None
+
+
+def cmd_pins(cfg, action, specs):
+    meta = lib.current_run(cfg)
+    specs = [s.rsplit('@', 1) for s in specs]
+    held = lib.read_json(pin_hold_file(cfg), {}) or {}
+    if action == 'hold':
+        held.update({source: sha for source, sha in specs})
+        lib.atomic(pin_hold_file(cfg), held)
+        note = 'Held the pins at ' + ', '.join(f'`{s}` (upstream {sha[:7]})' for s, sha in specs) + '; the next upstream change asks again.'
+        lib.journal(cfg, meta['run_id'], 'note', text=note)
+        print(json.dumps({'note': note}))
+        return 0
+    co = Checkout(cfg)
+    env = dict(os.environ, PATH=cfg['path'])
+    moved, kept = [], []
+    for source, sha in specs:
+        tree = upstream(cfg, source, f'git/trees/{sha}?recursive=1')
+        present = {e['path'] for e in tree.get('tree', [])}
+        pins = pinned(co, source)
+        names = [n for n, e in pins.items() if e['skillPath'] in present and e.get('ref') != sha]
+        kept += [n for n, e in pins.items() if e['skillPath'] not in present]
+        if not names:
+            continue
+        for n in names:
+            lib.run(['npx', '-y', 'skills', 'remove', n, '-y'], cwd=co.dir, env=env, timeout=300)
+        add = ['npx', '-y', 'skills', 'add', f'{source}#{sha}', '--agent', 'codex', '--copy', '-y']
+        for n in names:
+            add += ['--skill', n]
+        lib.run(add, cwd=co.dir, env=env, timeout=600)
+        for n in names:
+            if not (co.dir / '.agents' / 'skills' / n / 'SKILL.md').is_file():
+                raise Failed(f'npx skills add wrote no .agents/skills/{n}')
+            (co.dir / '.claude' / 'skills').mkdir(parents=True, exist_ok=True)
+            link = co.dir / '.claude' / 'skills' / n
+            if link.is_symlink() or link.exists():
+                link.unlink()
+            link.symlink_to(f'../../.agents/skills/{n}')
+            stray = co.dir / 'skills' / n
+            if stray.is_symlink():  # in a brain the CLI also links skills/, the GBrain skill source
+                stray.unlink()
+        moved.append((source, sha, names))
+        held.pop(source, None)
+    allowed = re.compile(r'^(\.agents/skills/|\.claude/skills/|skills-lock\.json$)')
+    status = co.git('status', '--porcelain=v1', '--untracked-files=all', check=False)[1].splitlines()
+    stray = [line[3:] for line in status if not allowed.match(line[3:])]
+    if stray:
+        raise Failed('npx skills wrote outside the skill paths: ' + ', '.join(stray[:5]))
+    lib.atomic(pin_hold_file(cfg), held)
+    if not moved:
+        note = 'The pins were already at the upstream head.'
+        print(json.dumps({'note': note}))
+        return 0
+    for _, _, names in moved:
+        co.git('add', '-A', '--', LOCK, *[f'.agents/skills/{n}' for n in names], *[f'.claude/skills/{n}' for n in names])
+    subject = 'setup: ' + '; '.join(f'the {s} pins move to {sha[:7]}' for s, sha, _ in moved)
+    body = '\n'.join(f'- {s}@{sha}: ' + ', '.join(names) for s, sha, names in moved)
+    sha = co.commit_push(subject, f'Routine: {ROUTINE} ({meta["run_id"]})\nIssue: {os.environ.get("ATTENTION_ISSUE", "")}\n\n{body}')
+    url = co.commit_url(sha)
+    note = 'Moved the pins of ' + '; '.join(f'{", ".join(f"`{n}`" for n in names)} to {s} {sha_[:7]}' for s, sha_, names in moved) + '.'
+    if kept:
+        note += ' ' + ', '.join(f'`{n}`' for n in kept) + ' kept its pin: it is gone upstream.'
+    lib.journal(cfg, meta['run_id'], 'change', text=note, url=url, revert=co.revert_hint(sha))
+    print(json.dumps({'note': note, 'commits': [url]}))
+    return 0
+
+
 # commands
 
 def cmd_align(cfg, run_id):
@@ -775,6 +959,9 @@ def cmd_align(cfg, run_id):
         settling.append(cfg['manifest'])
     elif drift:
         findings.append(drift_finding(cfg, drift))
+    pins = pins_finding(cfg, brain)
+    if pins:
+        findings.append(pins)
     if settling:
         lib.journal(cfg, meta['run_id'], 'note', text='Changed in the last '
                     f'{cfg["core"].get("settle_minutes", 30)} minutes, checked next run: ' + ', '.join(f'`{s}`' for s in settling) + '.')
@@ -788,6 +975,8 @@ def cmd_align(cfg, run_id):
     if findings:
         parts.append(f'{len(findings)} need attention')
     parts.append('crons match the manifest' if not drift else f'{len(drift)} cron drift(s)')
+    if cfg['core'].get('pins'):
+        parts.append('pinned skills lag upstream' if pins else 'pinned skills current or held')
     summary = '; '.join(parts)
     routine = SKILL_DIR.parent / 'brain-routines' / 'scripts' / 'routine.py'
     counts = {'core files ok': b['ok'], 'workspace core files ok': w['ok']}
@@ -796,7 +985,7 @@ def cmd_align(cfg, run_id):
         'differs': bool(findings),
         'summary': summary,
         'applied': applied,
-        'findings': [{k: f.get(k) for k in ('id', 'type', 'target', 'path', 'title', 'question', 'options', 'recommended', 'evidence')} for f in findings],
+        'findings': [{k: f.get(k) for k in ('id', 'type', 'target', 'path', 'title', 'question', 'options', 'recommended', 'evidence') if k in f} for f in findings],
         'next': (f'Judge each finding, write [{{"id", "recommended", "reason"}}] to {lib.run_dir(cfg, meta["run_id"])}/verdicts.json, '
                  f'run `{cfg["python_bin"]} {Path(__file__).resolve()} flag --run {meta["run_id"]} {lib.run_dir(cfg, meta["run_id"])}/verdicts.json`, then end.'
                  if findings else 'Nothing needs judgment: end the run.'),
@@ -828,6 +1017,8 @@ def close_resolved(cfg, meta, live, settling, labels):
         kind, _, rel = fingerprint[len(ROUTINE) + 1:].partition(':')
         if kind == 'crons':
             rel = cfg['manifest']
+        elif kind == 'pins':
+            rel = LOCK
         elif kind in labels and kind != 'file':
             rel = labels[kind](rel)
         elif kind != 'file':
@@ -862,8 +1053,10 @@ def cmd_flag(cfg, run_id, verdicts_path):
             else:
                 options = options[1:]
                 recommended = 1
-        url, _ = lib.file_attention(cfg, meta, f['fingerprint'], f['title'], f['finding'], f['why'], f['evidence'],
-                                    options, recommended, v.get('reason', ''))
+        url = refresh_pins_issue(cfg, meta, f, recommended, v.get('reason', '')) if f['type'] == 'pins' else None
+        if not url:
+            url, _ = lib.file_attention(cfg, meta, f['fingerprint'], f['title'], f['finding'], f['why'], f['evidence'],
+                                        options, recommended, v.get('reason', ''))
         filed.append(url)
     print(json.dumps({'filed': filed}, indent=2))
     return 0
@@ -1071,6 +1264,9 @@ def main():
     c.add_argument('values')
     c.add_argument('--target', choices=TARGETS, default='brain')
     sub.add_parser('crons', help='option action: sync the crons to the manifest')
+    c = sub.add_parser('pins', help='option action: bump or hold the pinned skills at an upstream head')
+    c.add_argument('action', choices=('bump', 'hold'))
+    c.add_argument('specs', nargs='+', metavar='source@sha')
     args = p.parse_args()
     cfg = load_config()
     if args.command == 'align':
@@ -1083,6 +1279,8 @@ def main():
         return cmd_promote(cfg, args.path, args.target)
     if args.command == 'add':
         return cmd_add(cfg, args.path, args.values, args.target)
+    if args.command == 'pins':
+        return cmd_pins(cfg, args.action, args.specs)
     return cmd_crons(cfg)
 
 

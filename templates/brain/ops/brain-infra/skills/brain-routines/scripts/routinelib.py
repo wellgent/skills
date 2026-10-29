@@ -455,6 +455,16 @@ def file_attention(cfg, meta, fingerprint, title, finding, why, evidence, option
             journal(cfg, meta and meta['run_id'], 'attention', url=issue['url'], title=issue['title'], new=False)
             return issue['url'], False
     workflow = meta['workflow'] if meta else 'health'
+    argv = ['issue', 'create', '--repo', cfg['github_repo'], '--title', title, '--body-file', '-',
+            '--assignee', cfg['owner_github'], '--label', 'needs-attention', '--label', f'workflow:{workflow}']
+    url = gh(cfg, *argv, input=attention_body(meta, fingerprint, finding, why, evidence, options, recommended, reason)).splitlines()[-1]
+    journal(cfg, meta and meta['run_id'], 'attention', url=url, title=title, new=True)
+    return url, True
+
+
+def attention_body(meta, fingerprint, finding, why, evidence, options, recommended, reason=''):
+    """The body of a needs-attention issue, which the reply loop reads its options from."""
+    workflow = meta['workflow'] if meta else 'health'
     evidence = evidence if isinstance(evidence, list) else [evidence]
     lines = [
         f'**Finding.** {finding}', '',
@@ -469,11 +479,7 @@ def file_attention(cfg, meta, fingerprint, title, finding, why, evidence, option
         _json_comment('options', {'skill': meta['skill'] if meta else 'brain-routines',
                                   'options': [{'label': o['label'], 'action': o.get('action', {'type': 'close'})} for o in options]}),
     ]
-    argv = ['issue', 'create', '--repo', cfg['github_repo'], '--title', title, '--body-file', '-',
-            '--assignee', cfg['owner_github'], '--label', 'needs-attention', '--label', f'workflow:{workflow}']
-    url = gh(cfg, *argv, input='\n'.join(lines)).splitlines()[-1]
-    journal(cfg, meta and meta['run_id'], 'attention', url=url, title=title, new=True)
-    return url, True
+    return '\n'.join(lines)
 
 
 def parse_choice(text, count):

@@ -1,6 +1,6 @@
 ---
 name: brain-core
-description: "The core workflow: the daily cross-check of the brain and the main agent's workspace against the shared core, and of the routine manifest against the main agent's crons. Core changes flow into the brain and the workspace; a departure or a cron drift becomes a needs-attention issue. Use when running the core-check routine, answering one of its issues, or debugging it."
+description: "The core workflow: the daily cross-check of the brain and the main agent's workspace against the shared core, of the routine manifest against the main agent's crons, and of the brain's pinned skills against upstream. Core changes flow into the brain and the workspace; a departure, a cron drift or a pinned skill that changed upstream becomes a needs-attention issue. Use when running the core-check routine, answering one of its issues, or debugging it."
 ---
 
 # Brain Core
@@ -42,6 +42,11 @@ Otherwise the run record notes that the live workspace lags, and the next run tr
 Then `routine.py sync --check` compares the routine manifest with the main agent's crons and workspace skill links.
 Drift is needs attention, except within `settle_minutes` of a manifest change.
 
+Last, the skills the brain pins in `skills-lock.json` from each source in `config.json` `pins` are compared with that source's `main`.
+A pinned skill whose directory changed upstream since its pin is one needs-attention issue per brain, with each skill's change and its `SKILL.md` diff.
+A newer upstream change edits the open issue to the new head rather than filing another.
+After a hold, the brain is asked again only when a pinned skill changes upstream past the held head, which `<state_dir>/core-pins.json` records.
+
 Open issues of this routine whose finding is gone are closed with a comment.
 
 ## The `core-check` routine
@@ -57,6 +62,7 @@ The model only judges; `core.py` does every write.
    - **conflict** - take the core text when the colliding local lines are trivial or restated by the core change; merge by hand when they carry brain facts.
    - **unfilled** - read the brain for each placeholder value the core file needs and pass them as `values`; recommend writing it by hand when a value cannot be found.
    - **drift** - sync, unless a cron differs on purpose (for example, disabled during an incident).
+   - **pins** - bump when the upstream changes fit how the brain uses the skills; hold when one would break a convention the brain relies on; settle by hand when a pinned skill was renamed or removed upstream, since the core setup must learn the new name.
 4. Write `[{"id": "<finding id>", "recommended": <option number>, "reason": "<clause>", "values": {...}}]` to `<run_dir>/verdicts.json`.
    The reason completes "Recommended: N, ..." and starts lowercase; `values` is for unfilled findings only.
 5. Run `scripts/core.py flag --run <run_id> <run_dir>/verdicts.json`, which files one needs-attention issue per finding.
@@ -74,6 +80,8 @@ Each file action takes `--target workspace` for a workspace file; the brain is t
 - `core.py promote <path>` - writes the target's text into the core template, turns placeholder values back into placeholders, and commits it to the core as the maintenance writer; every brain then takes it as a core change. Only the owner brain promotes, and only its maintenance writer has write access to the core repository; every other brain consumes the core.
 - `core.py add <path> <values json>` - writes a new core file with the given values.
 - `core.py crons` - runs `routine.py sync`.
+- `core.py pins bump <source@sha>` - moves every pinned skill still upstream to that head through `npx skills` (remove, then add with `--agent codex --copy`), relinks `.claude/skills/`, and commits the skills and the lock; a skill gone upstream keeps its pin.
+- `core.py pins hold <source@sha>` - keeps the pins and records the held head.
 - A "by hand" option closes the issue; the next run files it again while the finding lasts.
 
 Every write is one commit by the maintenance writer, listed in the run record with its revert command.
@@ -81,6 +89,6 @@ Every write is one commit by the maintenance writer, listed in the run record wi
 ## Operating
 
 - The core clone lives in `<state_dir>/core/` and is fetched at every run; `promote` commits and pushes from it.
-- `config.json` holds the core repository, its branch, its owner brain, the core root of each target, the base file and `settle_minutes`.
-- Fingerprints are `core-check:file:<path>` for brain files, `core-check:workspace:<path>` for workspace files and `core-check:crons` for cron drift.
+- `config.json` holds the core repository, its branch, its owner brain, the core root of each target, the base file, `settle_minutes` and the pinned sources in `pins`.
+- Fingerprints are `core-check:file:<path>` for brain files, `core-check:workspace:<path>` for workspace files, `core-check:crons` for cron drift and `core-check:pins` for the pinned skills.
 - A manual cross-check from any checkout: `setup/setup-brain/core-check brain <checkout>` or `core-check workspace <workspace checkout>` in the core repository.

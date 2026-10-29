@@ -8,5 +8,8 @@
     "workspace": "templates/workspace"
   },
   "base_file": "ops/brain-infra/core-sync.json",
-  "settle_minutes": 30
+  "settle_minutes": 30,
+  "pins": [
+    "mattpocock/skills"
+  ]
 }
