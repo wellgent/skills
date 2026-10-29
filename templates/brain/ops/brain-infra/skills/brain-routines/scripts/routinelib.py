@@ -325,12 +325,23 @@ def alert(cfg, fingerprint, text):
 WINDOW_LABELS = {'168h': 'Week', '24h': 'Day'}
 
 
-def usage(cfg):
-    """The provider quota windows (percent used) and credit balance OpenClaw reports, or None when unreadable."""
-    try:
-        out = run([cfg['openclaw']['bin'], 'gateway', 'call', 'usage.status', '--json', '--timeout', '20000'], timeout=25)
-        data = json.loads(out[out.find('{'):])
-    except (Failed, OSError, ValueError):
+def usage(cfg, fresh_within=60, tries=5):
+    """The provider quota windows (percent used) and credit balance OpenClaw reports, or None when unreadable or never fresh.
+
+    usage.status answers from a stale-while-revalidate cache that refreshes only when asked, so a first call can return a
+    reading hours old; the reading counts only once its updatedAt is within fresh_within seconds."""
+    data = None
+    for attempt in range(tries):
+        try:
+            out = run([cfg['openclaw']['bin'], 'gateway', 'call', 'usage.status', '--json', '--timeout', '20000'], timeout=25)
+            data = json.loads(out[out.find('{'):])
+        except (Failed, OSError, ValueError):
+            return None
+        if now() - (data.get('updatedAt') or 0) / 1000 <= fresh_within:
+            break
+        data = None
+        time.sleep(2)
+    if data is None:
         return None
     return {p.get('provider', '?'): {'windows': {WINDOW_LABELS.get(w['label'], w['label']): w.get('usedPercent') for w in p.get('windows', [])},
                                      'credits': next((b.get('amount') for b in p.get('billing', []) if b.get('unit') == 'credits'), None)}
