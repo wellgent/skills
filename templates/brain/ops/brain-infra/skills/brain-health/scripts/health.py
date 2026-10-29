@@ -116,8 +116,10 @@ def frontmatter_repair(s):
                 unfixed.append(rel)
                 continue
             code, out, _ = s.gbrain_json(['frontmatter', 'validate', str(repo / rel), '--fix', '--json'], timeout=120)
-            changed = lib.clone_git(s.cfg, 'status', '--porcelain=v1', '--untracked-files=all').splitlines()
-            if code or not out or out.get('files_fixed') != 1 or [line[3:] for line in changed] != [rel]:
+            changed = (lib.clone_git(s.cfg, 'diff', '--name-only') + '\n' +
+                       lib.clone_git(s.cfg, 'ls-files', '--others', '--exclude-standard')).split('\n')
+            changed = [c for c in changed if c]
+            if code or not out or out.get('files_fixed') != 1 or changed != [rel]:
                 lib.clone_git(s.cfg, 'checkout', '--quiet', '--', '.')
                 lib.clone_git(s.cfg, 'clean', '-fdq')
                 unfixed.append(rel)
