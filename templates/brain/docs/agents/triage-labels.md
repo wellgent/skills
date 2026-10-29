@@ -34,7 +34,7 @@ On a wayfinder ticket the assignee says whose move it is: a session's claim, or 
 
 `run` marks a run request for `/operate`, assigned to the requester while a call or a checked note waits for them.
 
-`needs-attention` marks an item a maintenance routine could not settle, assigned to {{owner}} with options and a recommended one; `workflow:<name>` names the workflow that raised it (`health`, `review`, `relevance`, `core`, `summary`).
+`needs-attention` marks an item a maintenance routine could not settle, assigned to {{owner}} with options and a recommended one; `workflow:<name>` names the workflow that raised it (`health`, `alignment`, `relevance`, `core`, `digest`).
 {{owner}} replies with an option number, and the workflow's next run applies it and closes the issue (`ops/brain-infra/skills/brain-routines/`).
 
 `eval-candidate` marks an issue about a lookup that missed; the weekly retrieval eval verifies it as a candidate, comments the outcome and removes the label (`ops/brain-infra/skills/brain-health/eval/EVAL.md`).
