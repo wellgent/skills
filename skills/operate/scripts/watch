@@ -98,6 +98,10 @@ while :; do
         exit 4
       fi
     else
+      # A file no watch has touched for two usage rounds is an earlier streak, not this one.
+      if [ -n "$(find "$blind_file" -mmin "+$((usage_every / 30))" 2>/dev/null)" ]; then
+        rm -f "$blind_file"
+      fi
       since=$(cat "$blind_file" 2>/dev/null || true)
       case $since in ''|*[!0-9]*)
         # Said once per failing streak; the read is retried on the next usage round.
@@ -105,6 +109,7 @@ while :; do
         mkdir -p "${blind_file%/*}" && echo "$since" >"$blind_file"
         echo "watch: weekly usage unreadable, retrying: $usage" >&2 ;;
       esac
+      touch "$blind_file"
       if [ $((now - since)) -ge "$blind_s" ]; then
         # The operator reads the pane now, and the next exit 6 comes a full window later.
         echo "$now" >"$blind_file"
