@@ -66,6 +66,10 @@ No GitHub Actions run for this project.
   A bug fix, or a fix that makes the UI match `DESIGN.md` or `PRODUCT.md`, lands on its verifier's pass, labelled `preview`, and the run's note lists it.
   A fix round on a review answer changes only what the answer names, and any further visible change it brings waits for its own review on the preview, even where the answer authorized landing on the verifier's pass.
   The verifier's screenshots are its own evidence: they stay in its evidence directory and are never committed, pushed or posted.
+- **Volume tests run locally.** A test at volume, such as a full fill of the project's data or a full run of a data job, runs on the worktree's own backend, which no provider meters.
+  A cloud preview takes one full-volume run, only for behaviour the local backend does not enforce: <the cloud limits the local backend does not enforce>.
+  That preview run happens once, before the production run that needs it, and a gate on it names the shape production runs in, such as a rerun over existing data or a first fill.
+  <The command that reads a deployment's metered usage, such as database I/O, for the run's note.>
 
 ## Agents
 
@@ -104,8 +108,9 @@ Each journey has one browser test, and `scripts/check` runs them all.
 
 Every branch is worked in its own worktree with its own dev environment, so parallel sessions share no server, port or data.
 
+- **Where:** every linked worktree goes at `../<repo>-wt/<branch>`, beside the main checkout, so one directory holds a run's trees.
 - **Set up:** `<worktree setup command>`, run once in a new linked worktree. <What it creates: dependencies, env file, own dev backend, seed data.>
-- **Tear down:** `<worktree teardown command>`, run inside the worktree once its work is pushed. <What it stops and removes.>
+- **Tear down:** `<worktree teardown command>`, run inside the worktree once its work is pushed. <What it stops and removes.> It removes `<repo>-wt` once its last worktree is gone.
 - **A run cleans up after itself.** Before a run posts its note, it tears down every worktree and scratch tree it created, so `git worktree list` shows only the main checkout and no run directory remains.
   It deletes the local branch of each pull request it landed, since `scripts/land` merges on the remote and leaves the local branch behind.
   The scratch under pstack's run store (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/orchestrate/<run>/scratch/`) goes too, since a verifier's captures there can hold a token in plain text.

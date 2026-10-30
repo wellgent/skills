@@ -130,6 +130,31 @@ test("teardown piped through a command started in the tree spares that command",
   expect(existsSync(worktree)).toBe(false);
 });
 
+test("teardown removes the worktrees' directory with its last worktree", () => {
+  const trees = join(scratch, "project-wt");
+  const first = join(trees, "feature", "one");
+  const second = join(trees, "two");
+  git(main, "worktree", "add", "-q", "--detach", first);
+  git(main, "worktree", "add", "-q", "--detach", second);
+  const teardown = (cwd: string) =>
+    spawnSync("bash", ["scripts/worktree-teardown.sh"], {
+      cwd,
+      encoding: "utf8",
+    });
+
+  const one = teardown(first);
+  expect(one.status, one.stderr).toBe(0);
+  expect(existsSync(join(trees, "feature"))).toBe(false);
+  expect(existsSync(second)).toBe(true);
+
+  const two = teardown(second);
+  expect(two.status, two.stderr).toBe(0);
+  expect(two.stdout).toContain(`removed empty ${trees}`);
+  expect(existsSync(trees)).toBe(false);
+  expect(existsSync(main)).toBe(true);
+  expect(existsSync(scratch)).toBe(true);
+});
+
 test("teardown with nothing left running removes the tree and reports no strays", () => {
   const teardown = spawnSync("bash", ["scripts/worktree-teardown.sh"], {
     cwd: worktree,

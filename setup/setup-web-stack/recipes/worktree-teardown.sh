@@ -67,3 +67,12 @@ fi
 
 git -C "$main" worktree remove "$tree"
 echo "removed worktree $tree"
+
+# The worktrees' own directory (`../<repo>-wt`) goes with its last worktree, and so does each
+# empty directory a branch name with slashes made under it; the directory that holds the main
+# checkout never does.
+parent=$(dirname "$tree")
+while [ "$parent" != "$(dirname "$main")" ] && rmdir "$parent" 2>/dev/null; do
+  echo "removed empty $parent"
+  parent=$(dirname "$parent")
+done

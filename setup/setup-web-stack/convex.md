@@ -16,7 +16,7 @@ Every step converges on a state, so a re-run changes only what is behind.
    `host-claims.sh` keeps parallel worktrees on one host apart: `start` and `serve-build` claim their port and refuse one another worktree holds, and the local backend's create and first start run under one host-wide lock, since the Convex CLI picks a backend's ports without binding them.
    The pid and log files are named by the checkout and the port, a server is ready only once this checkout's listener answers, and `stop` stops only this checkout's server.
    `serve-build <port>` serves a fresh production build through `next start` on a claimed port.
-   The teardown stops the worktree's servers and `convex dev`, then every other process still running from the tree, and removes the tree.
+   The teardown stops the worktree's servers and `convex dev`, then every other process still running from the tree, and removes the tree, and the worktrees' directory once it is empty.
    Once the backend runs, the dev server holds the worktree's Convex CLI to it alone (`CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY` and a rejected `CONVEX_OVERRIDE_ACCESS_TOKEN` in `.env.local`), so nothing run from the worktree reaches production.
 3. **Crons in production only.** `convex/crons.ts` registers no cron when the deployment's `CRONS` variable is `off`, declared in `convex.config.ts` as `v.optional(v.literal("off"))`.
    Convex reads it when functions are pushed, so the worktree setup sets it before the first push.
@@ -30,6 +30,9 @@ Every step converges on a state, so a re-run changes only what is behind.
    The production deploy key goes in Vercel's Production environment and the preview deploy key in its Preview environment, both as `CONVEX_DEPLOY_KEY`, with no `NEXT_PUBLIC_CONVEX_URL` there.
    A preview deploy key is generated only in the Convex dashboard (Project Settings, Preview Deploy Keys), so this is the owner's step where the operator has no dashboard access.
    A preview build gets a fresh Convex preview deployment with the pull request's functions and the seed.
+   On the "Volume tests run locally" line of `docs/agents/dev-loop.md`, the cloud limits are the action memory and time limits and the query and transaction limits.
+   The usage command is `pnpm exec convex deployment usage --deployment <name>`, or `--prod`, which prints the day's and the month's database I/O and function calls for one deployment.
+   A preview's database I/O is billed like production's.
 7. **Lint, migrations, file manager.** Wire `@convex-dev/eslint-plugin` through oxlint, install `@convex-dev/migrations` as a component, and set `{"aiFiles": {"enabled": false}}` in `convex.json`.
 8. **Prove it.** Run the worktree setup in a scratch worktree.
    Done when the seed lands on the worktree's own local deployment, the seeded identities can sign in there, the deployment registers no cron, and `scripts/check` passes from the worktree; then run the teardown.
