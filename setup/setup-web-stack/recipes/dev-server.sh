@@ -20,6 +20,15 @@
 # needs the login to run the backend, gets CONVEX_DEPLOYMENT and the login on its command line.
 set -euo pipefail
 
+# Convex's local backend runs "use node" actions on the `node` on PATH, which must be 22 or 24.
+case $(node --version) in
+  v22.* | v24.*) ;;
+  *)
+    supported=$(ls -d "$HOME"/.nvm/versions/node/v24.* "$HOME"/.nvm/versions/node/v22.* 2>/dev/null | head -1 || true)
+    [[ -z $supported ]] || PATH="$supported/bin:$PATH"
+    ;;
+esac
+
 CMD="${1:-}"
 DEFAULT_PORT="<lowest dev-server port, e.g. 6110>"
 PORT="${2:-$DEFAULT_PORT}"
