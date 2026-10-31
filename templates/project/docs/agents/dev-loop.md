@@ -119,7 +119,7 @@ Every branch is worked in its own worktree with its own dev environment, so para
 
 ## Host tools
 
-What a run needs on its host beyond the checkout, each with the check `/operate`'s Ready runs (exit 0 when ready):
+What a run needs on its host beyond the checkout and `/operate`'s own tools, each with the check its Ready runs (exit 0 when ready):
 
 - **<tool>:** `<check command>`
 

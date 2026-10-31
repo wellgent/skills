@@ -3,6 +3,8 @@
 # Run from the brain's checkout before /operate writes a run's prompt. Prints one line per check:
 #   brain     the brain checkout clean and at its remote head
 #   project   ~/repos/<repo> clean on main and at its remote head (fast-forwarded when only behind)
+#   operator  the tools this skill's own scripts call
+#   usage     this host's weekly Claude usage, or that it is unreadable; never blocks
 #   tool      each check command under "## Host tools" in the project's docs/agents/dev-loop.md
 #   pstack    the plugin version installed for this checkout against the port's marketplace version
 #   advisory  the output of the "Advisory probe" command in dev-loop.md, when it names one; never blocks
@@ -14,7 +16,8 @@
 # 1 blocked (a dirty or diverged checkout, a failing tool, a failing smoke step).
 set -euo pipefail
 die() { echo "ready: $*" >&2; exit 1; }
-for tool in git gh jq; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+for tool in git gh jq curl claude herdr; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+echo "operator ok"
 
 smoke=""
 [ "${1:-}" != --smoke ] || { smoke=1; shift; }
@@ -47,6 +50,12 @@ head_check() {
 
 head_check brain "$PWD" "$(git rev-parse --abbrev-ref 'origin/HEAD' 2>/dev/null | sed 's#^origin/##' || echo main)"
 head_check project "$cwd" main
+
+if usage=$(bash "$(dirname "${BASH_SOURCE[0]}")/usage" 2>&1); then
+  echo "usage ok: weekly at $(jq -r '.seven_day.percent' <<<"$usage")%"
+else
+  echo "usage unreadable: $(head -1 <<<"$usage" | cut -c1-120)"
+fi
 
 # Host tools: "- **<tool>:** `<check command>`" lines under "## Host tools".
 tools=$(awk '/^## Host tools/{on=1; next} /^## /{on=0} on' "$loop" | sed -n 's/^- \*\*\([^*]*\):\*\* `\([^`]*\)`.*/\1	\2/p')
