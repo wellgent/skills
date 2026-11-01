@@ -86,7 +86,7 @@ The run reads the request only while it waits on a stop, so every message to it 
 
 ```bash
 rex send -s <session> -b agent "<message>" && rex send-key -s <session> -b agent enter
-rex capture -s <session> -b agent --trim | tail -n 40
+rex capture -s <session> -b agent --trim | grep . | tail -n 40
 rex block call -s <session> -b agent program_status
 ```
 
