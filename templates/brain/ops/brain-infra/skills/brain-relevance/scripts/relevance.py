@@ -523,7 +523,7 @@ def build_packet(cfg, rc, meta, slice_name, brain=None, issues=None):
             ev = brain.evidence(path)
             if ev['date'] and since and ev['date'] > since and ev['from'] != 'timeline row':
                 add(path, 'restore', [f'interaction evidence {ev["date"]} ({ev["from"]}) after the move: restore?'])
-    research = [p for p in brain.files if brain.kind(p) == 'research' and not p.startswith(rc['archive'])]
+    research = [p for p in brain.files if brain.kind(p) == 'research' and not p.startswith(rc['archive']) and not under(p, rc['unpruned'])]
     by_question = collections.defaultdict(list)
     for p in research:
         stem = re.sub(r'^r-\d{8}-', '', os.path.basename(p))

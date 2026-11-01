@@ -17,11 +17,11 @@ Before using external search, enrichment APIs, or general model memory for an ac
 Research that leaves the brain meets one standard, whatever tool runs it:
 
 1. The lookup order above comes first.
-2. Classify the question: a quick fact, source discovery, deep research, or extraction from a known source.
+2. Classify the question: a quick fact, or dedicated research.
 3. Treat prior research records as leads (sources, questions), never as inherited verdicts: re-test their conclusions against primary sources.
 4. Answer from the authoritative page itself (the official docs, the registry entry, the filing), not from a summary of it.
 5. Cite the real URL the fact came from.
-6. Land a quick fact inline on the page it serves, with its citation. Land deep research as a run record at {{research_records}}, linked from the pages it informs.
+6. Land a quick fact inline on the page it serves, with its citation. Land dedicated research as a run record at {{research_records}}, linked from the pages it informs.
 
 The tool route for each class:
 
