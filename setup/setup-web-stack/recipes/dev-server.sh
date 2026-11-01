@@ -23,10 +23,7 @@ set -euo pipefail
 # Convex's local backend runs "use node" actions on the `node` on PATH, which must be 22 or 24.
 case $(node --version) in
   v22.* | v24.*) ;;
-  *)
-    supported=$(ls -d "$HOME"/.nvm/versions/node/v24.* "$HOME"/.nvm/versions/node/v22.* 2>/dev/null | head -1 || true)
-    [[ -z $supported ]] || PATH="$supported/bin:$PATH"
-    ;;
+  *) PATH="$(brew --prefix node@24)/bin:$PATH" ;;
 esac
 
 CMD="${1:-}"
