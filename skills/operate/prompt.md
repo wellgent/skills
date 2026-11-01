@@ -15,7 +15,7 @@ Resume from: <hand-back URL; this line goes on a first run>
 Run lines from the operator:
 
 - Work in a fresh worktree, under the rules in the project's `AGENTS.md`.
-- Keep a decision log, and keep it out of git. A row records a command's result only after its exit is read, and a loop over landings or checks runs in bash.
+- Keep a decision log, and keep it out of git. A row records a command's result only after its exit is read, and a loop over landings or checks runs in bash. Read an exit with no pipe on that command, since `${PIPESTATUS[0]}` is empty in zsh, the shell a run's commands use.
 - Run at most `AGENT_SLOTS` implementers and verifiers at once (the host's environment; the project's `dev-loop.md` under Agents).
 - Scope: on mid-run discoveries, pstack's Orchestrate rule (`orchestrate.md`) holds over its Autonomous run rule (`autonomous-run.md`). Fix only what blocks the done check; everything else parks as a follow-up in your note.
 - Before you start any implementer, post your plan on <request URL> as a stop and wait for the operator's go or cut. The plan names each unit's model and effort.
@@ -33,6 +33,6 @@ Run lines from the operator:
 - On a resume, restore each file from the hand-back to its path under `$HOME`, carry on the decision log posted with it, apply every `scope:` comment on <request URL>, and pick up through pstack's Session pickup from the resume note.
 - Give every background command and every wait a time limit, and never wait on a command that may not exit, such as a `--watch`. Look at any unit silent for an hour, and treat an agent that ended with no report as silent. Stop a process by its PID, never by a name match.
 - Delete files only with `rm` on a literal path or `find <dir> -delete`, never `rm` on a glob or a variable: Claude Code stops the session at a permission prompt for those, even with permissions bypassed.
-- Never print or write a deployment's whole environment (`convex env list`, `vercel env pull`): read the one value you need (`convex env get <name>`) into a variable, or use the host's own login, and never trace a script that holds a secret (`bash -x`, `set -x`), since the trace prints the value. A printed environment or secret lands in the session's transcript on disk.
+- Never print or write a deployment's whole environment (`convex env list`, `vercel env pull`): read the one value you need (`convex env get <name>`) into a variable, or use the host's own login, and never trace a script that holds a secret (`bash -x`, `set -x`), since the trace prints the value. Never print a process's arguments (`pgrep -fl`, `ps` with arguments) or read a backend's local config, since they hold its admin key: `pgrep` without `-l` or `-f` output gives the PID. A printed environment or secret lands in the session's transcript on disk.
 - If you are truly stuck after a few hours, stop and write up why.
 - When the done check passes, or you stop, post the audited decision log as a comment on <request URL> with `gh issue comment`: a line `Decision log` and the TSV in a collapsed `<details>` block, in as many comments as the length limit needs. Then post your `/ketchup` note as a comment on <request URL> with `gh issue comment`.
