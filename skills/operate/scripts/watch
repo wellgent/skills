@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 # watch <request issue> [<after comment URL or id>]
-# Run from the brain's checkout. Waits on the run request and the run's herdr session, and returns
+# Run from the brain's checkout. Waits on the run request and the run's Rex session, and returns
 # with one reason, so the operator session that started it in the background acts on it:
 #   exit 0  new comments after the given one (default: the newest one now), printed in full once the
 #           newest is WATCH_SETTLE_SECONDS old (default 90), so a follow-up posted right after a stop
 #           arrives with it; the operator's own (opening with **Operator or scope: **Operator) are skipped
-#   exit 3  the run's session is gone with no new comment
+#   exit 3  the run's session is gone or its agent has exited, with no new comment
 #   exit 4  this host's weekly usage is at or above WATCH_WEEKLY_LIMIT percent (default 90; off disables)
-#   exit 5  the run's session has done nothing for WATCH_IDLE_MINUTES (default 30) with no new comment,
-#           while nobody is assigned on the request (an assignee is the requester holding a call the
-#           run waits on, so its quiet is expected)
+#   exit 5  the run's session has had no status change for WATCH_IDLE_MINUTES (default 30), or for
+#           WATCH_STALL_MINUTES (default 60) while it reads working, with no new comment and nobody
+#           assigned on the request (an assignee is the requester holding a call the run waits on, so
+#           its quiet is expected)
 #   exit 6  the weekly usage has been unreadable for WATCH_USAGE_BLIND_MINUTES (default 30)
 #   exit 1  a usage error
 # Exits 3 to 6 print a one-line reason. A failed GitHub call or usage read while waiting is retried.
 set -euo pipefail
 die() { echo "watch: $*" >&2; exit 1; }
-for tool in gh jq herdr; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+for tool in gh jq rex; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
 here=$(cd "$(dirname "$0")" && pwd)
 
 issue=${1:?usage: watch <request issue> [<after comment URL or id>]}
@@ -26,6 +27,7 @@ weekly_limit=${WATCH_WEEKLY_LIMIT:-90}
 settle_s=${WATCH_SETTLE_SECONDS:-90}
 usage_every=${WATCH_USAGE_INTERVAL:-300}
 idle_s=$(( ${WATCH_IDLE_MINUTES:-30} * 60 ))
+stall_s=$(( ${WATCH_STALL_MINUTES:-60} * 60 ))
 blind_s=$(( ${WATCH_USAGE_BLIND_MINUTES:-30} * 60 ))
 case $weekly_limit in off|[0-9]|[0-9][0-9]|100) ;; *) die "WATCH_WEEKLY_LIMIT must be a percent or off, got: $weekly_limit" ;; esac
 
@@ -35,18 +37,32 @@ after=${2:-$(comments | jq 'map(.id) | max // 0')}
 after=${after##*issuecomment-}
 case $after in *[!0-9]*|"") die "the comment must be its URL or the number in it, got: $2" ;; esac
 
-# The session name follows start: op-<repo>-<issue>, cut to herdr's 32 characters.
+# The session name follows start: op-<repo>-<issue>.
 repo=$(gh issue view "$issue" --json body --jq '.body' | sed -n 's/^- \*\*Repo:\*\* *\([^ ]*\).*/\1/p' | head -1)
 [ -n "$repo" ] || die "request $issue names no repo"
-name=${repo##*/}
-session="op-${name:0:$((28 - ${#issue}))}-$issue"
-# start records the run's pane here; herdr can drop the session's name while the run goes on.
-pane_file="${XDG_STATE_HOME:-$HOME/.local/state}/operate/$session.pane"
+session="op-${repo##*/}-$issue"
 
-# Idle: herdr reports the session as anything but working, and its state has not changed since the
-# last round. A state change between rounds (a short turn the rounds missed) counts as activity.
-active_at=$(date +%s)
-last_seq=""
+# Rex streams the session's events, so the quiet clock counts from the run's last status change. Each
+# round still reads the status, since the stream stays open after a session is killed.
+changed_at=$(date +%s)
+follow() { exec 3< <(exec rex events -s "$session" --json 2>/dev/null); events_pid=$!; }
+trap 'kill "$events_pid" 2>/dev/null || true' EXIT
+follow
+# Waits out one round, and returns early when the agent exits.
+await_round() {
+  local until=$(($(date +%s) + interval)) left line
+  while left=$((until - $(date +%s))); [ "$left" -gt 0 ]; do
+    if IFS= read -r -t "$left" -u 3 line; then
+      case $line in
+        *'"name":"child_exited"'*) changed_at=$(date +%s); return ;;
+        *'"name":"program_status_changed"'*|*'"name":"process_changed"'*) changed_at=$(date +%s) ;;
+      esac
+    elif [ $? -gt 128 ]; then return
+    else follow; sleep "$left"; return
+    fi
+  done
+}
+
 usage_at=0
 # The start of an unreadable streak lives in a host file, so a watch restarted after each comment
 # keeps counting the streak instead of starting it again.
@@ -66,25 +82,26 @@ while :; do
     fi
   fi
 
-  if ! agent=$(herdr agent get "$session" 2>/dev/null); then
-    # A lost name with Claude still in the run's pane is the run: name the pane again.
-    if [ -s "$pane_file" ] && agent=$(herdr agent get "$(cat "$pane_file")" 2>/dev/null) &&
-        [ "$(jq -r '.result.agent.agent // empty' <<<"$agent")" = claude ]; then
-      herdr agent rename "$(cat "$pane_file")" "$session" >/dev/null 2>&1 || true
-    else
-      echo "watch: $session is gone and request $issue has no comment after $after" >&2
-      exit 3
-    fi
+  rc=0
+  status=$(rex block call -s "$session" -b agent program_status 2>/dev/null) || rc=$?
+  if [ "$rc" -eq 3 ]; then
+    echo "watch: $session is gone and request $issue has no comment after $after" >&2
+    exit 3
+  fi
+  if [ "$rc" -eq 0 ] && [ "$(rex block call -s "$session" -b agent process 2>/dev/null | jq '.last_exit != null')" = true ]; then
+    echo "watch: the agent in $session has exited and request $issue has no comment after $after" >&2
+    exit 3
   fi
   now=$(date +%s)
-  status=$(jq -r '.result.agent.agent_status // "unknown"' <<<"$agent")
-  seq=$(jq -r '.result.agent.state_change_seq // ""' <<<"$agent")
   # The operator assigns the requester while a call is theirs: the run waits on it, so quiet is not idle.
   assigned=$(gh issue view "$issue" --json assignees --jq '.assignees | length' 2>/dev/null || echo 0)
-  if [ "$status" = working ] || [ "$seq" != "$last_seq" ] || [ "${assigned:-0}" -gt 0 ]; then active_at=$now; fi
-  last_seq=$seq
-  if [ $((now - active_at)) -ge "$idle_s" ]; then
-    echo "watch: $session has been $status for $(( (now - active_at) / 60 )) minutes and request $issue has no comment after $after" >&2
+  [ "${assigned:-0}" -eq 0 ] || changed_at=$now
+  # Any record working means the run is, since a background agent reports below a settled root.
+  state=$(jq -r 'if any(.records[]?; .state == "working") then "working" else (.records[0].state // "unknown") end' <<<"$status" 2>/dev/null || echo unknown)
+  limit=$idle_s
+  [ "$state" != working ] || limit=$stall_s
+  if [ "$rc" -eq 0 ] && [ $((now - changed_at)) -ge "$limit" ]; then
+    echo "watch: $session has been $state with no status change for $(( (now - changed_at) / 60 )) minutes and request $issue has no comment after $after" >&2
     exit 5
   fi
 
@@ -118,5 +135,5 @@ while :; do
       fi
     fi
   fi
-  sleep "$interval"
+  await_round
 done

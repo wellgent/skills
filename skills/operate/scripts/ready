@@ -3,7 +3,8 @@
 # Run from the brain's checkout before /operate writes a run's prompt. Prints one line per check:
 #   brain     the brain checkout clean and at its remote head
 #   project   ~/repos/<repo> clean on main and at its remote head (fast-forwarded when only behind)
-#   operator  the tools this skill's own scripts call
+#   operator  the tools this skill's own scripts call, a Rex server, and Claude Code new enough to
+#             report its status to Rex
 #   usage     this host's weekly Claude usage, or that it is unreadable; never blocks
 #   tool      each check command under "## Host tools" in the project's docs/agents/dev-loop.md
 #   pstack    the plugin version installed for this checkout against the port's marketplace version
@@ -16,7 +17,12 @@
 # 1 blocked (a dirty or diverged checkout, a failing tool, a failing smoke step).
 set -euo pipefail
 die() { echo "ready: $*" >&2; exit 1; }
-for tool in git gh jq curl claude herdr; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+for tool in git gh jq curl claude rex; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+rex whoami >/dev/null || die "no Rex server answers"
+claude_floor=2.1.295
+claude_version=$(claude --version | sed 's/ .*//')
+[ "$(printf '%s\n' "$claude_floor" "$claude_version" | sort -V | head -n 1)" = "$claude_floor" ] ||
+  die "Claude Code $claude_version reports no status to Rex: it needs $claude_floor or newer"
 echo "operator ok"
 
 smoke=""

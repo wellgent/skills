@@ -6,7 +6,7 @@ How we run product work with agents at [Wellgent](https://wellgent.ai), publishe
 
 - **pstack** (the [Claude Code port](https://github.com/michael-denyer/pstack-claude), installed as the plugin `pstack@pstack-claude` per project) owns everything inside a project: planning, build, review, verification, pull requests, shipping and retro.
 - **A brain** is the repository where decisions and requests live: wayfinder maps for what to do, and **run requests** for what pstack should run. A request is one tracker issue with the five parts pstack's own prompting guide asks for: goal, a done check that passes or fails, the proof, what is known, constraints.
-- **`/operate <issue>`**, run from the brain, turns a request into a pstack run: it writes the prompt, starts the run as its own herdr session in the project checkout with landing authority, and stops. The run merges what its verifier passes and posts its note back on the request.
+- **`/operate <issue>`**, run from the brain, turns a request into a pstack run: it writes the prompt, starts the run as its own Rex session in the project checkout with landing authority, and stops. The run merges what its verifier passes and posts its note back on the request.
 
 ## Layout
 
@@ -31,7 +31,7 @@ Everything published here is internals-free: no person, project, company or host
 
 ## Conventions assumed
 
-- Claude Code with the pstack plugin on every host that runs a project, and [herdr](https://github.com/herdr) on the host `/operate` runs on.
+- Claude Code with the pstack plugin on every host that runs a project, and [Rex](https://www.superlogical.com/rex) on the host `/operate` runs on.
 - A GitHub repository per project and per brain, with GitHub Issues as the tracker and GitHub Actions for the check command.
 - [mattpocock/skills](https://github.com/mattpocock/skills) for the brain's planning skills, pinned by commit.
 
