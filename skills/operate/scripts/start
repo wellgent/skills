@@ -42,4 +42,5 @@ while [ "$waited" -lt "${START_WAIT_SECONDS:-120}" ]; do
   sleep 2; waited=$((waited + 2))
 done
 echo "$session stopped at a startup prompt: answer it in the block (rex capture -s $session -b agent --trim)"
+echo "start prompt: $prompt"
 exit 4

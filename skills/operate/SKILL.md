@@ -58,6 +58,7 @@ bash <this skill's directory>/scripts/start <owner>/<repo> <n> ~/.local/state/op
 
 It creates the Rex session `op-<repo>-<n>` in the project checkout, with Claude Code in its block labelled `agent` and `/pstack:poteto-mode` pointed at the prompt file, and prints the session name.
 A start that stops at a startup prompt (folder trust, a login), exit 4, is answered in that block (see Talking to the run).
+Folder trust opens on `No, exit`, so its answer is `down`, then `enter`. Claude Code then rejects the start prompt as an unknown command, because a project's plugins load only after trust: send `/reload-plugins`, then the start prompt `start` printed.
 
 ## 6. Record and watch
 
