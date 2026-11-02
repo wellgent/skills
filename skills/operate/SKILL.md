@@ -76,6 +76,7 @@ It returns with one reason, printed:
 - **Exit 4**: this host's weekly usage is at 90% or above: pause the run (see Pause).
 - **Exit 5**: the run's session has had no status change for 30 minutes, or for an hour while it reads `working`, with no new comment and nobody assigned on the request. This only alerts you, and the run carries on. Read its pane and act on what holds it: a five-hour usage limit waits for its reset, then the run is told in its pane to carry on; anything else is handled like a stop. A pane that names a unit as still running answers nothing: check how long that unit has been silent, and tell the run to look at it.
 - **Exit 6**: this host's weekly usage has been unreadable for 30 minutes. Read the weekly percentage from the run's status line in its pane; at 90% or above pause the run, otherwise restart the watch.
+- **Exit 7**: a permission prompt in the run's session has held for a minute. Claude Code stops on some commands even with permissions bypassed, for itself and for any subagent, and nobody else sees the prompt. Answer it as in Talking to the run.
 
 Restart it after each return, from the newest comment id it printed, or from the id it started from when it printed none, until the note is handled. Never restart it from a comment this session posted: the watch skips the operator's own comments, and a run comment posted just before the operator's would go unread.
 This session stays open for the run's whole length; a closed operator leaves the run's stops unread.
@@ -92,6 +93,8 @@ rex block call -s <session> -b agent program_status
 
 The second reads the pane, and the third gives its state: any record `working` is working, and a `blocked` root says why in `kind` and `msg`.
 Pass `-s` and `-b` on every call, since a bare command acts on the session this operator runs in.
+
+A permission prompt shows its command in the pane, cut off by a narrow pane. Read the whole command first: note the pane's size from the block's `size` method, then `rex block call -s <session> -b agent resize '{"columns":200,"rows":120}'`, read it, and restore the size. `rex send-key -s <session> -b agent enter` takes the highlighted Yes when the command stays within the request's constraints. For anything else, press `down` and `enter` for No, then tell the run in its pane why.
 
 ## The plan
 

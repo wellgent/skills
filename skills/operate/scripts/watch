@@ -12,8 +12,10 @@
 #           assigned on the request (an assignee is the requester holding a call the run waits on, so
 #           its quiet is expected)
 #   exit 6  the weekly usage has been unreadable for WATCH_USAGE_BLIND_MINUTES (default 30)
+#   exit 7  a permission prompt in the run's session, its main agent's or a subagent's, has held for
+#           WATCH_PERMISSION_SECONDS (default 60), with no new comment
 #   exit 1  a usage error
-# Exits 3 to 6 print a one-line reason. A failed GitHub call or usage read while waiting is retried.
+# Exits 3 to 7 print a one-line reason. A failed GitHub call or usage read while waiting is retried.
 set -euo pipefail
 die() { echo "watch: $*" >&2; exit 1; }
 for tool in gh jq rex; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
@@ -29,6 +31,7 @@ usage_every=${WATCH_USAGE_INTERVAL:-300}
 idle_s=$(( ${WATCH_IDLE_MINUTES:-30} * 60 ))
 stall_s=$(( ${WATCH_STALL_MINUTES:-60} * 60 ))
 blind_s=$(( ${WATCH_USAGE_BLIND_MINUTES:-30} * 60 ))
+permission_s=${WATCH_PERMISSION_SECONDS:-60}
 case $weekly_limit in off|[0-9]|[0-9][0-9]|100) ;; *) die "WATCH_WEEKLY_LIMIT must be a percent or off, got: $weekly_limit" ;; esac
 
 comments() { gh issue view "$issue" --json comments --jq '[.comments[] | {id: (.url | sub(".*issuecomment-"; "") | tonumber), author: .author.login, at: .createdAt, url, body}]'; }
@@ -64,6 +67,7 @@ await_round() {
 }
 
 usage_at=0
+permission_at=0
 # The start of an unreadable streak lives in a host file, so a watch restarted after each comment
 # keeps counting the streak instead of starting it again.
 blind_file="${XDG_STATE_HOME:-$HOME/.local/state}/operate/usage-unreadable-since"
@@ -98,6 +102,16 @@ while :; do
   [ "${assigned:-0}" -eq 0 ] || changed_at=$now
   # Any record working means the run is, since a background agent reports below a settled root.
   state=$(jq -r 'if any(.records[]?; .state == "working") then "working" else (.records[0].state // "unknown") end' <<<"$status" 2>/dev/null || echo unknown)
+  # A prompt holds its agent while the other records keep the run reading working, so it has its own clock.
+  if [ "$rc" -eq 0 ] && jq -e 'any(.records[]?; .state == "blocked" and .kind == "permission")' >/dev/null 2>&1 <<<"$status"; then
+    [ "$permission_at" -ne 0 ] || permission_at=$now
+    if [ $((now - permission_at)) -ge "$permission_s" ]; then
+      echo "watch: $session has held a permission prompt for $((now - permission_at)) seconds and request $issue has no comment after $after" >&2
+      exit 7
+    fi
+  else
+    permission_at=0
+  fi
   limit=$idle_s
   [ "$state" != working ] || limit=$stall_s
   if [ "$rc" -eq 0 ] && [ $((now - changed_at)) -ge "$limit" ]; then
