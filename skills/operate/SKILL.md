@@ -94,7 +94,7 @@ rex block call -s <session> -b agent program_status
 The second reads the pane, and the third gives its state: any record `working` is working, and a `blocked` root says why in `kind` and `msg`.
 Pass `-s` and `-b` on every call, since a bare command acts on the session this operator runs in.
 
-A permission prompt shows its command in the pane, cut off by a narrow pane. Read the whole command first: note the pane's size from the block's `size` method, then `rex block call -s <session> -b agent resize '{"columns":200,"rows":120}'`, read it, and restore the size. `rex send-key -s <session> -b agent enter` takes the highlighted Yes when the command stays within the request's constraints. For anything else, press `down` and `enter` for No, then tell the run in its pane why.
+A permission prompt shows its command in the pane, cut off by a narrow pane. Read the whole command first: note the pane's size from the block's `size` method, then `rex block call -s <session> -b agent resize '{"columns":200,"rows":120}'`, read it, and restore the size. A pane a client holds keeps its size, so `size` still reads the old values after the resize: read the command instead from the newest `Bash` call in the transcript of the agent the prompt belongs to, `~/.claude/projects/<checkout's project>/<session id>/subagents/agent-<id>.jsonl` with `<id>` from `program_status`, or the session's own `<session id>.jsonl` when no agent holds it. `rex send-key -s <session> -b agent enter` takes the highlighted Yes when the command stays within the request's constraints. For anything else, press `down` and `enter` for No, then tell the run in its pane why.
 
 ## The plan
 
