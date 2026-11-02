@@ -63,7 +63,7 @@ Folder trust opens on `No, exit`, and a project's external import prompt on `No,
 ## 6. Record and watch
 
 Comment on the request: `**Operator:** run: <session> started on <hostname> at <UTC time>`, or on a resume `**Operator:** run: <session> resumed on <hostname> at <UTC time> from <hand-back URL>`.
-Start the watch in the background from the `ready:` comment's URL, then end the turn: a run can post its plan before the `run:` comment, and the watch then prints both.
+Remove any assignee from the request, since watch exit 5 stays silent while one is set. Start the watch in the background from the `ready:` comment's URL, then end the turn: a run can post its plan before the `run:` comment, and the watch then prints both.
 
 ```bash
 bash <this skill's directory>/scripts/watch <n> <ready: comment URL>

@@ -18,6 +18,8 @@ cd "$main"
 # Every process whose working directory is inside the tree or whose command line names a path
 # inside it, sparing this shell, its ancestors, its descendants and the other members of the
 # caller's pipeline (same parent, same process group), such as a `| tail` started in the tree.
+# A `timeout` above this shell has its own process group, so the rest of the pipeline is told by
+# sharing that `timeout`'s parent.
 strays() {
   local procs cwds
   procs=$(ps -axo pid=,ppid=,pgid=,command=)
@@ -27,7 +29,7 @@ strays() {
     BEGIN { self = ENVIRON["SELF"] + 0; tree = ENVIRON["TREE"]; cwds = ENVIRON["CWDS"] }
     {
       pid = $1; parent[pid] = $2; group[pid] = $3; kids[$2] = kids[$2] " " pid
-      cmd = $0; sub(/^ *[0-9]+ +[0-9]+ +[0-9]+ +/, "", cmd)
+      cmd = $0; sub(/^ *[0-9]+ +[0-9]+ +[0-9]+ +/, "", cmd); command[pid] = cmd
       if (index(cmd " ", tree "/") || index(cmd " ", tree " ")) hit[pid] = 1
     }
     END {
@@ -38,6 +40,9 @@ strays() {
       }
       for (p = self; p > 1 && !(p in spare); p = parent[p]) spare[p] = 1
       for (p in parent) if (parent[p] == parent[self] && group[p] == group[self]) spare[p] = 1
+      for (a = self; a > 1; a = parent[a]) {
+        if (command[a] ~ /^([^ ]*\/)?g?timeout /) for (p in parent) if (parent[p] == parent[a]) spare[p] = 1
+      }
       queue = self
       while (queue != "") {
         m = split(queue, batch, " "); queue = ""

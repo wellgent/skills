@@ -166,3 +166,17 @@ test("teardown with nothing left running removes the tree and reports no strays"
   expect(teardown.stdout).toContain(`removed worktree ${worktree}`);
   expect(existsSync(worktree)).toBe(false);
 });
+
+test("teardown under timeout spares the rest of the caller's pipeline", () => {
+  const teardown = spawnSync(
+    "bash",
+    [
+      "-c",
+      'timeout 60 bash scripts/worktree-teardown.sh | tail -n 1; echo "statuses ${PIPESTATUS[*]}"',
+    ],
+    { cwd: worktree, encoding: "utf8" },
+  );
+
+  expect(teardown.stdout, teardown.stderr).toContain("statuses 0 0");
+  expect(existsSync(worktree)).toBe(false);
+});
