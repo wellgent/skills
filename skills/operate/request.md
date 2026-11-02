@@ -21,7 +21,7 @@ labels: run
 
 ## Known
 
-<What is already known: the files, records, decisions and findings the run starts from. The run starts from the main branch after the operator's Ready; a starting commit named here is the last one known.>
+<What is already known: the files, records, decisions and findings the run starts from. The run starts from the main branch after the operator's Ready; a starting commit named here is the last one known. A fact about the run's host is stated as checked on that host, with how; a fact not yet checked is checked there before the run starts, by whoever can reach it.>
 
 ## Constraints
 
