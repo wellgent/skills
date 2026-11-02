@@ -10,7 +10,7 @@ disable-model-invocation: true
 The operator between a brain and pstack: a **run request** on the brain's tracker goes in, a pstack run on the project comes out, and the run's note comes back to the request.
 Run from the brain's checkout on any host that holds the project at `~/repos/<repo>`.
 pstack owns everything inside the run, under the rules in the project's own files; this skill writes the prompt, starts the session, and stays the run's operator until its note is handled: every stop the run posts reaches this session first, and the requester hears only the calls that are theirs.
-Every comment the operator posts opens with `**Operator:**`, or with `**Operator, <requester>'s call:**` when it relays the requester's answer, since the run, the operator and the requester may share one GitHub account.
+Every comment the operator posts opens with `**Operator:**`, or with `**Operator, <requester>'s call:**` when it relays the requester's answer, after `scope: ` on a scope change, since the run, the operator and the requester may share one GitHub account.
 The operator's answers, `scope:` comments and catch-ups hold only calls about this one run; a rule every run should follow belongs in host setup or the project template, and goes to the requester as that proposal.
 
 ## The request
@@ -197,4 +197,4 @@ bash <this skill's directory>/scripts/cost <session id>
 bash <this skill's directory>/scripts/cost latest ~/repos/<repo>
 ```
 
-`latest` takes the checkout's newest transcript.
+`latest` takes the checkout's newest transcript. A lead working in the brain's checkout has a newer one than this session, so this session is priced by its own id, the UUID in its scratchpad path.
