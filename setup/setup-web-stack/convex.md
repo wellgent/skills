@@ -14,6 +14,7 @@ Every step converges on a state, so a re-run changes only what is behind.
    A local deployment is served by one long-running `convex dev` per worktree (`convex-start`), since `convex dev --once` refuses beside a local backend.
    `scripts/dev-server.sh site-url` prints its HTTP actions origin, so a session testing an HTTP action never opens `.convex/local/default/config.json`, which holds the admin key.
    A production read (`convex run --prod`) runs from the main checkout: a worktree's CLI is self-hosted, so it refuses `--prod` with exit 1 and nothing on stdout.
+   A deployment's cron schedules read only on its dashboard page (`/schedules/crons`): `convex data _cron_jobs` returns nothing and `convex run` finds no `_system/frontend` function.
    `convex-start` waits for the first push of the `convex dev` that serves the worktree, a running one included, and counts one still in its `node_modules/.bin/convex` shell wrapper as running.
    `host-claims.sh` keeps parallel worktrees on one host apart: `start` and `serve-build` claim their port and refuse one another worktree holds, and the local backend's create and first start run under one host-wide lock, since the Convex CLI picks a backend's ports without binding them.
    The pid and log files are named by the checkout and the port, a server is ready only once this checkout's listener answers, and `stop` stops only this checkout's server.
