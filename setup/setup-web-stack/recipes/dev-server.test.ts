@@ -607,6 +607,28 @@ sleep 1
     expect(existsSync(join(devTypes, "validator.ts"))).toBe(true);
   });
 
+  test("site-url prints the local deployment's origin and none of its admin key", () => {
+    const local = join(checkout, ".convex", "local", "default");
+    mkdirSync(local, { recursive: true });
+    writeFileSync(
+      join(local, "config.json"),
+      JSON.stringify({ adminKey: "secret-key", ports: { cloud: 3210, site: 3211 } }),
+    );
+
+    const run = devServer("site-url");
+
+    expect(run.status).toBe(0);
+    expect(run.stdout.trim()).toBe("http://127.0.0.1:3211");
+    expect(run.stdout).not.toContain("secret-key");
+  });
+
+  test("site-url refuses a checkout with no local deployment", () => {
+    const run = devServer("site-url");
+
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("no local deployment");
+  });
+
   test("clear-stale-types removes the dev types when no next dev of the checkout runs", () => {
     writeDevLock(exitedPid());
 

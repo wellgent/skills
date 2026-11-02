@@ -85,6 +85,8 @@ No GitHub Actions run for this project.
 - **A stop runs leaves first:** `ListAgents`, stop every descendant, then the parent, then `ListAgents` again until it is empty.
 - **Environments.** No session prints or writes a deployment's whole environment (`convex env list`, `vercel env pull`), since a printed one lands in its transcript on disk: it reads the one value it needs into a variable, or uses the host's own login, and never traces a script that holds a secret (`bash -x`, `set -x`), since the trace prints the value.
 - **Deletes.** A delete through a variable is written `rm -f "${VAR:?}"/...`, or with a literal path, so Claude Code's possibly-empty-variable prompt never holds an unattended session.
+- **Brace defaults.** An expansion's default is never a brace pair (`${VAR:-{}}`): Claude Code stops on it at a "Dangerous rm operation" prompt, with no `rm` in the command and with permissions bypassed. The default goes in a variable first (`empty='{}'`, then `${VAR:-$empty}`).
+- **Time limits.** The `timeout` command is not on every host. A foreground command takes the Bash tool's `timeout` parameter, and anything else runs under `perl -e 'alarm shift; exec @ARGV' <seconds> <command>`.
 
 ## Advisories
 

@@ -2,8 +2,8 @@
 # Ephemeral dev-server lifecycle: start, stop and status of one `next dev` on an explicit port,
 # serve-build of a fresh production build through `next start` on one,
 # the checkout's long-running `convex dev` on a local Convex deployment (convex-start,
-# convex-stop), teardown before a worktree goes, and clear-stale-types, which the typecheck
-# runs first.
+# convex-stop), teardown before a worktree goes, site-url, which prints the local deployment's
+# HTTP actions origin, and clear-stale-types, which the typecheck runs first.
 # One server per checkout at a time - servers share .next, which a second one clears or corrupts.
 # One server per port on the host: `start` and `serve-build` claim their port
 # (scripts/host-claims.sh) and refuse one another checkout holds, and `stop` stops only this
@@ -328,6 +328,12 @@ case "$CMD" in
       exit 1
     fi
     ;;
+  site-url)
+    # The local deployment's HTTP actions origin, read here so no session opens the config file,
+    # whose admin key would land in its transcript.
+    [ -f "$LOCAL_CONFIG" ] || { echo "no local deployment in this checkout" >&2; exit 1; }
+    jq -er '"http://127.0.0.1:\(.ports.site)"' "$LOCAL_CONFIG"
+    ;;
   clear-stale-types)
     # The typecheck reads .next/dev/types, which only a running `next dev` keeps current:
     # with none running they name the routes of an earlier tree, so they go.
@@ -337,7 +343,7 @@ case "$CMD" in
     ;;
   *)
     echo "usage: $0 {start|serve-build|stop|status|free} [port]   (default port $DEFAULT_PORT)" >&2
-    echo "       $0 {convex-start|convex-stop|teardown|clear-stale-types}" >&2
+    echo "       $0 {convex-start|convex-stop|teardown|site-url|clear-stale-types}" >&2
     exit 2
     ;;
 esac
