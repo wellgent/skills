@@ -17,7 +17,7 @@
 # 1 blocked (a dirty or diverged checkout, a failing tool, a failing smoke step).
 set -euo pipefail
 die() { echo "ready: $*" >&2; exit 1; }
-for tool in git gh jq curl claude rex; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+for tool in git gh jq curl timeout claude rex; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
 rex whoami >/dev/null || die "no Rex server answers"
 claude_floor=2.1.295
 claude_version=$(claude --version | sed 's/ .*//')
