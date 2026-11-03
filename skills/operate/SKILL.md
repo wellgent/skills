@@ -168,9 +168,9 @@ Every run ends with a review from outside it, so each run leaves the protocol an
 3. **Sort every finding:**
    - **Fix now**, with no ask, when it repairs setup code or makes it match a rule already decided: route the run's setup changes as The setup says, port them to wellgent/skills, and re-pin with `sync-brain`.
    - **A call for the requester** when it adds or changes a rule, a budget, a model choice or a tool: the run lines, stop rules, slots, models, a candidate tool. Apply it once answered.
-   - **Project work** for a later run: a `scope:` addition if the requester wants it now, otherwise a line for the next request.
-   - **No change**, with the reason.
-4. **Post one `Run review` comment** on the request: what held, what did not, what was fixed with its commits, the calls, and the run's numbers (cost per PR, PRs landed, stops and how many reached the requester, deviations, wall time) beside those of the last closed `run` request's review.
+   - **Project work** for a later run, judged one item at a time and kept selective: an item earns a place only with real value, such as a defect a user or a later run will hit, a gap in what the run was asked to deliver, or a risk. Each such item becomes one issue on the project's tracker, linked from the review, or a `scope:` addition when the requester wants it now. The rest is **No change**.
+   - **No change**, with the reason. The tracker holds what is worth someone's time later; the review's reason is the record of the rest.
+4. **Post one `Run review` comment** on the request: what held, what did not, what was fixed with its commits, the issues filed, the calls, and the run's numbers (cost per PR, PRs landed, stops and how many reached the requester, deviations, wall time) beside those of the last closed `run` request's review.
 
 ## The setup
 
