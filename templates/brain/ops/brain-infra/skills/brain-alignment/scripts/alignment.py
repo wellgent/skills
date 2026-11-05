@@ -21,6 +21,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 
 sys.dont_write_bytecode = True  # routines write nothing into the published copy
 SCRIPTS = Path(__file__).resolve().parent
@@ -34,6 +35,7 @@ import apply as applylib  # noqa: E402
 CONF = json.loads((SKILL_DIR / 'config.json').read_text())
 RID = CONF['routine']
 CMD = f'{sys.executable} {SCRIPTS / "alignment.py"}'
+PUBLIC_AREAS = ('practices/', 'topics/', 'tools/')
 FRONTMATTER_KEY = re.compile(r'^\s*(updated|created|status|tags|aliases|related|title|type|last_verified):')
 WORD = re.compile(r"[\w][\w.,:/'-]*\w|\w")
 DATE = re.compile(r'\*\*(\d{4}-\d{2}-\d{2})\*\*')
@@ -473,6 +475,30 @@ def check_verdict(v, packet, targets, cooling, seen):
     return None
 
 
+def unshareable(cfg, v):
+    """Pages under PUBLIC_AREAS are published as written: refuse an edit that adds a scripts/check-shareable.sh hit."""
+    path = v['path']
+    if v.get('op') not in ('UPDATE', 'ADD') or not path.startswith(PUBLIC_AREAS):
+        return None
+    repo = Path(cfg['maintenance_repo'])
+    text, check = read(repo, path), repo / 'scripts' / 'check-shareable.sh'
+    anchor = v.get('old') if v['op'] == 'UPDATE' else v.get('after')
+    if text is None or not check.is_file() or not anchor or anchor not in text:
+        return None  # apply.py refuses a missing span
+    new = v.get('new') or ''
+    after = text.replace(anchor, new if v['op'] == 'UPDATE' else anchor + new, 1)
+    hits = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, body in (('before', text), ('after', after)):
+            page = Path(tmp) / name / path
+            page.parent.mkdir(parents=True)
+            page.write_text(body)
+            _, out, _ = lib.run(['bash', check, page], cwd=repo, timeout=60, check=False)
+            hits.append({re.sub(r'^([\w-]+): [^:]+:\d+:', r'\1:', line) for line in out.splitlines() if not line.startswith('shareable:')})
+    added = sorted(hits[1] - hits[0])
+    return f'{path} is published as written, and the edit adds {added[0][:160]}' if added else None
+
+
 def cmd_apply(cfg, args):
     meta = lib.current_run(cfg, args.run)
     run_id = meta['run_id']
@@ -489,6 +515,8 @@ def cmd_apply(cfg, args):
     for v in verdicts:
         reason = check_verdict(v, packet, targets, cooling, seen)
         op = v.get('op')
+        if not reason and op in ('UPDATE', 'ADD'):
+            reason = unshareable(cfg, dict(v, path=os.path.normpath(v['path'])))
         if reason:
             refused.append({'verdict': v, 'reason': reason})
             if reason.startswith('cooldown') and op in ('UPDATE', 'ADD', 'DELETE'):

@@ -55,7 +55,8 @@ Neighbours come in this order up to `neighbour_cap`: propagation hits, the top `
 
 - a page outside the packet, a second verdict on one page, an edit on a read-only page or on a record that is not the target;
 - MOVE and whole-page DELETE, which belong to the relevance routine;
-- an edit on a page the maintenance writer changed in the last `cooldown_days`: the page is queued again with this batch's targets as context, and is judged once its cooldown ends.
+- an edit on a page the maintenance writer changed in the last `cooldown_days`: the page is queued again with this batch's targets as context, and is judged once its cooldown ends;
+- an edit to a page under `practices/`, `topics/` or `tools/` that adds a `scripts/check-shareable.sh` hit, when the brain has that script: those pages are published as written.
 
 `apply.py` then enforces the framework guards: content hash, a unique span, cited quotes found, every new number or date cited, and the 20% tripwire.
 There is no edit cap.
