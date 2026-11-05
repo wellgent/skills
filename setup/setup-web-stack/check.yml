@@ -1,7 +1,7 @@
 # The check command on pull requests from contributors outside runs, whose heads no scripts/check
 # signs off. Copied to .github/workflows/check.yml by setup-web-stack only for a project that takes
 # such contributions; an agent-run project has no workflow. The node version comes from the repo's
-# own pin, pnpm from the packageManager field.
+# own pin (devEngines.runtime in package.json), pnpm from the packageManager field.
 name: check
 on:
   pull_request:
@@ -18,7 +18,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .node-version
+          node-version-file: package.json
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check

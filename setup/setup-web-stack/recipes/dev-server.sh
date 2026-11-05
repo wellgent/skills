@@ -20,16 +20,13 @@
 # needs the login to run the backend, gets CONVEX_DEPLOYMENT and the login on its command line.
 set -euo pipefail
 
-# Convex's local backend runs "use node" actions on the `node` on PATH, which must be 22 or 24.
-case $(node --version) in
-  v22.* | v24.*) ;;
-  *) PATH="$(brew --prefix node@24)/bin:$PATH" ;;
-esac
-
 CMD="${1:-}"
 DEFAULT_PORT="<lowest dev-server port, e.g. 6110>"
 PORT="${2:-$DEFAULT_PORT}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Every server this script starts runs on the project's own node, the devEngines.runtime pin pnpm
+# installs into node_modules; Convex's local backend runs "use node" actions on the `node` on PATH.
+PATH="$REPO_ROOT/node_modules/.bin:$PATH"
 # shellcheck source=scripts/host-claims.sh
 source "$REPO_ROOT/scripts/host-claims.sh"
 PIDFILE="/tmp/${PROJECT:?}-dev-$(basename "$REPO_ROOT")-${PORT}.pid"

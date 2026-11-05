@@ -52,12 +52,13 @@ Deviations from any rule are allowed with a written justification in the `Deviat
 - **Package manager**: pnpm.
   The `packageManager` field is mandatory in every repo, pinning the exact pnpm version.
   One canonical pnpm supply-chain config applies identically everywhere: `minimumReleaseAge: 1440` in `pnpm-workspace.yaml` - a 24-hour damping window, so a day-old release failing to resolve is the policy working, not an error.
-  Node is pinned repo-side (`engines` plus a version file) even on self-hosted machines - the repo, not the host, defines the toolchain.
-  The `engines` value and the version file agree on one exact line (`24.x` / `26.x` style); a range (`>=24`) or a disagreement between the two is drift.
+  Node is pinned repo-side even on self-hosted machines - the repo, not the host, defines the toolchain.
+  `engines.node`, which the hosting platform reads, and `devEngines.runtime` (`{"name": "node", "version": ..., "onFail": "download"}`), which pnpm installs into `node_modules`, name one exact line (`24.x` / `26.x` style); a range (`>=24`), a separate version file, or a disagreement between the two is drift.
+  Every pnpm script and every server `scripts/dev-server.sh` starts runs on that node; the host's own node runs only global tools, and no version manager is involved.
 - **Runner convention**: our authored surfaces write `pnpm dlx`, never `npx`.
   Third-party content stays verbatim, and following an external doc's `npx ...` line is fine - this is an authoring rule, not an execution ban.
 - **Canonical version set**: one exact pin per tool (typescript, oxlint, oxfmt, pnpm, node), declared in the private registry - any project mismatch is drift by definition.
-  The node pin bows to the hosting-platform ceiling: a platform-hosted project pins the newest node line its platform's build image supports, and a ceiling pin is conformant, not a deviation.
+  The node pin bows to the platform ceiling: a project pins the newest node line every platform it runs on supports - its hosting build image, and for a Convex project the runtime of Convex's Node actions - and a ceiling pin is conformant, not a deviation.
 - **Upgrades** run as sweeps: bump the canonical set in the registry, then roll every project in one pass.
   Never per-project ad hoc - a one-repo upgrade that stops there is the failure mode this rule exists for.
 
@@ -137,7 +138,7 @@ Apps read a co-located checkout and write markdown-first under the owning knowle
 - **Prod-parity proofs, per hosting class**:
   - Platform-hosted: `next build` inside `check` pre-ship, a mandatory deploy-status check post-ship.
   - Self-hosted: a `systemd-run --user` env-parity smoke proof pre-ship, the commit-equality healthcheck post-ship.
-- **Build-environment pins are deploy-shaped and locally unprovable**: a diff touching `engines`, `packageManager`, a node version file, or platform build settings carries a pre-ship check that the pinned values are supported by the hosting platform's build image (for Vercel, the supported-runtimes doc).
+- **Build-environment pins are deploy-shaped and locally unprovable**: a diff touching `engines`, `devEngines`, `packageManager`, or platform build settings carries a pre-ship check that the pinned values are supported by the hosting platform's build image (for Vercel, the supported-runtimes doc).
   A preview deploy does not prove it.
 - **A ship is complete when the production surface is verified serving the shipped commit** - not when the push succeeds.
 
