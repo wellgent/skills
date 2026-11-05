@@ -39,6 +39,7 @@ Pins from `mattpocock/skills` and from this repo are removed with their `.claude
 npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill <name> ...]
 ```
 
+- In a project whose package manifest pins node in `devEngines.runtime`, npm refuses `npx` (EBADDEVENGINES) under any other host node: run every `npx skills` call after a frozen install with the project's node first on `PATH` (`PATH="$PWD/node_modules/.bin:$PATH"`).
 - `<sha>` is the full 40-character commit: the CLI fails to install from a short one.
 - Pass every `--skill <name>` as its own pair of arguments: with `-y`, a list the CLI cannot parse installs the whole source without an error.
 - A skill locked at the pin (`ref` in `skills-lock.json`) is skipped; one at another commit, or with no `ref`, is removed and added again at the pin. `npx skills update` rewrites lock entries wrongly, so updates go through `add` and `remove` only.

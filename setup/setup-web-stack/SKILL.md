@@ -37,6 +37,7 @@ npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill 
 ```
 
 - The sha is the commit the project already pins for that source when every skill of the source sits on it, otherwise the source's current `main` (`gh api repos/<source>/commits/main --jq .sha`); with `latest`, as `/operate`'s Ready runs it through `setup-project`, always the source's current `main`; the CLI records it as `ref` in `skills-lock.json`
+- The project's `devEngines.runtime` pin makes npm refuse `npx` (EBADDEVENGINES) under any other host node, so every `npx skills` call runs after a frozen install with `PATH="$PWD/node_modules/.bin:$PATH"`
 - `--agent codex` writes real directories into `.agents/skills/`; `--copy` keeps the files in the project instead of symlinking a package cache
 - Skip skills already locked at that `ref`; re-pin with `npx skills remove <name> -y` and a fresh `add`, never `npx skills update`
 - Normalize afterwards: real dirs under `.agents/skills/`, relative symlinks `.claude/skills/<name>` → `../../.agents/skills/<name>` (create missing ones; move any stray real dirs the CLI wrote into `.claude/` or `agent/`)
