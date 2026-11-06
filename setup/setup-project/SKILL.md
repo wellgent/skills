@@ -72,7 +72,7 @@ Template prose reads the same in every project and is replaced on a re-run; a li
 gh api -X PATCH repos/<owner>/<repo> -F allow_merge_commit=false -F allow_squash_merge=true -F allow_rebase_merge=true -F delete_branch_on_merge=true
 ```
 
-- Labels `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human`, `run` and `wontfix` exist; `run` marks a run request for `/operate` (`gh label create run --repo <owner>/<repo> --color 0E8A16 --description "A request for /operate" --force`).
+- Labels `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human`, `run` and `wontfix` exist; `run` marks a run request for `/operate` (`gh label create run --repo <owner>/<repo> --color 0E8A16 --description "A request for /operate" --force`). A project with `scripts/preview` also has `preview`, which the script adds to a pull request and fails without (`gh label create preview --repo <owner>/<repo> --color 1D76DB --description "Gets a preview from scripts/preview" --force`).
 - `.github/ISSUE_TEMPLATE/run.md` is a copy of [`skills/operate/request.md`](../../skills/operate/request.md), rewritten from it on every run: run requests live on the project's own tracker.
 
 ## 6. Verification skill
