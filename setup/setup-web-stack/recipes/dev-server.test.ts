@@ -466,13 +466,18 @@ describe("scripts/dev-server.sh", () => {
 
   test("start reports a failed start when another process takes the port before its next dev listens", () => {
     givenServableCheckout(checkout);
+    // The taker writes its pid only once it holds the port, and the step
+    // before next dev waits for that file, so next dev always finds the port
+    // taken.
     const taker = join(checkout, "taker.pid");
     executable(
       join(checkout, "host-bin", "pnpm"),
       `#!/usr/bin/env bash
-nohup node -e 'require("node:http").createServer((q, r) => r.end("other")).listen(${freePort})' >/dev/null 2>&1 &
-echo $! >${JSON.stringify(taker)}
-sleep 1
+nohup node -e 'require("node:http").createServer((q, r) => r.end("other")).listen(${freePort}, () => require("node:fs").writeFileSync(${JSON.stringify(taker)}, String(process.pid)))' >/dev/null 2>&1 &
+for _ in $(seq 1 100); do
+  [ -s ${JSON.stringify(taker)} ] && break
+  sleep 0.1
+done
 `,
     );
     try {
