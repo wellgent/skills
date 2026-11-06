@@ -369,8 +369,10 @@ def watch(cfg, start):
             lines.append('The weekly search check did not run this week.')
         else:
             now, before = week[-1], ([r for r in rows if r['at'] < week[-1]['at']] or [None])[-1]
-            if now['gate'] != 'pass' or now['critical_fail'] or not now['complete']:
+            if now['gate'] != 'pass' or now['critical_fail']:
                 lines.append('Search quality failed its weekly check' + (', and a critical lookup no longer comes first' if now['critical_fail'] else '') + '.')
+            elif not now['complete']:
+                lines.append('The weekly search check did not finish, and the lookups it scored passed.')
             elif before and (abs(now['top1'] - before['top1']) >= WATCH['eval_move'] or abs(now['recall'] - before['recall']) >= WATCH['eval_move']):
                 lines.append(f'Search quality moved: the right page came first in {now["top1"]:.0%} of lookups (was {before["top1"]:.0%}), '
                              f'and in the top ten in {now["recall"]:.0%} (was {before["recall"]:.0%}).')
@@ -709,24 +711,25 @@ def cmd_post(cfg, args):
         print(json.dumps({'messages': len(messages), 'characters': len(text)}), file=sys.stderr)
         return 0
     (d / 'digest.md').write_text(text + '\n')
-    error = None
+    error, sent = None, 0
     for k, msg in enumerate(messages):
         error = lib.post(cfg, cfg['channels']['brain-review'], msg, silent=k > 0)
         if error:
             break
+        sent += 1
     if error:
-        lib.journal(cfg, meta['run_id'], 'problem', text=f'Posting the digest failed: {error}')
+        lib.journal(cfg, meta['run_id'], 'problem', text=f'Posting digest message {sent + 1} of {len(messages)} failed: {error}')
     if args.fallback:
         lib.journal(cfg, meta['run_id'], 'note', text='The digest sentences were rendered from the facts.')
-    remember(cfg, meta, p, posted=not error)
+    remember(cfg, meta, p, posted=sent > 0)
     if not error:
         state = lib.load_state(cfg)
         state['send_failures'] = [f for f in state.get('send_failures', []) if parse_iso(f['at']) >= p['window']['end']]
         lib.save_state(cfg, state)
-    summary = (f'posted the {p["edition"]} digest in {len(messages)} message(s): {len(p.get("changes") or [])} changes, '
+    summary = (f'posted {sent} of {len(messages)} message(s) of the {p["edition"]} digest: {len(p.get("changes") or [])} changes, '
                f'{len(p.get("needs_you") or [])} open needs-attention items, {len(p.get("done") or [])} answers applied')
     runner.end(cfg, meta, 'partial' if error else 'ok', summary, {})
-    print(json.dumps({'ended': meta['run_id'], 'posted': not error, 'messages': len(messages), 'error': error}, indent=2))
+    print(json.dumps({'ended': meta['run_id'], 'posted': not error, 'messages': len(messages), 'sent': sent, 'error': error}, indent=2))
     return 0
 
 

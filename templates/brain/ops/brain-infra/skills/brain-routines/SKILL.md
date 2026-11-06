@@ -80,7 +80,7 @@ An alert is plain sentences: the routine's `title`, what happened and the proble
 
 - A failed command job exits non-zero and its cron `failureAlert` pages `#ops-alerts` (after 1 failure, one alert per incident, 24 h cooldown). An errored or timed-out turn pages the same way.
 - The runner pages a partial run, and an agentTurn that ends `failed`, itself: once per fingerprint per day (`routinelib.alert`).
-- A failed send is kept in the framework state and reported in the next digest's health line, including cron failure alerts OpenClaw could not deliver.
+- Every post goes through the running gateway's `send` method (`routinelib.send`), which retries a timed-out call under the same idempotency key, so a slow send neither drops nor doubles a message. A send that still fails is kept in the framework state and reported in the next digest's health line, including cron failure alerts OpenClaw could not deliver.
 - The health workflow checks every heartbeat against its routine's schedule; the reconciler checks the health routine's heartbeat through its `deadman` list.
 
 ## Apply

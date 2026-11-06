@@ -293,14 +293,41 @@ def post(cfg, channel, text, silent=True):
             current = ''
         current = f'{current}\n{line}' if current else line
     chunks.append(current)
-    o = cfg['openclaw']
-    try:
-        for chunk in chunks:
-            run([o['bin'], 'message', 'send', '--account', o['account'], '--channel', 'discord',
-                 '--target', 'channel:' + str(channel), '--message', chunk] + (['--silent'] if silent else []), timeout=60)
-    except Failed as error:
-        return str(error)
+    for chunk in chunks:
+        error = send(cfg, channel, chunk, silent)
+        if error:
+            return error
     return None
+
+
+def send(cfg, channel, message, silent, tries=3):
+    """Send one message through the running gateway's send method; return None or the error.
+
+    The message keeps one idempotency key across tries, and the gateway joins a retry to the send still in flight or
+    answers it from its record, so a call that timed out is retried without posting twice. A gateway answer is final."""
+    o = cfg['openclaw']
+    params = json.dumps({'to': f'channel:{channel}', 'channel': 'discord', 'accountId': o['account'], 'message': message,
+                         'silent': silent, 'idempotencyKey': uuid.uuid4().hex})
+    for attempt in range(tries):
+        if attempt:
+            time.sleep(10)
+        try:
+            code, out, err = run([o['bin'], 'gateway', 'call', 'send', '--json', '--timeout', '30000', '--params', params],
+                                 timeout=45, check=False)
+        except Failed as failure:
+            error = str(failure)
+            continue
+        if not code:
+            return None
+        try:
+            answer = json.loads(out).get('error') or {}
+        except ValueError:
+            answer = {}
+        error = answer.get('message') or (err or out).strip()[-300:] or f'gateway call send exited {code}'
+        if answer.get('type') == 'gateway_request_error':
+            queued = (answer.get('details') or {}).get('code') == 'OUTBOUND_DELIVERY_QUEUED'
+            return error + (', and the gateway holds it for its own retry' if queued else '')
+    return error
 
 
 def alert(cfg, fingerprint, text):
