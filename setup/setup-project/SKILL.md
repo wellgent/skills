@@ -1,6 +1,6 @@
 ---
 name: setup-project
-description: Bring a project onto pstack - the plugin at project scope, stack skills pinned by commit, the local sign-off and landing scripts, the docs set with AGENTS.md and dev-loop.md from the templates, the verification skill. Idempotent; the plugin pin moves here.
+description: Bring a project onto pstack - the plugin at project scope, stack skills pinned by commit, the local sign-off and landing scripts, the docs set with AGENTS.md and dev-loop.md from the templates, the run request template and tracker labels, the verification skill. Idempotent; the plugin pin moves here.
 argument-hint: "<owner>/<repo> [latest]"
 disable-model-invocation: true
 ---
@@ -72,7 +72,8 @@ Template prose reads the same in every project and is replaced on a re-run; a li
 gh api -X PATCH repos/<owner>/<repo> -F allow_merge_commit=false -F allow_squash_merge=true -F allow_rebase_merge=true -F delete_branch_on_merge=true
 ```
 
-- Labels `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human` and `wontfix` exist.
+- Labels `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human`, `run` and `wontfix` exist; `run` marks a run request for `/operate` (`gh label create run --repo <owner>/<repo> --color 0E8A16 --description "A request for /operate" --force`).
+- `.github/ISSUE_TEMPLATE/run.md` is a copy of [`skills/operate/request.md`](../../skills/operate/request.md), rewritten from it on every run: run requests live on the project's own tracker.
 
 ## 6. Verification skill
 
@@ -87,4 +88,4 @@ Without one, run `/pstack:create-verification-skill` in the checkout, fed by "Ru
 
 ## Report
 
-The plugin version and where it is enabled; skills added, re-pinned and removed; each file created, changed or removed with its commit; the docs deviations and their commits, the sign-off and landing scripts, any workflow kept, the ruleset or why none, repository settings and labels; pending checks; the `doctor` findings and any design doc folded into `DESIGN.md`; the verification skill; what only the owner can do (secrets, dashboard-only keys).
+The plugin version and where it is enabled; skills added, re-pinned and removed; each file created, changed or removed with its commit; the docs deviations and their commits, the sign-off and landing scripts, any workflow kept, the ruleset or why none, repository settings, labels and the run request template; pending checks; the `doctor` findings and any design doc folded into `DESIGN.md`; the verification skill; what only the owner can do (secrets, dashboard-only keys).

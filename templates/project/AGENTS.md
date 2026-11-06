@@ -17,6 +17,7 @@
 - **Cleanup.** Before a run posts its note, it tears down every worktree and scratch tree it created with `<worktree teardown command>`, so `git worktree list` shows only the main checkout, and deletes the local branch of each pull request it landed.
 - **Docs.** A change updates every doc it makes untrue in the same pull request, in the present tense.
   Knowledge goes into the doc "Where things live" names for it, and `scripts/check-docs` fails on any other markdown file; research, plans and history belong to the tracker and git.
+- **Citations.** Commits, pull requests and project docs cite only this project's own issues and files, never a brain: a fact from elsewhere is written out where it is used.
 - **Production.** Sessions work on their own dev environment per [docs/agents/dev-loop.md](docs/agents/dev-loop.md). A production read or write, a deploy, a data deletion and a message to a user are stops: each goes to the request issue, or to the person in the chat, and waits for the answer.
 
 ## Must-read

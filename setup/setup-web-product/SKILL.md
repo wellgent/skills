@@ -29,8 +29,8 @@ Cache Components defaults on for greenfield (the user can decline).
 2. **Claim** - registration writes up front, so nothing downstream uses placeholders.
    This stage is pluggable: where the operator keeps a project registry (port map, capability declarations, skill membership), add the project there now - next free port block on the target machine, capability declarations.
    With no registry, the ports still land in `.agents/launch.json`; move on.
-3. **Brain** - run `/setup-brain` against the brain that will operate the product, when it is not set up yet: the `operate` skill, the `run` label, the request template and the operating section.
-4. **Project** - run `/setup-project <owner>/<repo>`: the pstack plugin at project scope, the stack pins, `AGENTS.md` and `docs/agents/dev-loop.md` from the templates, CI, the owner's critical journeys, the verification skill. It calls `/setup-web-stack` again for the stack's lines, the journey tests and, with a database, the Convex branch.
+3. **Brain** - run `/setup-brain` against the brain that will operate the product, when it is not set up yet: the `operate` skill and the operating section.
+4. **Project** - run `/setup-project <owner>/<repo>`: the pstack plugin at project scope, the stack pins, `AGENTS.md` and `docs/agents/dev-loop.md` from the templates, the run request template and the `run` label, CI, the owner's critical journeys, the verification skill. It calls `/setup-web-stack` again for the stack's lines, the journey tests and, with a database, the Convex branch.
 5. **Hosting** - per audience class: Vercel + Convex link for public; the self-hosted ops pattern plus cloudflared + Access (team) or `tailscale serve` (personal) for internal.
 6. **First ship** - the check command runs green, production serves the shipped commit per the class's prod-parity proof, then finalize the registration (public URL, live fields) where a registry exists.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails when the project's markdown leaves the project-docs set: a standing doc missing, CLAUDE.md
 # not a link to AGENTS.md, a tracked markdown file outside the set, or a topic guide AGENTS.md does
-# not name. Skipped: .agents/, .claude/ and the paths the "## Not docs" section of
+# not name. Skipped: .agents/, .claude/, .github/ and the paths the "## Not docs" section of
 # docs/agents/dev-loop.md lists, each as a "- `<path prefix>`" line.
 # Exit: 0 the docs follow the set, 1 with every deviation listed.
 set -euo pipefail
@@ -26,7 +26,7 @@ fi
 while IFS= read -r f; do
   case "$f" in
     README.md | AGENTS.md | CLAUDE.md | PRODUCT.md | GLOSSARY.md | DESIGN.md | "$loop") continue ;;
-    .agents/* | .claude/*) continue ;;
+    .agents/* | .claude/* | .github/*) continue ;;
     docs/adr/*/* | docs/agents/*/*) ;;
     docs/adr/[0-9][0-9][0-9][0-9]-*.md) continue ;;
     docs/agents/*.md)

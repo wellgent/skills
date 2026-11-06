@@ -9,7 +9,7 @@ The rest of the process is pstack's.
 
 The check command blocks on every step it runs: <the steps, in order>.
 
-- **`scripts/check-docs`** runs first. It fails on a standing doc missing, `CLAUDE.md` not a link to `AGENTS.md`, a tracked markdown file outside the docs set, or a topic guide `AGENTS.md` does not name; it skips `.agents/`, `.claude/` and the paths "Not docs" lists.
+- **`scripts/check-docs`** runs first. It fails on a standing doc missing, `CLAUDE.md` not a link to `AGENTS.md`, a tracked markdown file outside the docs set, or a topic guide `AGENTS.md` does not name; it skips `.agents/`, `.claude/`, `.github/` and the paths "Not docs" lists.
 
 - **Slots:** every test run takes one of the host's heavy-run slots: the test scripts, the check command and every browser suite run through `scripts/slot`, which waits for a free slot and holds it while the command runs.
   A test run inside a run that already holds a slot, such as the tests inside the check command, uses that slot.
@@ -107,6 +107,7 @@ Each journey has one browser test, and `scripts/check` runs them all.
 - **Production:** <the domain, what builds and deploys it, and where its configuration lives>.
 - **Previews:** <what a preview deployment gets and where its configuration comes from>.
 - **Dev:** <the backend each worktree gets, and how its tools are held to it>.
+- **Secrets** live only in the platform environment (<where each deployment's values live, and how `.env.local` is made from them>) and in each host's own logins, each named here or under "Host tools" with its check, so any contributor or host with team access can run the project; none lives in a personal password vault.
 
 ## Worktrees
 
