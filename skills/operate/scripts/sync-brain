@@ -4,7 +4,8 @@
 # skills/operate: the operate skill pinned at that commit (.agents/skills/operate, the
 # .claude/skills link, its skills-lock.json entry), the run request template
 # .github/ISSUE_TEMPLATE/run.md copied from its request.md, and the `run` label on the tracker.
-# A change is committed with the prefix SYNC_BRAIN_PREFIX (default "setup") and pushed.
+# A change is committed with the prefix SYNC_BRAIN_PREFIX (default "setup"), with SYNC_BRAIN_BODY as
+# its body when set, and pushed.
 # Prints "operate at <sha>" with "(moved from <sha>)" when the pin moved.
 # Exit 0 current or synced, 1 failed (a dirty or diverged brain, a CLI failure).
 set -euo pipefail
@@ -44,7 +45,8 @@ main() {
   [ -z "$stray" ] || die "the CLI wrote outside the operate paths: $stray"
   if [ -n "$(git status --porcelain)" ]; then
     git add -A .agents/skills/operate .claude/skills/operate skills-lock.json .github/ISSUE_TEMPLATE/run.md
-    git commit -qm "${SYNC_BRAIN_PREFIX:-setup}: operate at wellgent/skills ${sha:0:7}, with its run request template"
+    git commit -qm "${SYNC_BRAIN_PREFIX:-setup}: operate at wellgent/skills ${sha:0:7}, with its run request template" \
+      ${SYNC_BRAIN_BODY:+-m "$SYNC_BRAIN_BODY"}
     git push -q || die "git push failed in $brain"
   fi
 
