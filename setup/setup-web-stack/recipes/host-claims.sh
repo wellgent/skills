@@ -8,6 +8,8 @@
 # A script releases on exit every claim it still holds under its own pid.
 
 PROJECT="<project name>"
+# The Convex team and project a worktree's own deployment is created in.
+CONVEX_PROJECT="<Convex team>:<Convex project>"
 CLAIMS_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/${PROJECT:?}"
 CLAIM_CHECKOUT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_LOCK="$CLAIMS_DIR/convex-backend"

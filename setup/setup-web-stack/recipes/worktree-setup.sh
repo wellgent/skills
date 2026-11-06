@@ -20,7 +20,7 @@ create_local_deployment() {
   errors=$(mktemp)
   for attempt in 1 2; do
     status=0
-    { env -u CONVEX_DEPLOY_KEY pnpm exec convex deployment create "$project:local" --select 2>&1 1>&3 | tee "$errors" >&2; } 3>&1 || status=$?
+    { env -u CONVEX_DEPLOY_KEY pnpm exec convex deployment create "${CONVEX_PROJECT:?}:local" --select 2>&1 1>&3 | tee "$errors" >&2; } 3>&1 || status=$?
     if [ "$status" = 0 ] || [ "$attempt" = 2 ] || ! grep -Eq 'Error fetching .* 5[0-9]{2} ' "$errors"; then
       break
     fi
@@ -51,15 +51,13 @@ main=$(git worktree list --porcelain | sed -n '1s/^worktree //p')
 pnpm install --frozen-lockfile
 
 if [ ! -f .convex/local/default/config.json ] && ! grep -q '^CONVEX_DEPLOYMENT=' .env.local 2>/dev/null; then
-  # The main checkout's CONVEX_DEPLOYMENT comment names the Convex team and project. The create
-  # takes them in its reference, so only a created deployment is ever written to .env.local.
-  project=$(sed -nE 's/^CONVEX_DEPLOYMENT=.*# team: ([^,]+), project: ([^ ]+).*/\1:\2/p' "$main/.env.local" 2>/dev/null || true)
-  [ -n "$project" ] || { echo "$main/.env.local names no Convex team and project" >&2; exit 1; }
+  # The create names the team and project of CONVEX_PROJECT in its reference, so only a created
+  # deployment is ever written to .env.local.
   if [ "$mode" = local ]; then
     backend_lock
     create_local_deployment
   else
-    env -u CONVEX_DEPLOY_KEY pnpm exec convex deployment create "$project:dev/$name" --type dev --select --expiration "$EXPIRATION"
+    env -u CONVEX_DEPLOY_KEY pnpm exec convex deployment create "${CONVEX_PROJECT:?}:dev/$name" --type dev --select --expiration "$EXPIRATION"
     env -u CONVEX_DEPLOY_KEY pnpm exec convex deployment token create "$name" --save-env
   fi
 fi

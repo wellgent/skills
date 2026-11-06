@@ -54,26 +54,30 @@ beforeEach(() => {
   stateHome = mkdtempSync(join(tmpdir(), "<project name>-dev-server-state-"));
 });
 
-// A checkout holding the scripts under scripts/ and a bin dir that a test
+// Puts the scripts under the checkout's scripts/ and a bin dir that a test
 // puts first on the script's PATH to stand in for a host tool.
 let checkouts: Array<string> = [];
-const newCheckout = () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "<project name>-dev-server-")));
+const withScripts = (root: string) => {
   mkdirSync(join(root, "scripts"));
   for (const name of ["dev-server.sh", "host-claims.sh"]) {
     copyFileSync(join(scriptsDir, name), join(root, "scripts", name));
   }
   mkdirSync(join(root, "host-bin"));
-  checkouts.push(root);
   return root;
 };
 
-// A checkout that is a linked worktree of a fresh repository, as teardown
-// requires.
-const newWorktreeCheckout = () => {
+const newCheckout = () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "<project name>-dev-server-")));
+  checkouts.push(root);
+  return withScripts(root);
+};
+
+// A fresh repository with one commit, whose root is its main checkout.
+const newRepository = () => {
   const repo = realpathSync(
     mkdtempSync(join(tmpdir(), "<project name>-dev-server-repo-")),
   );
+  checkouts.push(repo);
   const git = (...args: Array<string>) =>
     spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" });
   git("init", "-q");
@@ -88,15 +92,19 @@ const newWorktreeCheckout = () => {
     "-m",
     "root",
   );
+  return { git, repo };
+};
+
+const newMainCheckout = () => withScripts(newRepository().repo);
+
+// A checkout that is a linked worktree of a fresh repository, as teardown
+// requires.
+const newWorktreeCheckout = () => {
+  const { git, repo } = newRepository();
   const root = join(repo, "..", `${basename(repo)}-wt`);
   git("worktree", "add", "-q", "--detach", root);
-  mkdirSync(join(root, "scripts"));
-  for (const name of ["dev-server.sh", "host-claims.sh"]) {
-    copyFileSync(join(scriptsDir, name), join(root, "scripts", name));
-  }
-  mkdirSync(join(root, "host-bin"));
-  checkouts.push(root, repo);
-  return root;
+  checkouts.push(root);
+  return withScripts(root);
 };
 
 // The test's own checkout, with a .next holding the dev types a `next dev`
@@ -242,21 +250,33 @@ const executable = (path: string, body: string) => {
   chmodSync(path, 0o755);
 };
 
-// A checkout on a local deployment whose last convex dev logged its ready
-// line, on a host slow to start a process, with a `convex dev` that names its
-// deployment in .env.local and then pushes, as the CLI's does, and appends its
-// start and its push to the file TIMELINE names, when set. Returns the file
-// that `convex dev` writes once it has pushed.
-const givenLocalCheckout = (pushAfterMs = 500, root = checkout) => {
-  const hostBin = join(root, "host-bin");
-  mkdirSync(join(root, ".convex", "local", "default"), { recursive: true });
+const localConfig = (root: string) =>
+  join(root, ".convex", "local", "default", "config.json");
+
+const writeLocalConfig = (
+  root: string,
+  ports: { cloud: number; site: number },
+) =>
   writeFileSync(
-    join(root, ".convex", "local", "default", "config.json"),
+    localConfig(root),
     JSON.stringify({
       adminKey: "local-admin-key",
       deploymentName: "local-test",
+      ports,
     }),
   );
+
+// A checkout on a local deployment whose last convex dev logged its ready
+// line, on a host slow to start a process, with a `convex dev` that saves the
+// backend ports it is given to the config, names its deployment in .env.local
+// and then pushes, as the CLI's does, and appends its start and its push to
+// the file TIMELINE names, when set. Like the CLI's, it leaves the URLs in
+// .env.local as they are while another line repeats their value. Returns the
+// file that `convex dev` writes once it has pushed.
+const givenLocalCheckout = (pushAfterMs = 500, root = checkout) => {
+  const hostBin = join(root, "host-bin");
+  mkdirSync(join(root, ".convex", "local", "default"), { recursive: true });
+  writeLocalConfig(root, { cloud: 3210, site: 3211 });
   writeFileSync(
     join(root, ".env.local"),
     "NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:1\n",
@@ -282,6 +302,12 @@ const mark = (event) => {
   }
 };
 mark("start");
+const port = (flag) => process.argv.includes(flag) && Number(process.argv[process.argv.indexOf(flag) + 1]);
+if (port("--local-cloud-port")) {
+  const config = JSON.parse(fs.readFileSync(".convex/local/default/config.json", "utf8"));
+  config.ports = { cloud: port("--local-cloud-port"), site: port("--local-site-port") };
+  fs.writeFileSync(".convex/local/default/config.json", JSON.stringify(config));
+}
 process.on("SIGINT", () => process.exit(0));
 setTimeout(() => {
   fs.appendFileSync(
@@ -379,6 +405,38 @@ http
   );
   executable(join(root, "host-bin", "pnpm"), "#!/usr/bin/env bash\nsleep 1\n");
 };
+
+// Another checkout's local backend: a process serving the given port that
+// answers /instance_name with that checkout's deployment.
+const otherBackend = async (port: number) => {
+  const backend = spawn(
+    "node",
+    [
+      "-e",
+      `require("node:http").createServer((q, r) => r.end(q.url === "/instance_name" ? "other-checkout" : "")).listen(${port}, "127.0.0.1", () => console.log("listening"))`,
+    ],
+    { stdio: ["ignore", "pipe", "ignore"] },
+  );
+  holders.push(backend);
+  await new Promise((resolve) => backend.stdout.once("data", resolve));
+};
+
+// The .env.local of a local checkout held to its backend on the given ports.
+const heldEnvLocal = (cloud: number, site: number) =>
+  [
+    `NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:${cloud}`,
+    `NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:${site}`,
+    "# The Convex CLI of this checkout reaches only its local backend (scripts/dev-server.sh).",
+    `CONVEX_SELF_HOSTED_URL=http://127.0.0.1:${cloud}`,
+    "CONVEX_SELF_HOSTED_ADMIN_KEY=local-admin-key",
+    "CONVEX_OVERRIDE_ACCESS_TOKEN=checkout-holds-no-convex-login",
+    "",
+  ].join("\n");
+
+const envValue = (root: string, name: string) =>
+  new RegExp(`^${name}=(.*)$`, "m").exec(
+    readFileSync(join(root, ".env.local"), "utf8"),
+  )?.[1];
 
 describe("scripts/dev-server.sh", () => {
   test("start of one port from two checkouts at once serves one and refuses the other, leaving the served one's pid and log files as they were", async () => {
@@ -757,6 +815,93 @@ sleep 1
     ).not.toBe(otherPid);
     expect(alive(Number(otherPid))).toBe(true);
   }, 15_000);
+
+  test("convex-start after another checkout's backend took the backend's port serves new ports and points .env.local at them", async () => {
+    const pushed = givenLocalCheckout();
+    const taken = Number(freePort);
+    const site = Number(otherFreePort);
+    await otherBackend(taken);
+    writeLocalConfig(checkout, { cloud: taken, site });
+    writeFileSync(join(checkout, ".env.local"), heldEnvLocal(taken, site));
+
+    const run = devServer("convex-start");
+    await waitFor(() => existsSync(pushed));
+
+    expect(run.status, run.stderr).toBe(0);
+    const { ports } = JSON.parse(readFileSync(localConfig(checkout), "utf8"));
+    expect(ports.cloud).not.toBe(taken);
+    expect(ports.site).not.toBe(ports.cloud);
+    expect(
+      [
+        "NEXT_PUBLIC_CONVEX_URL",
+        "CONVEX_SELF_HOSTED_URL",
+        "NEXT_PUBLIC_CONVEX_SITE_URL",
+      ].map((name) => envValue(checkout, name)),
+    ).toEqual([
+      `http://127.0.0.1:${ports.cloud}`,
+      `http://127.0.0.1:${ports.cloud}`,
+      `http://127.0.0.1:${ports.site}`,
+    ]);
+  }, 30_000);
+
+  test("convex-start whose convex dev exits before its backend answers, while another checkout's backend holds the config's port, exits 2 and leaves .env.local naming no backend URL", async () => {
+    givenLocalCheckout();
+    const taken = Number(freePort);
+    await otherBackend(taken);
+    writeLocalConfig(checkout, { cloud: taken, site: Number(otherFreePort) });
+    writeFileSync(
+      join(checkout, ".env.local"),
+      heldEnvLocal(taken, Number(otherFreePort)),
+    );
+    writeFileSync(
+      join(checkout, "node_modules", "convex", "bin", "main.js"),
+      "process.exit(1);\n",
+    );
+
+    const run = devServer("convex-start");
+
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain("the local Convex backend did not start");
+    expect(readFileSync(join(checkout, ".env.local"), "utf8")).not.toMatch(
+      /^(NEXT_PUBLIC_CONVEX_URL|NEXT_PUBLIC_CONVEX_SITE_URL|CONVEX_SELF_HOSTED_URL)=/m,
+    );
+  }, 30_000);
+
+  test("convex-start in a main checkout with stray local state refuses, names the recovery, and leaves .env.local byte for byte", () => {
+    const main = newMainCheckout();
+    givenLocalCheckout(500, main);
+    const envLocal =
+      "CONVEX_DEPLOYMENT=dev:shared-otter-100 # team: team-a, project: proj-b\nNEXT_PUBLIC_CONVEX_URL=https://shared-otter-100.convex.cloud\n";
+    writeFileSync(join(main, ".env.local"), envLocal);
+    const timeline = join(stateHome, "timeline");
+
+    const run = devServerIn(main, ["convex-start"], { TIMELINE: timeline });
+
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain(".convex/local is stray state");
+    expect(run.stderr).toContain('docs/agents/dev-loop.md "Main checkout"');
+    expect(readFileSync(join(main, ".env.local"), "utf8")).toBe(envLocal);
+    expect(existsSync(timeline)).toBe(false);
+  });
+
+  test("start in a main checkout with stray local state pushes once to its cloud deployment and starts no convex dev", () => {
+    const main = newMainCheckout();
+    givenLocalCheckout(500, main);
+    givenServableCheckout(main);
+    const calls = join(stateHome, "pnpm-calls");
+    executable(
+      join(main, "host-bin", "pnpm"),
+      `#!/usr/bin/env bash\necho "pnpm $*" >>${JSON.stringify(calls)}\n`,
+    );
+    const timeline = join(stateHome, "timeline");
+
+    const run = devServerIn(main, ["start", freePort], { TIMELINE: timeline });
+
+    expect(run.status, run.stderr).toBe(0);
+    expect(readFileSync(calls, "utf8")).toBe("pnpm exec convex dev --once\n");
+    expect(existsSync(timeline)).toBe(false);
+    expect(existsSync(join(main, ".convex", "convex-dev.pid"))).toBe(false);
+  }, 30_000);
 
   test("clear-stale-types in a checkout without .next changes nothing", () => {
     rmSync(join(checkout, ".next"), { force: true, recursive: true });

@@ -20,6 +20,18 @@ const scriptsDir = import.meta.dirname;
 const SHARED_DEPLOYMENT_LINE =
   "CONVEX_DEPLOYMENT=dev:shared-otter-100 # team: team-a, project: proj-b";
 
+// The committed Convex team and project, from scripts/host-claims.sh.
+const convexProject = (() => {
+  const line = /^CONVEX_PROJECT=(\S+)$/m.exec(
+    readFileSync(join(scriptsDir, "host-claims.sh"), "utf8"),
+  );
+  if (line === null) {
+    throw new Error("scripts/host-claims.sh names no CONVEX_PROJECT");
+  }
+  return line[1];
+})();
+const CREATE_LOCAL = `pnpm exec convex deployment create ${convexProject}:local --select`;
+
 const executable = (path: string, body: string) => {
   writeFileSync(path, body);
   chmodSync(path, 0o755);
@@ -172,18 +184,35 @@ const DEPLOYMENT_CALLS = [
 ];
 
 describe("scripts/worktree-setup.sh", () => {
-  test("a first setup creates and selects a local deployment in the main checkout's team and project, then sets CRONS off, starts convex dev and seeds", () => {
+  test("a first setup creates and selects a local deployment in the committed team and project, then sets CRONS off, starts convex dev and seeds", () => {
     const run = setup("succeed");
 
     expect(run.status, run.stderr).toBe(0);
     expect(calls()).toEqual([
       "pnpm install --frozen-lockfile",
-      "pnpm exec convex deployment create team-a:proj-b:local --select",
+      CREATE_LOCAL,
       "pnpm exec convex env set CRONS off",
       "dev-server.sh convex-start",
       "pnpm exec convex run <seed function, e.g. seed:run>",
     ]);
     expect(envLocal()).not.toMatch(/^CONVEX_DEPLOYMENT=dev:/m);
+  });
+
+  test("a first setup creates its local deployment in the committed team and project when the main checkout's .env.local names no CONVEX_DEPLOYMENT", () => {
+    writeFileSync(
+      join(main, ".env.local"),
+      [
+        "NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210",
+        "# The Convex CLI of this checkout reaches only its local backend (scripts/dev-server.sh).",
+        "CONVEX_SELF_HOSTED_URL=http://127.0.0.1:3210",
+        "",
+      ].join("\n"),
+    );
+
+    const run = setup("succeed");
+
+    expect(run.status, run.stderr).toBe(0);
+    expect(creates()).toEqual([CREATE_LOCAL]);
   });
 
   test("a first setup whose create fails other than by a server error leaves no cloud deployment in .env.local, and its rerun creates again once without pushing or seeding", () => {
@@ -210,8 +239,8 @@ describe("scripts/worktree-setup.sh", () => {
     expect(run.stderr).toContain(SERVER_ERROR);
     expect(calls()).toEqual([
       "pnpm install --frozen-lockfile",
-      "pnpm exec convex deployment create team-a:proj-b:local --select",
-      "pnpm exec convex deployment create team-a:proj-b:local --select",
+      CREATE_LOCAL,
+      CREATE_LOCAL,
       "pnpm exec convex env set CRONS off",
       "dev-server.sh convex-start",
       "pnpm exec convex run <seed function, e.g. seed:run>",

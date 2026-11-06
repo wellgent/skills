@@ -10,9 +10,10 @@
 # checkout's server. The pid and log files are named by the checkout and the port.
 # .next is also mode-contaminated across build/dev: `next dev` over a production build's .next
 # 500s at runtime, and `next start` over a dev .next crashes - so both clear .next first.
-# A checkout with a local deployment (.convex/local/default/config.json) is served by one
+# A linked worktree with a local deployment (.convex/local/default/config.json) is served by one
 # long-running `convex dev`, which owns the local backend and pushes on every change;
 # `convex dev --once` refuses beside it. A checkout on a cloud deployment pushes once per start.
+# The main checkout stays on the shared cloud dev deployment, whatever .convex/local it holds.
 # On a local deployment .env.local holds the Convex CLI to that backend alone: the self-hosted
 # variables name its URL and admin key, and CONVEX_OVERRIDE_ACCESS_TOKEN replaces the host's
 # Convex login with a token that authenticates nowhere, so `--prod`, `deploy` and every other
@@ -79,9 +80,26 @@ LOCAL_CONFIG="$REPO_ROOT/.convex/local/default/config.json"
 # Stands in for the host's Convex login in a local checkout's .env.local; Convex refuses it.
 NO_LOGIN_TOKEN="checkout-holds-no-convex-login"
 
-local_deployment() { [[ -f "$LOCAL_CONFIG" ]]; }
+# Only the main checkout's git dir is also the common one.
+main_checkout() {
+  local git_dir
+  git_dir=$(git -C "$REPO_ROOT" rev-parse --git-dir 2>/dev/null) || return 1
+  [ "$git_dir" = "$(git -C "$REPO_ROOT" rev-parse --git-common-dir)" ]
+}
+
+local_deployment() { [[ -f "$LOCAL_CONFIG" ]] && ! main_checkout; }
 
 local_url() { sed -nE 's/^NEXT_PUBLIC_CONVEX_URL=([^ #]+).*/\1/p' "$REPO_ROOT/.env.local"; }
+
+# Prints the first port from the given one on that no process listens on and that is not the
+# second argument.
+free_port() {
+  local port=$1
+  while [ "$port" = "${2:-}" ] || lsof -ti "tcp:$port" -sTCP:LISTEN >/dev/null 2>&1; do
+    port=$((port + 1))
+  done
+  echo "$port"
+}
 
 # Prints the pid of this checkout's running `convex dev`; fails when none runs.
 # For its first moments the process runs as the node_modules/.bin/convex shell wrapper before
@@ -96,17 +114,27 @@ convex_dev_pid() {
 }
 
 # Rewrites .env.local so the Convex CLI reaches only the local backend: drops CONVEX_DEPLOYMENT,
-# which `convex dev` writes at its start, and names the backend's URL and admin key and the
-# token that replaces the login.
+# which `convex dev` writes at its start, and names the backend's URLs, its admin key and the
+# token that replaces the login. The URLs come from the config, which the CLI saves before it
+# starts the backend: the CLI rewrites no .env.local value another line repeats, so on new ports it
+# leaves NEXT_PUBLIC_CONVEX_URL on the old one, where another checkout's backend may answer.
+# Given "none", the backend did not start, and .env.local names no backend URL.
 hold_cli_env() {
-  local env="$REPO_ROOT/.env.local" tmp
+  local env="$REPO_ROOT/.env.local" tmp cloud site key
+  read -r cloud site key < <(jq -r '"\(.ports.cloud) \(.ports.site) \(.adminKey)"' "$LOCAL_CONFIG")
   tmp=$(mktemp "$REPO_ROOT/.convex/env-local.XXXXXX")
-  grep -v -E '^(# Deployment used by `npx convex dev`|# The Convex CLI of this checkout|CONVEX_DEPLOYMENT=|CONVEX_SELF_HOSTED_URL=|CONVEX_SELF_HOSTED_ADMIN_KEY=|CONVEX_OVERRIDE_ACCESS_TOKEN=)' \
+  grep -v -E '^(# Deployment used by `npx convex dev`|# The Convex CLI of this checkout|CONVEX_DEPLOYMENT=|NEXT_PUBLIC_CONVEX_URL=|NEXT_PUBLIC_CONVEX_SITE_URL=|CONVEX_SELF_HOSTED_URL=|CONVEX_SELF_HOSTED_ADMIN_KEY=|CONVEX_OVERRIDE_ACCESS_TOKEN=)' \
     "$env" 2>/dev/null | sed '/^$/d' >"$tmp" || true
   {
+    if [ "${1:-}" != none ]; then
+      echo "NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:$cloud"
+      echo "NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:$site"
+    fi
     echo "# The Convex CLI of this checkout reaches only its local backend (scripts/dev-server.sh)."
-    echo "CONVEX_SELF_HOSTED_URL=$(local_url)"
-    echo "CONVEX_SELF_HOSTED_ADMIN_KEY=$(jq -r .adminKey "$LOCAL_CONFIG")"
+    if [ "${1:-}" != none ]; then
+      echo "CONVEX_SELF_HOSTED_URL=http://127.0.0.1:$cloud"
+    fi
+    echo "CONVEX_SELF_HOSTED_ADMIN_KEY=$key"
     echo "CONVEX_OVERRIDE_ACCESS_TOKEN=$NO_LOGIN_TOKEN"
   } >>"$tmp"
   mv "$tmp" "$env"
@@ -143,9 +171,9 @@ backend_answers() {
 # CONVEX_DEPLOYMENT there before it pushes. A backend lock this script holds goes once the
 # backend answers.
 # Exit 1 when the push fails (the functions do not deploy), 2 when the local backend never
-# answers.
+# answers as this checkout's deployment.
 await_first_push() {
-  local pid=$1 url
+  local pid=$1
   for _ in $(seq 1 "$CONVEX_READY_TIMEOUT"); do
     if grep -q 'Convex functions ready!' "$CONVEX_LOGFILE"; then
       hold_cli_env
@@ -155,14 +183,14 @@ await_first_push() {
     if holds_backend_lock && backend_answers; then backend_unlock; fi
     sleep 1
   done
-  hold_cli_env
-  url=$(local_url)
-  if curl -sf -o /dev/null "$url/instance_name"; then
+  if backend_answers; then
+    hold_cli_env
     echo "convex dev did not push the functions - see $CONVEX_LOGFILE" >&2
     convex_stop >/dev/null || true
     return 1
   fi
-  echo "the local Convex backend did not start at $url - see $CONVEX_LOGFILE" >&2
+  hold_cli_env none
+  echo "the local Convex backend did not start - see $CONVEX_LOGFILE" >&2
   convex_stop >/dev/null || true
   return 2
 }
@@ -178,18 +206,25 @@ convex_start() {
   convex_stop >/dev/null
   mkdir -p "$REPO_ROOT/.convex"
   cd "$REPO_ROOT"
-  # convex dev picks the backend's ports, free when it looks, and binds them only once the
-  # backend runs, so no other checkout starts a backend until this one answers.
+  # The backend binds its ports only once it runs, so no other checkout starts a backend until
+  # this one answers.
   backend_lock
+  # The ports are picked here: the config's while free, else the next free ones. The CLI keeps the
+  # config's ports only while both are free, and otherwise can pick one port for both.
+  local name cloud site
+  read -r name cloud site < <(jq -r '"\(.deploymentName) \(.ports.cloud // 3210) \(.ports.site // 3211)"' "$LOCAL_CONFIG")
+  cloud=$(free_port "$cloud")
+  site=$(free_port "$site" "$cloud")
   # The wait reads the ready line of this convex dev only, so the last run's log goes first.
   # The child's own redirect empties it only after the child has expanded the variables below,
   # which can come after the wait's first read.
   : >"$CONVEX_LOGFILE"
   # The empty variables keep .env.local's values out, since the CLI's dotenv load never
   # replaces a variable the process already has.
-  CONVEX_DEPLOYMENT="local:$(jq -r .deploymentName "$LOCAL_CONFIG")" \
+  CONVEX_DEPLOYMENT="local:$name" \
     CONVEX_SELF_HOSTED_URL="" CONVEX_SELF_HOSTED_ADMIN_KEY="" CONVEX_OVERRIDE_ACCESS_TOKEN="" \
-    nohup node_modules/.bin/convex dev --typecheck disable --tail-logs disable >"$CONVEX_LOGFILE" 2>&1 &
+    nohup node_modules/.bin/convex dev --typecheck disable --tail-logs disable \
+    --local-cloud-port "$cloud" --local-site-port "$site" >"$CONVEX_LOGFILE" 2>&1 &
   pid=$!
   echo "$pid" >"$CONVEX_PIDFILE"
   await_first_push "$pid" || return
@@ -278,6 +313,13 @@ case "$CMD" in
     exit 1
     ;;
   convex-start)
+    if main_checkout; then
+      echo "convex-start serves a linked worktree's local deployment; the main checkout stays on the shared cloud dev deployment" >&2
+      if [ -e "$REPO_ROOT/.convex/local" ]; then
+        echo "its .convex/local is stray state from an earlier local convex dev: recover the checkout as docs/agents/dev-loop.md \"Main checkout\" says" >&2
+      fi
+      exit 1
+    fi
     local_deployment || { echo "convex-start serves a local deployment; .env.local names none" >&2; exit 1; }
     convex_start
     ;;
@@ -287,7 +329,7 @@ case "$CMD" in
     ;;
   teardown)
     # Before the worktree goes: the checkout's servers, on whatever port, and its convex dev.
-    if [[ "$(git -C "$REPO_ROOT" rev-parse --git-dir)" == "$(git -C "$REPO_ROOT" rev-parse --git-common-dir)" ]]; then
+    if main_checkout; then
       echo "teardown is for a linked worktree; this is the main checkout" >&2
       exit 1
     fi
