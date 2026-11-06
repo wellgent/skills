@@ -38,11 +38,19 @@ Big or fuzzy efforts are charted with `wayfinder` as a map of decision tickets o
 
 ## Operating projects
 
-Product work on a project runs through pstack, started from this brain with `/operate <issue>`.
+Product work on a project runs through pstack, started from this brain with `/operate <owner>/<repo>#<n>`.
 
-- A **run request** is one issue on this tracker labelled `run`, in the shape of the "Run request" issue template: the project as `owner/repo`, the goal, a done check that passes or fails, the proof, what is known, constraints. It names no host; the run starts on whichever host `/operate` runs on.
-- `/operate <issue>` starts the run as its own Rex session in the project checkout and stays the run's operator. The run merges what its verifier passes and posts its stops and its note on the request; the operator answers each stop the request and the brain settle, and assigns the requester for the calls that are theirs and once it has checked the note. Open issues labelled `run` and assigned to you are the calls and checked notes waiting for you.
-- A wayfinder map whose route reaches work on a project ends in run requests, one per run, each a child issue of the map titled `Run: <repo name> - <goal>` per `docs/agents/issue-tracker.md`; the map stays the record of what to do, the request the record of one run. `/wayfinder <map> <run>` leads such a run and operates it in its own session by following `operate`'s `SKILL.md`, per "Starting a run" in `docs/agents/issue-tracker.md`.
+- A **run request** is one issue labelled `run` on the project's own tracker, titled `Run: <goal>`, in the shape of that tracker's "Run request" issue template: the goal, a done check that passes or fails, the proof, what is known, constraints.
+  It names no host; the run starts on whichever host `/operate` runs on.
+  The run's whole record lives on it, and this tracker holds maps and decision tickets only.
+- A request is self-contained: it and every answer on it write out each fact from this brain, and link no brain page or issue, since `/operate` refuses a request whose body links a brain.
+  A commit, a pull request and a project doc cite only the project's own issues and files.
+- `/operate <owner>/<repo>#<n>`, or the issue's URL, starts the run as its own Rex session in the project checkout and stays the run's operator from this brain's checkout, writing nothing about the run to the brain.
+  The run reads only its issue and its repository: it merges what its verifier passes and posts its stops and its note on the request.
+  The operator answers each stop the request and the project's records settle, and assigns the requester for the calls that are theirs and once it has checked the note.
+  Open `run` issues assigned to you on the project trackers are the calls and checked notes waiting for you.
+- A wayfinder map whose route reaches work on a project ends in run requests, one per run, each the project's issue as a native sub-issue of the map per `docs/agents/issue-tracker.md`; the map stays the record of what to do, the request the record of one run.
+  `/wayfinder <map> <run>` leads such a run: it writes the request from the map, starts the operator, answers what the map and the brain settle, brings the requester the rest and records the outcome on the map, per "Starting a run" in `docs/agents/issue-tracker.md`.
 - `/operate cost <session id>` prices a finished run from its transcript on this host.
 {{local}}
 

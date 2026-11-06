@@ -4,7 +4,6 @@
   { "name": "wayfinder:prototype", "color": "FBCA04", "description": "Wayfinder prototype ticket - draft artifact to react to" },
   { "name": "wayfinder:grilling", "color": "D93F0B", "description": "Wayfinder grilling ticket - HITL decision interview" },
   { "name": "wayfinder:task", "color": "1D76DB", "description": "Wayfinder task ticket - work that unblocks a decision" },
-  { "name": "run", "color": "0E8A16", "description": "A request for /operate" },
   { "name": "defect", "color": "D73A4A", "description": "Something in the brain or its tooling is wrong" },
   { "name": "change", "color": "A2EEEF", "description": "New capability or improvement" },
   { "name": "effort", "color": "5319E7", "description": "Investigation or operational work" },

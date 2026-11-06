@@ -1,13 +1,14 @@
 ---
 name: setup-brain
-description: Make a brain able to plan with wayfinder, operate projects through pstack, and carry the shared core - the operate skill and the planning skills pinned by commit, the tracker labels and the request template, and every shared-core file, written where missing and cross-checked where present. Idempotent.
+description: Make a brain able to plan with wayfinder, operate projects through pstack, and carry the shared core - the operate skill and the planning skills pinned by commit, the tracker labels, and every shared-core file, written where missing and cross-checked where present. Idempotent.
 argument-hint: "<path to the brain checkout>"
 disable-model-invocation: true
 ---
 
 # Setup brain
 
-Converge a **brain**, the repository whose tracker holds maps and run requests, on the state below.
+Converge a **brain**, the repository whose tracker holds maps and their decision tickets, on the state below.
+Run requests live on each project's own tracker, which `setup-project` gives the request template and the `run` label.
 Run from a checkout of this repo; the argument is the brain's checkout (ask if missing). A re-run changes only what is behind, and never overwrites a file the brain already has.
 
 ## 1. Read the brain
@@ -19,7 +20,7 @@ The tracker is `git remote get-url origin`.
 
 Two sources, each pinned by commit, in the brain's root:
 
-- `wellgent/skills`: `operate`, pinned by [`skills/operate/scripts/sync-brain`](../../skills/operate/scripts/sync-brain) `<brain checkout>`, which also writes the run request template and the `run` label; `/operate`'s Ready runs the same script before every run.
+- `wellgent/skills`: `operate`, pinned by [`skills/operate/scripts/sync-brain`](../../skills/operate/scripts/sync-brain) `<brain checkout>`; `/operate`'s Ready runs the same script before every run.
 - `mattpocock/skills`: `wayfinder`, `grilling`, `domain-modeling`, `research`, `prototype`, `writing-for-agents`, `wizard`, `ask-matt`, through the steps below.
 
 ```bash
@@ -35,7 +36,6 @@ npx skills add "<source>#<sha>" --agent codex --copy -y --skill <name> [--skill 
 ## 3. Tracker
 
 - Every label in [`labels.json`](labels.json) exists on the tracker with that colour and description: `gh label create <name> --repo <tracker> --color <color> --description <description> --force`.
-- `.github/ISSUE_TEMPLATE/run.md` in the brain is a copy of [`skills/operate/request.md`](../../skills/operate/request.md), written by `sync-brain` in step 2.
 
 ## 4. Shared core
 
@@ -56,8 +56,8 @@ Re-run `core-check` until every file it reports is `ok` or a deviation named in 
 ## 5. Check
 
 Commit and push the brain by its own rules.
-Done when `.agents/skills/` holds the nine skills with working `.claude/skills/` links and a `ref` each in `skills-lock.json`, every label and the request template exist, and `core-check` reports each core file `ok` or as a reported deviation.
+Done when `.agents/skills/` holds the nine skills with working `.claude/skills/` links and a `ref` each in `skills-lock.json`, every label exists, and `core-check` reports each core file `ok` or as a reported deviation.
 
 ## Report
 
-Skills added, re-pinned and removed; labels created or changed; the request template written; core files and `AGENTS.md` sections written; every deviation with its failing core line.
+Skills added, re-pinned and removed; labels created or changed; core files and `AGENTS.md` sections written; every deviation with its failing core line.
