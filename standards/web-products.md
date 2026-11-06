@@ -205,7 +205,7 @@ Project rules an agent consults are in the docs set of [project-docs.md](project
 - **What this stack puts in those files** (Next.js with Convex; a project without one of them drops its lines):
   - Must-read list: `convex/_generated/ai/guidelines.md` and the `convex-authz` checklist when touching Convex code; `convex-reviewer` before a Convex diff goes into a pull request; `convex-migrate` when a change touches the schema of a populated table; `web-design-guidelines` when a change touches a screen; `vercel-react-best-practices` when a change renders or fetches data in React; `find-docs` for a library API.
   - `docs/agents/dev-loop.md`: `agent-browser` and `next-dev-loop` under "Running the app", with the check "`get_errors` returns nothing for the routes exercised"; the design-system lint and the impeccable scanner under "Design system"; `convex/_generated/` under "Not docs".
-- **Tracker labels**: one taxonomy across projects - `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human` and `wontfix` on every project tracker, `run` on the brain's.
+- **Tracker labels**: one taxonomy across projects - `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human`, `run` and `wontfix` on every project tracker, where run requests live.
   Per-project freedom is topical labels only.
 
 ## Learning propagation
@@ -214,7 +214,7 @@ Project rules an agent consults are in the docs set of [project-docs.md](project
   Project trackers keep only project-local observations.
   Inside a project, retro is pstack's: `/reflect` at the end of a run, `/correct` for a repeated mistake.
   From a machine whose identity cannot write the destination tracker, the lesson files on the project tracker with an `[upstream:<home>]` title marker - the operator's cross-project board sweep picks those up; the marker makes local pooling protocol, not a miss.
-- **Boards get periodic cross-project triage**: the operator sweeps every project's board as one set at their own cadence - closing what reality has already resolved, triaging the `needs-triage` pool per the label taxonomy, reframing issues whose right solution changed, deduplicating within and across projects (the best-framed issue survives and absorbs the rest), and refiling shared-asset issues, including `[upstream:<home>]`-marked ones, on their home trackers.
+- **Boards get periodic cross-project triage**: the operator sweeps every project's board as one set at their own cadence - closing what reality has already resolved, triaging the `needs-triage` pool per the label taxonomy, leaving each open `run` issue as it is, reframing issues whose right solution changed, deduplicating within and across projects (the best-framed issue survives and absorbs the rest), and refiling shared-asset issues, including `[upstream:<home>]`-marked ones, on their home trackers.
   The sweep is what keeps every board accurate between sessions without per-project ceremony.
 - **Lessons land as changes, not memos**: destination repos turn filed lessons into skill updates, doctrine edits, or catalog entries, propagated by the ordinary sweep.
   Observe, file upstream, fix at source, sweep out.
@@ -236,7 +236,7 @@ The golden path is this repo's [`setup-web-product`](../setup/setup-web-product/
 Defaults applied without asking: Next latest stable per the channel rule, Tailwind v4 on, the full toolchain standard, the check composition, the catalog entries the stack setup picks, port block auto-allocated as the next free block on the target machine, the tracker labels seeded.
 Cache Components defaults on for greenfield.
 
-**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), brain (setup-brain: the `operate` skill, the `run` label and request template, the operating section in the brain's `AGENTS.md`), project (setup-project: the pstack plugin at project scope, the stack pins, the sign-off and landing scripts, `AGENTS.md`, `docs/agents/dev-loop.md` and `PRODUCT.md` from the templates, the verification skill; through setup-web-stack the journey tests, the worktree setup and teardown, the dev server and the seed), hosting (per audience class), first ship (check command green, prod-parity proof, registration finalized).
+**Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), brain (setup-brain: the `operate` skill and the operating section in the brain's `AGENTS.md`), project (setup-project: the pstack plugin at project scope, the stack pins, the sign-off and landing scripts, the run request template and the `run` label, `AGENTS.md`, `docs/agents/dev-loop.md` and `PRODUCT.md` from the templates, the verification skill; through setup-web-stack the journey tests, the worktree setup and teardown, the dev server and the seed), hosting (per audience class), first ship (check command green, prod-parity proof, registration finalized).
 
 **Two-phase registration**: claim at step 2 (ports), finalize at first ship (public URL, live fields); observation tolerates claimed-but-not-yet-live in between.
 

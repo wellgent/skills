@@ -24,9 +24,9 @@ A markdown file outside this set is a deviation: `scripts/check-docs` fails on i
 
 ## Outside the set
 
-- Not docs, and not checked: `.agents/` (pinned skills and `.agents/playbooks/`), `.claude/`, and the paths the "Not docs" section of `docs/agents/dev-loop.md` lists, which are product content written in markdown or vendor-generated files.
+- Not docs, and not checked: `.agents/` (pinned skills and `.agents/playbooks/`), `.claude/`, `.github/` (the run request template among the tracker's files), and the paths the "Not docs" section of `docs/agents/dev-loop.md` lists, which are product content written in markdown or vendor-generated files.
 - Never in a project, each with its home:
-  - research, plans, specs and status: the brain and its tracker;
+  - research, plans, specs and status: the project's tracker, or the brain that plans the work;
   - history, changelogs and what a doc said before: git;
   - process and conventions, including tracker, triage and domain docs and coding-standards files: this repo and pstack;
   - a rule a lint can enforce: that lint rule;
@@ -39,4 +39,5 @@ A markdown file outside this set is a deviation: `scripts/check-docs` fails on i
 - A number that mirrors a constant has a test that fails when the two differ, or the doc leaves it out.
 - The why of a decision lives in its ADR when it passes the three tests, in a code comment beside a constraint local to one place, and otherwise in the pull request body, which the squash merge keeps on `main`.
 - A change updates every doc it makes untrue in the same pull request.
-- A brain session writes nothing into a project: a term or decision a brain settles goes into the run request, and the run writes it into the project's doc.
+- A brain session writes nothing into a project: a term or decision a brain settles is written out in the run request, and the run writes it into the project's doc.
+- A commit, a pull request and a project doc cite only the project's own issues and files, never a brain.

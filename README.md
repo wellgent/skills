@@ -5,16 +5,17 @@ How we run product work with agents at [Wellgent](https://wellgent.ai), publishe
 ## The shape
 
 - **pstack** (the [Claude Code port](https://github.com/michael-denyer/pstack-claude), installed as the plugin `pstack@pstack-claude` per project) owns everything inside a project: planning, build, review, verification, pull requests, shipping and retro.
-- **A brain** is the repository where decisions and requests live: wayfinder maps for what to do, and **run requests** for what pstack should run. A request is one tracker issue with the five parts pstack's own prompting guide asks for: goal, a done check that passes or fails, the proof, what is known, constraints.
-- **`/operate <issue>`**, run from the brain, turns a request into a pstack run: it writes the prompt, starts the run as its own Rex session in the project checkout with landing authority, and stops. The run merges what its verifier passes and posts its note back on the request.
+- **A brain** is the repository where decisions live: wayfinder maps for what to do, and the decision tickets that chart them.
+- **A run request** is what pstack should run: one issue on the project's own tracker with the five parts pstack's own prompting guide asks for: goal, a done check that passes or fails, the proof, what is known, constraints. It cites only the project's own issues and files, so the run's whole record lives with the project.
+- **`/operate <owner>/<repo>#<n>`**, run from the brain, turns a request into a pstack run: it writes the prompt, starts the run as its own Rex session in the project checkout with landing authority, and stops. The run merges what its verifier passes and posts its note back on the request.
 
 ## Layout
 
 - [`AGENTS.md`](AGENTS.md) - the entry for an agent pointed at this repo.
 - [`skills/operate/`](skills/operate/) - the operator skill: the request template, the prompt template, the start script and the cost script. Installed into a brain by `setup-brain`.
 - [`setup/`](setup/) - the setup skills, run from this checkout:
-  - **setup-brain** - pins `operate` and the brain's planning skills from mattpocock/skills, creates the tracker labels and the request issue template, writes every shared-core file the brain lacks, and cross-checks the rest with `core-check`, reporting each deviation without overwriting.
-  - **setup-project** - enables the pstack plugin at project scope, pins the project's stack skills by commit, lays down the local sign-off and landing scripts, `AGENTS.md` and `docs/agents/dev-loop.md` from the templates, and offers pstack's verification skill. It names no stack. It is also where the plugin pin moves, on purpose.
+  - **setup-brain** - pins `operate` and the brain's planning skills from mattpocock/skills, creates the tracker labels, writes every shared-core file the brain lacks, and cross-checks the rest with `core-check`, reporting each deviation without overwriting.
+  - **setup-project** - enables the pstack plugin at project scope, pins the project's stack skills by commit, lays down the local sign-off and landing scripts, `AGENTS.md` and `docs/agents/dev-loop.md` from the templates, the run request template and the `run` label, and offers pstack's verification skill. It names no stack. It is also where the plugin pin moves, on purpose.
   - **setup-web-stack** - the stack setup for a web product: a curated [catalog](setup/setup-web-stack/catalog.md) of community skills, quality tooling and known-good configs, the sign-off and preview scripts, the journey tests and the Convex branch.
   - **setup-web-product** - the golden path for a new web product, each stage deferred to its installer.
 - [`templates/project/`](templates/project/) - `AGENTS.md`, `docs/agents/dev-loop.md` and the `slot`, `land` and `check-docs` scripts as the setup scaffolds them into a project.

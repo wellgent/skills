@@ -5,7 +5,7 @@ Every skill runs from this checkout in either harness (`.claude/skills/` and `.a
 
 - A brain that should plan, operate projects and carry the shared core in `templates/brain/`: run `setup-brain <brain checkout>`.
 - A project that should run on pstack: run `setup-project <owner>/<repo>`.
-- Work to run on a project: a run request on the brain's tracker, then `/operate <issue>` from the brain.
+- Work to run on a project: a run request on the project's own tracker, then `/operate <owner>/<repo>#<n>` from the brain.
 - A new web product: `setup-web-product`, which drives the two above and `setup-web-stack`.
 - The docs every project carries: `standards/project-docs.md`; `setup-project` converges a project on it.
 - Stack rules for web products: `standards/web-products.md`; the `setup-web-stack` catalog installs them.
