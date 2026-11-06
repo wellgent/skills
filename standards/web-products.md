@@ -238,7 +238,7 @@ Cache Components defaults on for greenfield.
 
 **Composition order**: scaffold (setup-web-stack), claim (registry entries up front, no placeholders downstream), brain (setup-brain: the `operate` skill, the `run` label and request template, the operating section in the brain's `AGENTS.md`), project (setup-project: the pstack plugin at project scope, the stack pins, the sign-off and landing scripts, `AGENTS.md`, `docs/agents/dev-loop.md` and `PRODUCT.md` from the templates, the verification skill; through setup-web-stack the journey tests, the worktree setup and teardown, the dev server and the seed), hosting (per audience class), first ship (check command green, prod-parity proof, registration finalized).
 
-**Two-phase registration**: claim at step 2 (ports, membership), finalize at first ship (public URL, live fields); observation tolerates claimed-but-not-yet-live in between.
+**Two-phase registration**: claim at step 2 (ports), finalize at first ship (public URL, live fields); observation tolerates claimed-but-not-yet-live in between.
 
 **Done means**: the observation surface shows the project green across every conformance column after first ship - skill delta zero, project docs asserted, ports registered, prod serving.
 Bootstrap is not "repo created"; it is "conformant and live".
