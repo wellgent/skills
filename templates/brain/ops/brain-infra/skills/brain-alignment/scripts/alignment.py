@@ -4,7 +4,7 @@
 The alignment-daily agent turn runs, in order:
 
   routine.py begin alignment-daily               the run id (brain-routines)
-  alignment.py prep --run <run_id>               queue the changed pages, oldest change first
+  alignment.py prep --run <run_id>               queue the changed pages, oldest change first, minus pages only skip_writers changed
   alignment.py next --run <run_id>               the next batch packet, or {"done": true} at the page cap
   alignment.py apply --run <run_id> <verdicts>   the batch's verdicts through the alignment guards and apply.py
   ... next and apply until done ...
@@ -184,9 +184,12 @@ def cmd_prep(cfg, args):
         before = f'--before={CONF["first_run_hours"]} hours ago'
         base = git(cfg, 'rev-list', '-1', before, head) or git(cfg, 'rev-list', '--max-parents=0', head).splitlines()[0]
     author = maintenance_author(cfg)
+    queue = state.setdefault('queue', {})
     changed = {p: a for p, a in changed_pages(cfg, base, head, author).items()
                if area_class(p) in ('editable', 'records') and (repo / p).is_file()}
-    queue = state.setdefault('queue', {})
+    skipped = [p for p, a in changed.items() if p not in queue and set(a) <= set(CONF['skip_writers'])]
+    for path in skipped:
+        changed.pop(path)
     for path, authors in changed.items():
         entry = queue.setdefault(path, {'base': base, 'queued_at': lib.iso(), 'reason': 'changed', 'attempts': 0, 'context': []})
         entry['reason'] = 'changed'
@@ -194,9 +197,10 @@ def cmd_prep(cfg, args):
     state['cursor'] = head
     save_state(cfg, state)
     rec = run_record(cfg, meta['run_id'])
-    rec.update(new=len(changed), carried=len(queue) - len(changed), base=base, head=head)
+    rec.update(new=len(changed), carried=len(queue) - len(changed), skipped=len(skipped), base=base, head=head)
     save_run(cfg, meta['run_id'], rec)
     print(json.dumps({'queued': len(queue), 'changed_since_last_run': len(changed), 'carried_over': len(queue) - len(changed),
+                      'skipped_writers_only': len(skipped),
                       'batches_estimate': math.ceil(min(len(queue), CONF['max_pages']) / CONF['batch_size']),
                       'next': f'{CMD} next --run {meta["run_id"]}'}, indent=2))
     return 0

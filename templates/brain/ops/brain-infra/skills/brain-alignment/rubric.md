@@ -26,6 +26,7 @@ Two statements conflict only when both cannot be true at once, about the same at
 - Authority runs from {{owner}}'s own statements, to cited primary sources, to synthesis.
 
 When the evidence settles it, edit. When it does not, FLAG with an option per outcome.
+{{local}}
 
 ## Verdicts
 

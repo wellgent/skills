@@ -7,6 +7,7 @@
   },
   "batch_size": 5,
   "max_pages": {{alignment_max_pages}},
+  "skip_writers": {{alignment_skip_writers}},
   "budget_seconds": 3600,
   "cooldown_days": 3,
   "first_run_hours": 24,
