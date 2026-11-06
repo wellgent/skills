@@ -18,7 +18,8 @@ It runs as a systemd user service on the brain host, from the published copy its
   After that the reconciler pushes everything to a `rescue/<UTC timestamp>` branch, resets the copy to `origin/main`, keeps syncing, and files a needs-attention issue with the branch, the changed paths and the options (land through a writer clone, or discard).
 - **Paging.** A step that keeps failing for 10 minutes pages `#ops-alerts` once per day per stage, in a plain sentence naming what the reconciler cannot do, and a recovery posts once.
   The same applies to embedding failures and to a sync lock held by someone else for an hour.
-  A failed send is logged as an `alert_failed` event and shows in the rollup.
+  Every post goes through the running gateway's `send` method, which retries a timed-out call under the same idempotency key, so a slow send neither drops nor doubles a page.
+  A send that still fails is logged as an `alert_failed` event, shows in the rollup, and is tried again 10 minutes later.
 - **Shared sync lock.** Every host job that runs `gbrain sync`, `gbrain embed` or a full doctor takes the same lock file as the reconciler, blocking with `flock -w`. While a job holds it, the reconciler waits.
 - **Self-update.** A published commit that touches this skill restarts the service on the new code.
 

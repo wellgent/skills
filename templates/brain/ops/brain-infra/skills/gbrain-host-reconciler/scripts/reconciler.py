@@ -310,31 +310,53 @@ class Reconciler:
                           or now() - attempts.get(stage, 0) < self.t['block_alert_seconds']):
             return
         attempts[stage] = now()
-        a = self.cfg['alert']
         what = STAGES.get(stage.split(':', 1)[0], 'hit a problem')
         if stage.startswith('deadman:'):
             what = what.format(name=stage.split(':', 1)[1])
         text = f'{self.cfg["brain"]}: the reconciler, which publishes and indexes pushed commits, {what}: {reason}'
-        try:
-            run([a['openclaw_bin'], 'message', 'send', '--account', a['account'], '--channel', 'discord',
-                 '--target', 'channel:' + a['channel'], '--message', text, '--silent'], timeout=60)
+        error = self.send(text)
+        if error:
+            self.event('alert_failed', stage=stage, reason=str(reason)[:500], error=error)
+        else:
             alerts[stage] = {'sent_at': now(), 'reason': str(reason)[:500]}
             self.event('alert', stage=stage, reason=str(reason)[:500])
-        except Blocked as error:
-            self.event('alert_failed', stage=stage, reason=str(reason)[:500], error=str(error))
+
+    def send(self, text, tries=3):
+        """Post to #ops-alerts through the running gateway's send method; return None or the error.
+
+        The message keeps one idempotency key across tries, and the gateway joins a retry to the send still in flight or
+        answers it from its record, so a call that timed out is retried without posting twice. A gateway answer is final."""
+        a = self.cfg['alert']
+        params = json.dumps({'to': 'channel:' + a['channel'], 'channel': 'discord', 'accountId': a['account'],
+                             'message': text, 'silent': True, 'idempotencyKey': uuid.uuid4().hex})
+        for attempt in range(tries):
+            if attempt:
+                time.sleep(10)
+            try:
+                code, out, err = run([a['openclaw_bin'], 'gateway', 'call', 'send', '--json', '--timeout', '30000',
+                                      '--params', params], timeout=45, check=False)
+            except Blocked as failure:
+                error = str(failure)
+                continue
+            if not code:
+                return None
+            try:
+                answer = json.loads(out).get('error') or {}
+            except ValueError:
+                answer = {}
+            error = answer.get('message') or (err or out).strip()[-300:] or f'gateway call send exited {code}'
+            if answer.get('type') == 'gateway_request_error':
+                queued = (answer.get('details') or {}).get('code') == 'OUTBOUND_DELIVERY_QUEUED'
+                return error + (', and the gateway holds it for its own retry' if queued else '')
+        return error
 
     def recovered(self, stage):
         alerts = self.state.get('alerts', {})
         if stage in alerts:
             alerts.pop(stage)
             self.state.get('alert_attempts', {}).pop(stage, None)
-            a = self.cfg['alert']
-            with contextlib.suppress(Blocked):
-                run([a['openclaw_bin'], 'message', 'send', '--account', a['account'], '--channel', 'discord',
-                     '--target', 'channel:' + a['channel'], '--message',
-                     f'{self.cfg["brain"]}: the reconciler problem is resolved'
-                     + (f': {stage.split(":", 1)[1]} reports a heartbeat again.' if stage.startswith('deadman:') else ', and it publishes normally again.'),
-                     '--silent'], timeout=60)
+            self.send(f'{self.cfg["brain"]}: the reconciler problem is resolved'
+                      + (f': {stage.split(":", 1)[1]} reports a heartbeat again.' if stage.startswith('deadman:') else ', and it publishes normally again.'))
             self.event('recovered', stage=stage)
 
     def check_deadman(self):
