@@ -13,6 +13,17 @@ Every step converges on a state, so a re-run changes only what is behind.
 2. **Dev server, host claims and teardown.** Copy [`recipes/host-claims.sh`](recipes/host-claims.sh) to `scripts/host-claims.sh` with the project name and the Convex team and project (`CONVEX_PROJECT`) filled, [`recipes/dev-server.sh`](recipes/dev-server.sh) to `scripts/dev-server.sh` with the lowest dev-server port filled, and [`recipes/worktree-teardown.sh`](recipes/worktree-teardown.sh) to `scripts/worktree-teardown.sh`, named on the "Start", "Stop" and "Tear down" lines.
    A local deployment is served by one long-running `convex dev` per worktree (`convex-start`), since `convex dev --once` refuses beside a local backend.
    The main checkout stays on the shared cloud dev deployment whatever `.convex/local` it holds: `start` and `serve-build` push to it once, and `convex-start` refuses there and names the recovery, which the project's `dev-loop.md` gives under "Main checkout".
+   That recovery is for a main checkout off its cloud dev deployment, with no `CONVEX_DEPLOYMENT` line in `.env.local`, one naming another deployment, or a `.convex/local`, and it runs with nothing running in the checkout:
+
+   ```bash
+   cd ~/repos/<repo>
+   scripts/dev-server.sh convex-stop
+   rm -rf .convex/local .convex/convex-dev.log .convex/convex-dev.pid
+   sed -i '' -E '/^(# Deployment used by `npx convex dev`|# The Convex CLI of this checkout|CONVEX_SELF_HOSTED_URL=|CONVEX_SELF_HOSTED_ADMIN_KEY=|CONVEX_OVERRIDE_ACCESS_TOKEN=|NEXT_PUBLIC_CONVEX_URL=|NEXT_PUBLIC_CONVEX_SITE_URL=|CONVEX_DEPLOYMENT=)/d' .env.local
+   pnpm exec convex deployment select <Convex team>:<Convex project>:<dev deployment>
+   pnpm exec convex dev --once
+   ```
+
    `convex-start` picks the backend's two ports itself under the host-wide lock, the config's while both are free and otherwise the next free ones, never one port for both, and writes `.env.local`'s backend URLs from the config, so a worktree whose ports another backend took starts on new ones and never points at that backend.
    `scripts/dev-server.sh site-url` prints its HTTP actions origin, so a session testing an HTTP action never opens `.convex/local/default/config.json`, which holds the admin key.
    A production read (`convex run --prod`) runs from the main checkout: a worktree's CLI is self-hosted, so it refuses `--prod` with exit 1 and nothing on stdout.
