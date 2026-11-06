@@ -184,10 +184,9 @@ class Reconciler:
         return result, proof
 
     def embed(self):
-        env = dict(os.environ, GBRAIN_EMBED_LOCK_HEARTBEAT_MS='86400000')
         try:
             run([self.cfg['gbrain_bin'], 'embed', '--stale', '--max-usd', str(self.t['embed_max_usd'])],
-                timeout=self.t['embed_budget_seconds'], env=env, cwd=self.repo)
+                timeout=self.t['embed_budget_seconds'], cwd=self.repo)
         except Blocked as error:
             # A timed-out or budget-stopped embed keeps what it embedded; the next attempt resumes.
             if 'timed out' not in str(error) and 'exit 11' not in str(error):
