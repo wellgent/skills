@@ -182,6 +182,25 @@ def changes(cfg, start, end):
     return out
 
 
+def fold(cfg, changes):
+    """Split off the changes each `fold` entry of the config collapses: its workflows' commits on pages in its areas.
+
+    Returns the changes left for the narrative and, per fold that matched, its commits and page counts per area,
+    each area linking its history on the main branch."""
+    web = f'https://github.com/{cfg["github_repo"]}/commits/{cfg.get("branch", "main")}'
+    folds = []
+    for f in CONF['fold']:
+        hit = [c for c in changes if c['workflow'] in f['workflows'] and c['path'].split('/', 1)[0] in f['areas']]
+        if not hit:
+            continue
+        changes = [c for c in changes if c not in hit]
+        pages = {a: {c['path'] for c in hit if c['path'].split('/', 1)[0] == a} for a in f['areas']}
+        folds.append({'name': f['name'], 'workflows': f['workflows'], 'commits': [c['sha'] for c in hit],
+                      'pages': sum(len(p) for p in pages.values()),
+                      'areas': [{'area': a, 'pages': len(p), 'link': f'{web}/{a}'} for a, p in pages.items() if p]})
+    return changes, folds
+
+
 def runs_in(cfg, start, end):
     """Every routine run that started in the window, with its record and journal."""
     out = []
@@ -435,7 +454,8 @@ def build(cfg, run_id, own, end, edition=None):
 
     runs = runs_in(cfg, start, end)
     part('changes', changes, cfg, start, end)
-    packet['changes'] = (packet['changes'] or []) + outside_changes(cfg, runs)
+    packet['changes'], packet['folded'] = fold(cfg, packet['changes'] or [])
+    packet['changes'] += outside_changes(cfg, runs)
     part('needs_you', attention, cfg, start)
     packet['still_open'] = []
     if edition == 'daily' and packet['needs_you']:
@@ -451,7 +471,7 @@ def build(cfg, run_id, own, end, edition=None):
         problems += watch_problems
     packet['problems'] = problems
     needs = packet['needs_you'] or []
-    packet['news'] = bool(edition == 'weekly' or packet['changes'] or packet['done'] or packet['health']
+    packet['news'] = bool(edition == 'weekly' or packet['changes'] or packet['folded'] or packet['done'] or packet['health']
                           or any(i['new'] for i in needs) or packet['needs_you'] is None)
     packet['limits'] = limits(packet)
     return packet
@@ -616,11 +636,14 @@ def render(p, n):
         links = ', '.join(f'[#{i["number"]}](<{i["url"]}>)' for i in p['still_open'])
         blocks.append(f'-# {len(p["still_open"])} still open from earlier digests: {links}. Monday\'s edition lists them in full.')
     by_sha = {c['sha']: c for c in p.get('changes') or []}
-    if n.get('changed'):
+    if n.get('changed') or p.get('folded'):
         lines = ['**Changed**']
-        for item in n['changed']:
+        for item in n.get('changed') or []:
             c = by_sha.get((item.get('link') or '')[:7])
             lines.append(f'- {item["text"]}' + (f' [{clip(c["title"], 60)}](<{c["link"]}>)' if c else ''))
+        for f in p.get('folded') or []:
+            areas = ', '.join(f'[{a["pages"]} in {a["area"]}](<{a["link"]}>)' for a in f['areas'])
+            lines.append(f'- {" and ".join(f["workflows"]).capitalize()} changed {f["pages"]} page{"s" * (f["pages"] != 1)} in {f["name"]}: {areas}.')
         blocks.append('\n'.join(lines))
     if p.get('done') and p['edition'] == 'weekly':
         numbers = ', '.join(f'#{x["number"]}' for x in p['done'])
@@ -726,7 +749,8 @@ def cmd_post(cfg, args):
         state = lib.load_state(cfg)
         state['send_failures'] = [f for f in state.get('send_failures', []) if parse_iso(f['at']) >= p['window']['end']]
         lib.save_state(cfg, state)
-    summary = (f'posted {sent} of {len(messages)} message(s) of the {p["edition"]} digest: {len(p.get("changes") or [])} changes, '
+    folded = sum(len(f['commits']) for f in p.get('folded') or [])
+    summary = (f'posted {sent} of {len(messages)} message(s) of the {p["edition"]} digest: {len(p.get("changes") or []) + folded} changes, '
                f'{len(p.get("needs_you") or [])} open needs-attention items, {len(p.get("done") or [])} answers applied')
     runner.end(cfg, meta, 'partial' if error else 'ok', summary, {})
     print(json.dumps({'ended': meta['run_id'], 'posted': not error, 'messages': len(messages), 'sent': sent, 'error': error}, indent=2))

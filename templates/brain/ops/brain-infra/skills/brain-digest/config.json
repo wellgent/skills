@@ -5,6 +5,7 @@
   "max_window_days": 7,
   "areas": {{digest_areas}},
   "ledger": {{digest_ledger}},
+  "fold": {{digest_fold}},
   "watch": {
     "eval_move": 0.03,
     "window_near_points": 10,
