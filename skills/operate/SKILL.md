@@ -156,6 +156,7 @@ Check the note's claims against the project: the pull requests it names are merg
 Check the run cleaned up: `git worktree list` in the checkout shows only the main checkout, `git branch` shows no local branch of a pull request the run landed, and no worktree, scratch tree, evidence directory or log the run created is left on the host; the project's teardown removes any worktree that remains, and the operator deletes the rest. Nothing the run uploaded for evidence (a gist, an attachment) is left either.
 Price the run session and this session with `scripts/cost` (see Cost), then review the run (see Run review).
 Run `rex kill <session>` once the review is posted, so the session name is free for a resume.
+Then delete the run session's temporary directory, `claude-<uid>/<checkout's project>/<session id>` under the host's temp root (`/private/tmp` on macOS, `/tmp` on Linux): it holds the run's background task logs and its scratchpad, where the trail review leaves an index of the transcript.
 Then catch the requester up in `/ketchup`'s voice: what the check found, both totals, what the review fixed, and the review's calls as numbered questions, each with a recommendation. Assign them on the request; closing it is their acceptance, and their answers to the calls are applied before it closes.
 A watch exit 3 means the run ended without a note: read its pane or transcript, tell the requester what is known, and assign them.
 
