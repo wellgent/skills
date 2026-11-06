@@ -19,6 +19,7 @@ at its head commit. A file that matches an older core version is behind: the cor
 that version is merged in with the target's values and committed. A file that matches no core
 version since the target's recorded base commit has departed from the core and becomes a finding.
 A target's base commit is recorded in the brain whenever the whole target matches a new core head.
+Before any of that, the brain's own operate sync-brain moves its operate pin in the maintenance clone.
 The skills the brain pins from the sources in config.json `pins` are compared with upstream, and a
 pinned skill that changed upstream since its pin is a finding until the owner bumps or holds it.
 """
@@ -723,6 +724,46 @@ def drift_finding(cfg, drift):
             'recommended': 1, 'question': 'Is any drift a deliberate runtime change the manifest should take instead?'}
 
 
+# the operate skill
+
+OPERATE = '.agents/skills/operate'
+
+
+def sync_operate(cfg, meta, brain):
+    """Run the brain's own sync-brain on the maintenance clone: a failure finding, or None.
+
+    The sync commits and pushes its move, and a failed one has its leftovers wiped, so the clone is
+    clean when the alignment writes the brain.
+    """
+    before = brain.git('rev-parse', 'HEAD')
+    env = dict(os.environ, PATH=cfg['path'], SYNC_BRAIN_PREFIX='setup',
+               SYNC_BRAIN_BODY=f'Routine: {ROUTINE} ({meta["run_id"]})')
+    try:
+        code, out, err = lib.run(['bash', brain.dir / OPERATE / 'scripts' / 'sync-brain', brain.dir], env=env, timeout=600, check=False)
+    except Failed as error:
+        code, out, err = 1, '', str(error)
+    if code:
+        lib.reset_clone(cfg)
+        return operate_finding(cfg, (err or out).strip()[-1500:] or f'exit {code}')
+    sha = brain.git('rev-parse', 'HEAD')
+    if sha != before:
+        m = re.search(r'operate at (\w+)(?: \(moved from (\w*)\))?', out)
+        text = f'Pinned `operate` at wellgent/skills {m.group(1)}' + (f', from {m.group(2)}' if m.group(2) else '') + '.' if m else out.strip()
+        lib.journal(cfg, meta['run_id'], 'change', text=text, url=brain.commit_url(sha), revert=brain.revert_hint(sha))
+    return None
+
+
+def operate_finding(cfg, error):
+    return {'id': 'operate', 'type': 'operate', 'path': OPERATE, 'fingerprint': f'{ROUTINE}:operate',
+            'title': f'{cfg["brain"]} core: the operate sync fails',
+            'finding': f'`{OPERATE}/scripts/sync-brain` failed in the maintenance clone, so `operate` stays at its pin in `{LOCK}`.',
+            'why': 'The brain runs `/operate` from that pin, and the fix is a host or brain fact the routine cannot settle.',
+            'evidence': [f'Error:\n\n```\n{error}\n```'],
+            'options': [{'label': 'Fix it by hand', 'detail': 'closes this issue; every run syncs again and files it again while the sync fails',
+                         'action': {'type': 'close'}}],
+            'recommended': 1, 'question': 'What does the error say to fix?'}
+
+
 # the pinned skills
 
 LOCK = 'skills-lock.json'
@@ -911,6 +952,9 @@ def cmd_align(cfg, run_id):
     lib.reset_clone(cfg)
     core, brain = Core(cfg), Checkout(cfg)
     results, findings, settling, applied = {}, [], [], []
+    operate = sync_operate(cfg, meta, brain)
+    if operate:
+        findings.append(operate)
     for target in TARGETS:
         aligner = aligner_for(cfg, core, brain, target, results.get('brain', {}).get('aligner'))
         aligner.run_id = meta['run_id']
@@ -1019,6 +1063,8 @@ def close_resolved(cfg, meta, live, settling, labels):
             rel = cfg['manifest']
         elif kind == 'pins':
             rel = LOCK
+        elif kind == 'operate':
+            rel = OPERATE
         elif kind in labels and kind != 'file':
             rel = labels[kind](rel)
         elif kind != 'file':

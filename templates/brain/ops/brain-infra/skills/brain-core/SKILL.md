@@ -1,6 +1,6 @@
 ---
 name: brain-core
-description: "The core workflow: the daily cross-check of the brain and the main agent's workspace against the shared core, of the routine manifest against the main agent's crons, and of the brain's pinned skills against upstream. Core changes flow into the brain and the workspace; a departure, a cron drift or a pinned skill that changed upstream becomes a needs-attention issue. Use when running the core-check routine, answering one of its issues, or debugging it."
+description: "The core workflow: the daily sync of the brain's operate skill and cross-check of the brain and the main agent's workspace against the shared core, of the routine manifest against the main agent's crons, and of the brain's pinned skills against upstream. Core changes flow into the brain and the workspace; a failed operate sync, a departure, a cron drift or a pinned skill that changed upstream becomes a needs-attention issue. Use when running the core-check routine, answering one of its issues, or debugging it."
 ---
 
 # Brain Core
@@ -16,7 +16,12 @@ It runs on the `brain-routines` framework; its changes and needs-attention items
 
 ## The cross-check
 
-`scripts/core.py align` fetches the core into `<state_dir>/core/` and judges every core file of each target by the core's own rules: `setup/setup-brain/core-check` at the core head, where placeholders match anything, blank lines are ignored and `AGENTS.md` is checked by section.
+`scripts/core.py align` first runs the brain's own `.agents/skills/operate/scripts/sync-brain` on the reset maintenance clone, which commits and pushes the move of the `operate` pin to the newest commit of the core repository that touches `skills/operate`.
+A moved pin is a change in the run record and the digest.
+A failed sync wipes its leftovers from the clone and is one needs-attention issue.
+The sync finishes before the alignment reads or writes the brain, so the clone is clean between them.
+
+Then it fetches the core into `<state_dir>/core/` and judges every core file of each target by the core's own rules: `setup/setup-brain/core-check` at the core head, where placeholders match anything, blank lines are ignored and `AGENTS.md` is checked by section.
 
 - **Aligned**: the file matches the core head.
 - **Behind**: the file matches an older core version. The core change since that version is merged in with the target's values and the lines it adds at the core's local slots. All such changes land as one maintenance commit per target and run.
@@ -62,6 +67,7 @@ The model only judges; `core.py` does every write.
    - **conflict** - take the core text when the colliding local lines are trivial or restated by the core change; merge by hand when they carry brain facts.
    - **unfilled** - read the brain for each placeholder value the core file needs and pass them as `values`; recommend writing it by hand when a value cannot be found.
    - **drift** - sync, unless a cron differs on purpose (for example, disabled during an incident).
+   - **operate** - fix by hand; the reason names what the error says to fix.
    - **pins** - bump when the upstream changes fit how the brain uses the skills; hold when one would break a convention the brain relies on; settle by hand when a pinned skill was renamed or removed upstream, since the core setup must learn the new name.
 4. Write `[{"id": "<finding id>", "recommended": <option number>, "reason": "<clause>", "values": {...}}]` to `<run_dir>/verdicts.json`.
    The reason completes "Recommended: N, ..." and starts lowercase; `values` is for unfilled findings only.
@@ -90,5 +96,5 @@ Every write is one commit by the maintenance writer, listed in the run record wi
 
 - The core clone lives in `<state_dir>/core/` and is fetched at every run; `promote` commits and pushes from it.
 - `config.json` holds the core repository, its branch, its owner brain, the core root of each target, the base file, `settle_minutes` and the pinned sources in `pins`.
-- Fingerprints are `core-check:file:<path>` for brain files, `core-check:workspace:<path>` for workspace files, `core-check:crons` for cron drift and `core-check:pins` for the pinned skills.
+- Fingerprints are `core-check:file:<path>` for brain files, `core-check:workspace:<path>` for workspace files, `core-check:crons` for cron drift, `core-check:operate` for the operate sync and `core-check:pins` for the pinned skills.
 - A manual cross-check from any checkout: `setup/setup-brain/core-check brain <checkout>` or `core-check workspace <workspace checkout>` in the core repository.
