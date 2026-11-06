@@ -1,29 +1,35 @@
 ---
 name: operate
-description: Run a brain request on a project through pstack - read the request issue, bring the brain, the project and the host up to date and prove the project's tools (Ready), write the run prompt, start the run in Rex with landing authority, then watch the request, answer the run's plan and stops or bring them to the requester, pause the run near the weekly usage limit, check its note and review the run. Use for /operate <issue>, which also resumes a paused run, and /operate cost <session> to price a finished run.
-argument-hint: "<request issue> | cost <session id | latest <checkout>>"
+description: Run a project's run request through pstack - read the request issue on the project's tracker, bring the brain, the project and the host up to date and prove the project's tools (Ready), write the run prompt, start the run in Rex with landing authority, then watch the request, answer the run's plan and stops or bring them to the requester, pause the run near the weekly usage limit, check its note and review the run. Use for /operate <owner>/<repo>#<n> or the issue URL, which also resumes a paused run, and /operate cost <session> to price a finished run.
+argument-hint: "<owner>/<repo>#<n> | <issue URL> | cost <session id | latest <checkout>>"
 disable-model-invocation: true
 ---
 
 # Operate
 
-The operator between a brain and pstack: a **run request** on the brain's tracker goes in, a pstack run on the project comes out, and the run's note comes back to the request.
+The operator between a brain and pstack: a **run request** on the project's own tracker goes in, a pstack run on the project comes out, and the run's note comes back to the request.
 Run from the brain's checkout on any host that holds the project at `~/repos/<repo>`.
+The run's whole record lives on the request: its plan, stops, answers, decision log, note and review are comments there, and nothing about the run is written to the brain.
+Every `gh issue` and `gh api` call on the request names its repository (`-R <owner>/<repo>`, or the full `repos/<owner>/<repo>/...` path), since `gh` in the brain's checkout defaults to the brain's tracker.
 pstack owns everything inside the run, under the rules in the project's own files; this skill writes the prompt, starts the session, and stays the run's operator until its note is handled: every stop the run posts reaches this session first, and the requester hears only the calls that are theirs.
 Every comment the operator posts opens with `**Operator:**`, or with `**Operator, <requester>'s call:**` when it relays the requester's answer, after `scope: ` on a scope change, since the run, the operator and the requester may share one GitHub account.
 The operator's answers, `scope:` comments and catch-ups hold only calls about this one run; a rule every run should follow belongs in host setup or the project template, and goes to the requester as that proposal.
 
 ## The request
 
-One open issue on the brain's tracker labelled `run`, in the shape of [`request.md`](request.md): the repo as `<owner>/<repo>`, then Goal, Done check, Proof, Known and Constraints.
+One open issue labelled `run` on the project's own tracker, in the shape of [`request.md`](request.md): titled `Run: <goal>`, with Goal, Done check, Proof, Known and Constraints.
+The project is the repository the issue is on, given as `<owner>/<repo>#<n>` or the issue's URL; `<repo>` below is its name.
 A request missing a section gets one comment naming the missing sections, and no run starts.
+A request is self-contained: it, every answer on it and everything the run writes cite only the project's own issues and files, never a brain, so a brain fact the run needs is written out on the request.
 The body is frozen once a run starts: every change, from the operator or the requester, is a comment starting `scope:` (see Scope changes).
 
 ## 1. Read the request
 
-`gh issue view <n> --json title,body,author,url,labels,comments` on the brain's tracker (`git remote get-url origin` in the brain).
+`gh issue view <n> -R <owner>/<repo> --json title,body,author,url,labels,comments`.
 Every section present, the label `run` present (add it when missing), and no `run:` comment from the operator on the issue, which marks a run already started.
 The one exception is a paused run: when the newest `run:` comment is followed by a comment from the run headed `Hand-back`, this is its resume (see Resume).
+Then `bash <this skill's directory>/scripts/brain-links <owner>/<repo> <n>` from the brain: it prints each link in the body to a brain, as a GitHub URL or an `owner/repo#n` reference, where a brain is the repository this checkout belongs to or any repository whose `skills-lock.json` pins `operate`.
+Exit 3 refuses the request: post one comment naming each link it printed and asking for the fact behind it written out in the body, assign the requester, and start no run.
 
 ## 2. Check the project
 
@@ -35,7 +41,7 @@ Anything missing stops the run with its fix; a project not set up gets `setup-pr
 A run starts on the newest `operate`, the newest pstack release, the newest stack skill pins and project docs on the current templates, with the project's tools proven on this host.
 `ready` (below) fast-forwards a checkout that is only behind, so the brain and the project start at their remote heads.
 
-1. `bash <this skill's directory>/scripts/sync-brain <brain checkout>` pins `operate` at the newest wellgent/skills commit that touches it, with the run request template and the `run` label. When it moved the pin, read the new `SKILL.md` and carry on from this step under it.
+1. `bash <this skill's directory>/scripts/sync-brain <brain checkout>` pins `operate` at the newest wellgent/skills commit that touches it. When it moved the pin, read the new `SKILL.md` and carry on from this step under it.
 2. `bash <this skill's directory>/scripts/ready <owner>/<repo>` from the brain: the brain and the project at their remote heads, this skill's own tools, the weekly usage as a warning that never blocks, each check under "Host tools" in the project's `docs/agents/dev-loop.md`, the host's pstack version and every stack pin against upstream. Exit 1 is blocked, exit 3 is behind.
 3. `setup-project` with `latest` on the project, from the wellgent/skills checkout at `~/repos/wellgent-skills` pulled first: pstack at the version its marketplace serves on this host (a host change, no commit), every stack pin at its source's newest commit, and the project's docs on the current templates. A change to the repository goes on a branch `ready/<n>` as one PR, signed off with `scripts/check` in its own worktree, and lands through `scripts/land`; its sign-off is the smoke test, and on a project with `scripts/production-live` Ready ends only once it prints the merge commit, since every landing of the run waits for production to run `main`'s tip. A production deploy of it that fails stops Ready: read its build log for the cause, and a redeploy of that commit is the requester's call.
 4. Without a change, `bash <this skill's directory>/scripts/ready --smoke <owner>/<repo>`: a fresh worktree of `origin/main`, its Set up command, `scripts/check --dry`, then its Tear down.
@@ -66,7 +72,7 @@ Comment on the request: `**Operator:** run: <session> started on <hostname> at <
 Remove any assignee from the request, since watch exit 5 stays silent while one is set. Start the watch in the background from the `ready:` comment's URL, then end the turn: a run can post its plan before the `run:` comment, and the watch then prints both.
 
 ```bash
-bash <this skill's directory>/scripts/watch <n> <ready: comment URL>
+bash <this skill's directory>/scripts/watch <owner>/<repo> <n> <ready: comment URL>
 ```
 
 It returns with one reason, printed:
@@ -108,14 +114,16 @@ Only an out-of-scope ask in the plan reaches the requester, escalated as in Stop
 A stop is a comment from the run with questions it waits on, each with the default it applies when nobody answers.
 Sort every question:
 
-- **Answer it** when the request, the brain (the map the request came from, decisions on subject pages) or the project's own records settle it, or when it is reversible and the run's default is sound.
+- **Answer it** when the request or the project's own records settle it, when the lead, if one runs this session, settles it from the map and the brain, or when it is reversible and the run's default is sound.
 - **Escalate it** when it is a product or preference call only the requester can make, the review of a change to layout, look and feel or functionality on its preview, an irreversible action the constraints do not authorize, or work outside what the request asks for. A bug fix, or a fix that makes the UI match the project's design records, is not escalated: it lands on its verifier's pass.
 
 A review on a preview goes to the requester as the preview URL and what changed, never as screenshots.
+A lead that runs this session reads its pane: the catch-ups below reach the lead, which answers what the map and the brain settle and brings the requester the rest.
 To escalate, catch the requester up in this session in `/ketchup`'s voice: how many calls wait on them, then each call with your recommendation and why, and what the run does without an answer.
 Assign the requester on the request, so the call shows in their open `run` issues, and wait for their answer.
 
 Answer the stop in one comment on the request covering every question, the requester's calls in their substance, and remove the assignee.
+Every answer is written out in full: a brain fact the run needs is copied into it, and a brain change made to unblock the run is stated as a fact, never as a brain link.
 Then tell the run: "Your stop on <request URL> is answered: read it now."
 
 ## needs-human
@@ -147,7 +155,7 @@ At watch exit 4 the run pauses through pstack's Pause safely; a five-hour limit 
 ## Resume
 
 The requester picks the host and time.
-`/operate <issue>` on that host finds the hand-back at step 1 and starts a new run from it, under the same request, done check and `scope:` comments, through the same steps; the watch and everything after it run as for any run.
+`/operate <owner>/<repo>#<n>` on that host finds the hand-back at step 1 and starts a new run from it, under the same request, done check and `scope:` comments, through the same steps; the watch and everything after it run as for any run.
 
 ## The note
 
@@ -164,14 +172,14 @@ A watch exit 3 means the run ended without a note: read its pane or transcript, 
 
 Every run ends with a review from outside it, so each run leaves the protocol and the setup better than it found them.
 
-1. **Read the run as evidence:** the decision log, the trail review's flags, the deviations the note lists, every stop and how it was answered, the `ready:` comment, cost, and any host load or usage limit the log records.
-2. **Judge it against the protocol:** Ready, the plan stop, units outside the approved plan, stop defaults, the review rule, `needs-human`, the final-tree check, cleanup and cost. For each, it held or it did not, with the evidence.
+1. **Read the run as evidence:** the decision log, the trail review's flags, the deviations and follow-ups the note lists, every stop and how it was answered, the `ready:` comment, cost, and any host load or usage limit the log records.
+2. **Judge it against the protocol alone:** Ready, the plan stop, units outside the approved plan, stop defaults, the review rule, `needs-human`, the final-tree check, cleanup and cost. For each, it held or it did not, with the evidence.
 3. **Sort every finding:**
    - **Fix now**, with no ask, when it repairs setup code or makes it match a rule already decided: route the run's setup changes as The setup says, port them to wellgent/skills, and re-pin with `sync-brain`.
    - **A call for the requester** when it adds or changes a rule, a budget, a model choice or a tool: the run lines, stop rules, slots, models, a candidate tool. Apply it once answered.
-   - **Project work** for a later run, judged one item at a time and kept selective: an item earns a place only with real value, such as a defect a user or a later run will hit, a gap in what the run was asked to deliver, or a risk. Each such item becomes one issue on the project's tracker, linked from the review, or a `scope:` addition when the requester wants it now. The rest is **No change**.
+   - **Project work** for a later run, judged one item at a time and kept selective: an item earns a place only with real value, such as a defect a user or a later run will hit, a gap in what the run was asked to deliver, or a risk. Each such item becomes one `needs-triage` issue on the project's tracker, linked from the review, or a `scope:` addition when the requester wants it now. The rest is **No change**.
    - **No change**, with the reason. The tracker holds what is worth someone's time later; the review's reason is the record of the rest.
-4. **Post one `Run review` comment** on the request: what held, what did not, what was fixed with its commits, the issues filed, the calls, and the run's numbers (cost per PR, PRs landed, stops and how many reached the requester, deviations, wall time) beside those of the last closed `run` request's review.
+4. **Post one `Run review` comment** on the request: what held, what did not, what was fixed with its commits, the issues filed, the calls, and the run's own numbers: cost per PR, PRs landed, stops and how many reached the requester, deviations, wall time.
 
 ## The setup
 

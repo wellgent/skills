@@ -2,8 +2,9 @@
 # sync-brain <brain checkout>
 # Brings what a brain needs for /operate to the newest wellgent/skills commit that touches
 # skills/operate: the operate skill pinned at that commit (.agents/skills/operate, the
-# .claude/skills link, its skills-lock.json entry), the run request template
-# .github/ISSUE_TEMPLATE/run.md copied from its request.md, and the `run` label on the tracker.
+# .claude/skills link, its skills-lock.json entry). Run requests live on each project's tracker,
+# which setup-project gives the template and the label, so a run request template
+# .github/ISSUE_TEMPLATE/run.md in the brain is removed.
 # A change is committed with the prefix SYNC_BRAIN_PREFIX (default "setup"), with SYNC_BRAIN_BODY as
 # its body when set, and pushed.
 # Prints "operate at <sha>" with "(moved from <sha>)" when the pin moved.
@@ -20,11 +21,10 @@ main() {
   [ -z "$(git status --porcelain)" ] || die "the brain has uncommitted changes"
   git pull -q --rebase || die "git pull --rebase failed in $brain"
 
-  local sha old tracker
+  local sha old dropped=""
   sha=$(gh api "repos/wellgent/skills/commits?path=skills/operate&per_page=1" --jq '.[0].sha')
   [ -n "$sha" ] || die "no wellgent/skills commit touches skills/operate"
   old=$(jq -r '.skills.operate.ref // empty' skills-lock.json 2>/dev/null || true)
-  tracker=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 
   if [ "$old" != "$sha" ]; then
     [ -z "$old" ] || npx -y skills remove operate -y >/dev/null
@@ -36,16 +36,17 @@ main() {
     [ ! -L skills/operate ] || rm -f skills/operate
   fi
 
-  mkdir -p .github/ISSUE_TEMPLATE
-  cp .agents/skills/operate/request.md .github/ISSUE_TEMPLATE/run.md
-  gh label create run --repo "$tracker" --color 0E8A16 --description "A request for /operate" --force >/dev/null
+  if [ -f .github/ISSUE_TEMPLATE/run.md ]; then
+    git rm -q --ignore-unmatch .github/ISSUE_TEMPLATE/run.md && rm -f .github/ISSUE_TEMPLATE/run.md
+    dropped=", with no run request template in the brain"
+  fi
 
   local stray
   stray=$(git status --porcelain | grep -vE ' (\.agents/skills/operate/|\.claude/skills/operate$|skills-lock\.json$|\.github/ISSUE_TEMPLATE/run\.md$)' || true)
   [ -z "$stray" ] || die "the CLI wrote outside the operate paths: $stray"
   if [ -n "$(git status --porcelain)" ]; then
-    git add -A .agents/skills/operate .claude/skills/operate skills-lock.json .github/ISSUE_TEMPLATE/run.md
-    git commit -qm "${SYNC_BRAIN_PREFIX:-setup}: operate at wellgent/skills ${sha:0:7}, with its run request template" \
+    git add -A .agents/skills/operate .claude/skills/operate skills-lock.json
+    git commit -qm "${SYNC_BRAIN_PREFIX:-setup}: operate at wellgent/skills ${sha:0:7}$dropped" \
       ${SYNC_BRAIN_BODY:+-m "$SYNC_BRAIN_BODY"}
     git push -q || die "git push failed in $brain"
   fi

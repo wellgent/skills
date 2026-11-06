@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# brain-links <owner>/<repo> <issue>
+# Run from the brain's checkout. Prints each link in the run request's body that points at a brain,
+# one per line as "<link>  (brain <owner>/<repo>)": a GitHub URL (github.com/<owner>/<repo>/...) or
+# an <owner>/<repo>#<n> reference. A brain is the repository this checkout belongs to, or any
+# repository whose skills-lock.json pins operate, as sync-brain pins it in every brain.
+# Exit 0 no brain link, 3 brain links printed, 1 failed.
+set -euo pipefail
+die() { echo "brain-links: $*" >&2; exit 1; }
+for tool in gh jq; do command -v "$tool" >/dev/null 2>&1 || die "$tool is not on PATH"; done
+
+repo=${1:?usage: brain-links <owner>/<repo> <issue>}
+issue=${2:?usage: brain-links <owner>/<repo> <issue>}
+case $repo in */*) ;; *) die "repo must be <owner>/<repo>, got: $repo" ;; esac
+case $issue in *[!0-9]*|"") die "issue must be a number, got: $issue" ;; esac
+
+here=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || die "this checkout has no GitHub repository"
+body=$(gh issue view "$issue" -R "$repo" --json body --jq .body) || die "cannot read $repo#$issue"
+
+# Each link with the repository it points at, as "<link>\t<owner>/<repo>".
+links=$(jq -Rrs '
+  [ (scan("https?://(?:www\\.)?github\\.com/[\\w.-]+/[\\w.-]+[^\\s)>\\]\"`]*")
+       | sub("[.,;:!?]+$"; "") | [., (sub("^https?://(?:www\\.)?github\\.com/"; "") | split("/")[0:2] | join("/") | sub("\\.git$"; ""))]),
+    (scan("(?<![\\w./#-])[\\w.-]+/[\\w.-]+#[0-9]+") | [., split("#")[0]]) ]
+  | unique[] | @tsv' <<<"$body")
+
+lower() { tr '[:upper:]' '[:lower:]' <<<"$1"; }
+# Each repository is read once: "<repo> <1 or 0>" lines.
+seen=""
+found=""
+while IFS=$'\t' read -r link target; do
+  [ -n "$link" ] || continue
+  key=$(lower "$target")
+  [ "$key" != "$(lower "$repo")" ] || continue
+  verdict=$(awk -v k="$key" '$1 == k { print $2; exit }' <<<"$seen")
+  if [ -z "$verdict" ]; then
+    verdict=0
+    if [ "$key" = "$(lower "$here")" ]; then
+      verdict=1
+    elif gh api -H "Accept: application/vnd.github.raw+json" "repos/$target/contents/skills-lock.json" 2>/dev/null |
+      jq -e '.skills.operate' >/dev/null 2>&1; then
+      verdict=1
+    fi
+    seen="$seen$key $verdict"$'\n'
+  fi
+  if [ "$verdict" = 1 ]; then
+    echo "$link  (brain $target)"
+    found=1
+  fi
+done <<<"$links"
+
+[ -z "$found" ] || exit 3
+exit 0

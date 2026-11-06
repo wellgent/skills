@@ -1,11 +1,9 @@
 ---
 name: Run request
-about: Work for /operate to run on a project through pstack; once the run starts the body stays as written and every change is a comment starting `scope:`
+about: Work for /operate to run on this project through pstack; once the run starts the body stays as written and every change is a comment starting `scope:`
 title: "Run: "
 labels: run
 ---
-
-- **Repo:** <owner>/<repo>
 
 ## Goal
 
@@ -21,7 +19,7 @@ labels: run
 
 ## Known
 
-<What is already known: the files, records, decisions and findings the run starts from. The run starts from the main branch after the operator's Ready; a starting commit named here is the last one known. A fact about the run's host is stated as checked on that host, with how; a fact not yet checked is checked there before the run starts, by whoever can reach it.>
+<What is already known: the files, issues, decisions and findings the run starts from, as this project's own files and issues, with any fact from elsewhere written out here, never a link to a brain. The run starts from the main branch after the operator's Ready; a starting commit named here is the last one known. A fact about the run's host is stated as checked on that host, with how; a fact not yet checked is checked there before the run starts, by whoever can reach it.>
 
 ## Constraints
 
