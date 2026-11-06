@@ -22,7 +22,7 @@ const SHARED_DEPLOYMENT_LINE =
 
 // The committed Convex team and project, from scripts/host-claims.sh.
 const convexProject = (() => {
-  const line = /^CONVEX_PROJECT=(\S+)$/m.exec(
+  const line = /^CONVEX_PROJECT="?([^"\s]+)"?$/m.exec(
     readFileSync(join(scriptsDir, "host-claims.sh"), "utf8"),
   );
   if (line === null) {
