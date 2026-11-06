@@ -19,7 +19,9 @@ Run every command with the paths below; `S` is `{{host_home}}/{{name}}/ops/brain
 
 1. **Begin.** `python3 $S/brain-routines/scripts/routine.py begin alignment-daily` prints the run id; it takes the maintenance lease and applies {{owner}}'s replies on open alignment issues.
 2. **Prep.** `python3 $S/brain-alignment/scripts/alignment.py prep --run <run_id>` queues every page changed since the last run by any writer except the maintenance writer, oldest change first, after the pages carried over from earlier runs.
-   A page changed only by the writers in `config.json` `skip_writers` stays out, since those writers run their own sourcing checks.
+   A page with no content change stays out: every change to it came from a writer in `config.json` `skip_writers`, which run their own sourcing checks, or, with `skip_mechanical` true, was **mechanical**.
+   A mechanical change only removes frontmatter keys outright or rewords `[Source: ...]` citations, link targets included, so it carries no claim to judge.
+   A page already queued stays queued, whatever changed it.
 3. **Rubric.** Read `$S/brain-alignment/rubric.md` once; it governs every verdict.
 4. **Batch loop.** Repeat until `next` prints `"done": true`:
    1. `alignment.py next --run <run_id>` prints the batch number and the packet path.
@@ -71,5 +73,5 @@ A page that goes `max_attempts` batches without an apply leaves the queue and ma
 
 - Force a run with `routine.py force alignment-daily`.
 - Each run directory keeps `alignment.json`, every `batch-<n>.json` packet, the verdict files and each apply output.
-- Tune scope, skipped writers, batch size, page cap, budget and cooldown in `config.json`; the routine's schedule, model and effort are in `ops/brain-infra/routines.json`.
+- Tune scope, skipped writers, mechanical skipping, batch size, page cap, budget and cooldown in `config.json`; the routine's schedule, model and effort are in `ops/brain-infra/routines.json`.
 - `alignment-daily` is deferrable: the `brain-routines` subscription guard holds it back while the shared quota window is too full, and its queue waits for the next run.

@@ -4,7 +4,7 @@
 The alignment-daily agent turn runs, in order:
 
   routine.py begin alignment-daily               the run id (brain-routines)
-  alignment.py prep --run <run_id>               queue the changed pages, oldest change first, minus pages only skip_writers changed
+  alignment.py prep --run <run_id>               queue the changed pages, oldest change first, minus pages with no content change
   alignment.py next --run <run_id>               the next batch packet, or {"done": true} at the page cap
   alignment.py apply --run <run_id> <verdicts>   the batch's verdicts through the alignment guards and apply.py
   ... next and apply until done ...
@@ -20,6 +20,7 @@ import math
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 sys.dont_write_bytecode = True  # routines write nothing into the published copy
@@ -37,6 +38,7 @@ CMD = f'{sys.executable} {SCRIPTS / "alignment.py"}'
 FRONTMATTER_KEY = re.compile(r'^\s*(updated|created|status|tags|aliases|related|title|type|last_verified):')
 WORD = re.compile(r"[\w][\w.,:/'-]*\w|\w")
 DATE = re.compile(r'\*\*(\d{4}-\d{2}-\d{2})\*\*')
+CITATION = re.compile(r'\[Source:[^\]]*\](\([^)]*\))?')
 STOP = {'about', 'after', 'again', 'their', 'there', 'these', 'those', 'which', 'while', 'where', 'would', 'should',
         'could', 'other', 'being', 'under', 'between', 'through', 'source', 'jaros'}
 
@@ -151,8 +153,10 @@ class LinkIndex:
 # the queue
 
 def changed_pages(cfg, base, head, author):
-    """Pages changed in base..head by any writer but the maintenance writer, oldest change first: {path: [authors]}."""
-    raw = git(cfg, 'log', '--reverse', '--no-merges', '-M', '--name-status', '--format=%x01%an', f'{base}..{head}', timeout=120)
+    """Pages changed in base..head by any writer but the maintenance writer, oldest change first.
+
+    {path: [(author, status, old blob, new blob)]}, one entry per commit."""
+    raw = git(cfg, 'log', '--reverse', '--no-merges', '-M', '--raw', '--no-abbrev', '--format=%x01%an', f'{base}..{head}', timeout=120)
     pages = {}
     for chunk in raw.split('\x01'):
         if not chunk.strip():
@@ -161,11 +165,59 @@ def changed_pages(cfg, base, head, author):
         if who == author:
             continue
         for line in files.splitlines():
-            parts = line.split('\t')
-            if len(parts) < 2 or parts[0].startswith('D'):
+            meta, _, paths = line.partition('\t')
+            fields = meta.split()
+            if len(fields) < 5 or fields[4].startswith('D'):
                 continue
-            pages.setdefault(parts[-1], set()).add(who)
-    return {p: sorted(a) for p, a in pages.items()}
+            pages.setdefault(paths.split('\t')[-1], []).append((who, fields[4], fields[2], fields[3]))
+    return pages
+
+
+def blobs(cfg, shas):
+    """{sha: text} for the given blobs, read in one git cat-file call."""
+    shas = sorted(set(shas))
+    out = subprocess.run(['git', '-C', cfg['maintenance_repo'], 'cat-file', '--batch'], input=''.join(f'{s}\n' for s in shas).encode(),
+                         capture_output=True, check=True, timeout=120).stdout
+    texts, pos = {}, 0
+    for sha in shas:
+        nl = out.index(b'\n', pos)
+        size = int(out[pos:nl].split()[2])
+        texts[sha] = out[nl + 1:nl + 1 + size].decode(errors='replace')
+        pos = nl + 2 + size
+    return texts
+
+
+def frontmatter_keys(fm):
+    """{key: its lines} for each top-level frontmatter key."""
+    keys, key = {}, None
+    for line in fm.splitlines():
+        m = re.match(r'^([^\s#-][^:]*):', line)
+        if m:
+            key = m.group(1)
+            keys[key] = []
+        if key is not None and line.strip():
+            keys[key].append(line.rstrip())
+    return keys
+
+
+def mechanical(old, new):
+    """True when new differs from old only by frontmatter keys removed outright and by the wording of [Source: ...] citations."""
+    old_fm, old_body = split_frontmatter(old)
+    new_fm, new_body = split_frontmatter(new)
+    old_keys = frontmatter_keys(old_fm)
+    if any(old_keys.get(k) != v for k, v in frontmatter_keys(new_fm).items()):
+        return False
+    return CITATION.sub('[Source]', old_body) == CITATION.sub('[Source]', new_body)
+
+
+def to_judge(cfg, changes):
+    """The pages with a content change: one from a writer outside skip_writers that, with skip_mechanical, is not mechanical."""
+    writers = {p: [c for c in cs if c[0] not in CONF['skip_writers']] for p, cs in changes.items()}
+    if not CONF['skip_mechanical']:
+        return {p for p, cs in writers.items() if cs}
+    texts = blobs(cfg, [sha for cs in writers.values() for _, status, old, new in cs if status == 'M' for sha in (old, new)])
+    return {p for p, cs in writers.items()
+            if any(status != 'M' or not mechanical(texts[old], texts[new]) for _, status, old, new in cs)}
 
 
 def cooldown(cfg, author):
@@ -185,11 +237,11 @@ def cmd_prep(cfg, args):
         base = git(cfg, 'rev-list', '-1', before, head) or git(cfg, 'rev-list', '--max-parents=0', head).splitlines()[0]
     author = maintenance_author(cfg)
     queue = state.setdefault('queue', {})
-    changed = {p: a for p, a in changed_pages(cfg, base, head, author).items()
+    changes = {p: cs for p, cs in changed_pages(cfg, base, head, author).items()
                if area_class(p) in ('editable', 'records') and (repo / p).is_file()}
-    skipped = [p for p, a in changed.items() if p not in queue and set(a) <= set(CONF['skip_writers'])]
-    for path in skipped:
-        changed.pop(path)
+    judge = to_judge(cfg, changes)
+    changed = {p: sorted({c[0] for c in cs}) for p, cs in changes.items() if p in queue or p in judge}
+    skipped = len(changes) - len(changed)
     for path, authors in changed.items():
         entry = queue.setdefault(path, {'base': base, 'queued_at': lib.iso(), 'reason': 'changed', 'attempts': 0, 'context': []})
         entry['reason'] = 'changed'
@@ -197,10 +249,10 @@ def cmd_prep(cfg, args):
     state['cursor'] = head
     save_state(cfg, state)
     rec = run_record(cfg, meta['run_id'])
-    rec.update(new=len(changed), carried=len(queue) - len(changed), skipped=len(skipped), base=base, head=head)
+    rec.update(new=len(changed), carried=len(queue) - len(changed), skipped=skipped, base=base, head=head)
     save_run(cfg, meta['run_id'], rec)
     print(json.dumps({'queued': len(queue), 'changed_since_last_run': len(changed), 'carried_over': len(queue) - len(changed),
-                      'skipped_writers_only': len(skipped),
+                      'skipped_no_content_change': skipped,
                       'batches_estimate': math.ceil(min(len(queue), CONF['max_pages']) / CONF['batch_size']),
                       'next': f'{CMD} next --run {meta["run_id"]}'}, indent=2))
     return 0
