@@ -97,11 +97,11 @@ Preference and familiarity do not qualify.
   With the file manager off nothing refreshes `convex/_generated/ai/guidelines.md`, so every toolchain sweep replaces it with the current upstream `convex_rules.txt`.
 - Migrations run through `@convex-dev/migrations`.
   A production migration is dry-run first (`dryRun: true`), and its row counts are part of the production-write approval.
-- **A local deployment per worktree.** The worktree setup script creates a local deployment (`convex deployment create local --select`), served by one long-running `convex dev` per worktree, sets `CRONS=off`, pushes and runs the seed, so parallel sessions share no schema or data, use no plan quota or deployment slot, and every runtime check runs against the worktree's own code.
+- **A local deployment per worktree.** The worktree setup script creates a local deployment (`convex deployment create local --select`), which takes `CRONS=off` from the project's dev defaults, served by one long-running `convex dev` per worktree, pushes and runs the seed, so parallel sessions share no schema or data, use no plan quota or deployment slot, and every runtime check runs against the worktree's own code.
   The teardown stops that `convex dev` and its backend and removes the tree.
   A cloud dev deployment (`--cloud`, expiring, with a `CONVEX_DEPLOY_KEY` scoped to it in `.env.local`) is only for work that needs a public URL.
   The seed lives in the repo as an idempotent function: it creates the test identities `docs/agents/dev-loop.md` names and stores what the crons would.
-- **Crons run in production only**: `convex/crons.ts` registers none where the deployment's `CRONS` is `off`, which the shared dev deployment, the project's dev and preview defaults and every worktree set; production leaves it unset.
+- **Crons run in production only**: `convex/crons.ts` registers none where the deployment's `CRONS` is `off`, which the shared dev deployment, the project's dev and preview defaults and so every worktree's deployment carry; production leaves it unset.
 - **A worktree reaches only its own backend.** The run host's Convex login is used by the operator and by the worktree setup script, and stays readable on the host.
   Once a local worktree's backend runs, its `.env.local` holds the Convex CLI to that backend alone (`CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY` and a `CONVEX_OVERRIDE_ACCESS_TOKEN` Convex rejects), so `--prod` and the other deployment flags are refused before any network call and the login is never used from the worktree; a cloud worktree's scoped key does the same for its deployment.
   The production build environment holds the production deploy key, the preview build environment the preview deploy key.

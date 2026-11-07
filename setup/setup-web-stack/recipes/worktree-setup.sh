@@ -7,9 +7,12 @@
 # that needs a public URL. Either way the deployment runs no crons (CRONS=off), and the seed
 # stores what its crons would. Needs the run host's Convex login to create the deployment.
 # A rerun pushes and seeds again; the worktree keeps its deployment.
-# The Convex CLI picks a local backend's ports, free when it looks, without binding them, so the
-# create, the CRONS set and convex-start, which each start a backend, run under one host-wide lock
-# (scripts/host-claims.sh) until the worktree's backend runs: setups at once get distinct ports.
+# The Convex CLI picks a local backend's ports, free when it looks, without binding them, and a
+# backend another checkout starts outside a setup can take them at any time after. So only the
+# create and convex-start start a backend, each on ports checked free just before: the create on
+# the ones the CLI has just picked, convex-start on the ones it picks itself. Both run under one
+# host-wide lock (scripts/host-claims.sh) until the worktree's backend runs, so setups at once get
+# distinct ports.
 set -euo pipefail
 
 # The Convex CLI exits 1 on every failure and names a Convex API answer as
@@ -54,6 +57,13 @@ if [ ! -f .convex/local/default/config.json ] && ! grep -q '^CONVEX_DEPLOYMENT='
   # The create names the team and project of CONVEX_PROJECT in its reference, so only a created
   # deployment is ever written to .env.local.
   if [ "$mode" = local ]; then
+    # Convex reads CRONS when it pushes the functions. A local deployment takes it from the
+    # project's dev defaults at its create, before convex-start's first push.
+    crons=$(env -u CONVEX_DEPLOY_KEY pnpm exec convex env default get CRONS --type dev --project "${CONVEX_PROJECT:?}")
+    if [ "$crons" != off ]; then
+      echo "the Convex project's dev defaults set no CRONS=off, which a local deployment takes at its create; set it with: pnpm exec convex env default set CRONS off --type dev --project $CONVEX_PROJECT" >&2
+      exit 1
+    fi
     backend_lock
     create_local_deployment
   else
@@ -62,13 +72,9 @@ if [ ! -f .convex/local/default/config.json ] && ! grep -q '^CONVEX_DEPLOYMENT='
   fi
 fi
 
-# Convex reads CRONS when it pushes the functions, so it is set before the first push: on a new
-# local deployment while .env.local still names it, before convex-start holds the CLI.
+# No step between the create and convex-start reaches the deployment: a `convex` command there
+# would start a backend on the create's ports, which nobody has checked since.
 if [ -f .convex/local/default/config.json ]; then
-  backend_lock
-  if grep -q '^CONVEX_DEPLOYMENT=local:' .env.local; then
-    pnpm exec convex env set CRONS off
-  fi
   scripts/dev-server.sh convex-start
   backend_unlock
 else
