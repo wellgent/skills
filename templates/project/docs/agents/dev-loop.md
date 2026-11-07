@@ -61,7 +61,7 @@ No GitHub Actions run for this project.
 
 - **The verifier reruns no suite.** It drives the app on the changed surface with the verification skill, reads the diff, checks the test changes, and takes the head's `check` status as an input.
 - **The server log counts.** A screen works only when the app's server log shows no error the browser console misses (a failed hydration, an uncaught exception) since the verifier started it.
-- **Previews.** <What the host builds from git pushes, and how a PR labelled `preview` gets its preview: the command, where the URL is posted, and the preview backend it gets with the PR's own functions and the seed. How an agent opens a protected preview, with no secret written to a file.>
+- **Previews.** <What the host builds from git pushes, and how a PR labelled `preview` gets its preview: the command, where the URL is posted, and the preview backend it gets with the PR's own functions and the seed. How an agent opens a protected preview, with the exact command that reads its secret into a variable, and no secret written to a file or printed.>
   A change to layout, look and feel or functionality waits for the product's owner to review its preview before it lands.
   A bug fix, or a fix that makes the UI match `DESIGN.md` or `PRODUCT.md`, lands on its verifier's pass, labelled `preview`, and the run's note lists it.
   A fix round on a review answer changes only what the answer names, and any further visible change it brings waits for its own review on the preview, even where the answer authorized landing on the verifier's pass.
