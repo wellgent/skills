@@ -40,7 +40,7 @@ For any project with a UI a user opens in a browser. Both are named in the "Runn
 Known-good browser loop - never inspect a page with naive fetching (JS-rendered content comes back blank). Run it in a named session of your own (`export AGENT_BROWSER_SESSION=$(agent-browser session id --scope worktree --prefix verify)`, from a stable directory) so concurrent sessions never share a browser. Wait on a selector or text the page is known to render; `--load networkidle` only for pages known to go quiet:
 
 ```bash
-agent-browser open http://localhost:3000 && agent-browser wait --selector main
+agent-browser open http://localhost:3000 && agent-browser wait main
 agent-browser set viewport 375 812 && agent-browser screenshot --full mobile.png
 agent-browser set viewport 1280 800 && agent-browser screenshot --full desktop.png
 agent-browser close
@@ -211,7 +211,7 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 
 # browser review through the protection
 agent-browser set headers "{\"x-vercel-protection-bypass\":\"$VERCEL_AUTOMATION_BYPASS_SECRET\",\"x-vercel-set-bypass-cookie\":\"true\"}"
-agent-browser open https://<preview-url> && agent-browser wait --selector main
+agent-browser open https://<preview-url> && agent-browser wait main
 ```
 
 ## Situational skills
