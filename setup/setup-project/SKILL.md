@@ -79,6 +79,7 @@ gh api -X PATCH repos/<owner>/<repo> -F allow_merge_commit=false -F allow_squash
 
 The project has a verification skill (`.claude/skills/verify*`) pstack proves changes with on the real app.
 Without one, run `/pstack:create-verification-skill` in the checkout, fed by "Running the app" in `docs/agents/dev-loop.md`, and commit what it writes.
+Its server log check and its `get_errors` check follow the verification line of the `setup-web-stack` catalog's Quality gate; a skill whose checks differ from it is brought onto it in the same change.
 
 ## 7. Check
 

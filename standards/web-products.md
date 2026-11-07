@@ -204,7 +204,7 @@ Project rules an agent consults are in the docs set of [project-docs.md](project
   Promotion litmus: any line that should read identically in every project belongs to the template, and project files hold what is true of this repo.
 - **What this stack puts in those files** (Next.js with Convex; a project without one of them drops its lines):
   - Must-read list: `convex/_generated/ai/guidelines.md` and the `convex-authz` checklist when touching Convex code; `convex-reviewer` before a Convex diff goes into a pull request; `convex-migrate` when a change touches the schema of a populated table; `web-design-guidelines` when a change touches a screen; `vercel-react-best-practices` when a change renders or fetches data in React; `find-docs` for a library API.
-  - `docs/agents/dev-loop.md`: `agent-browser` and `next-dev-loop` under "Running the app", with the check "`get_errors` returns nothing for the routes exercised"; the design-system lint and the impeccable scanner under "Design system"; `convex/_generated/` under "Not docs".
+  - `docs/agents/dev-loop.md`: `agent-browser` and `next-dev-loop` under "Running the app", with the check "`get_errors` returns nothing for the routes exercised", apart from a Convex project's designed refusals as the `setup-web-stack` catalog states them; the design-system lint and the impeccable scanner under "Design system"; `convex/_generated/` under "Not docs".
 - **Tracker labels**: one taxonomy across projects - `needs-triage`, `needs-info`, `ready-for-agent`, `needs-human`, `run` and `wontfix` on every project tracker, where run requests live.
   Per-project freedom is topical labels only.
 
