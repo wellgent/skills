@@ -13,7 +13,7 @@
   When `scripts/check` cannot run (exit 2), landing pauses and the run posts a stop.
 - **Agents.** No agent sleeps or polls inside its own turn, every spawn passes `model`, and a stop runs leaves first; [docs/agents/dev-loop.md](docs/agents/dev-loop.md) under "Agents" has the full rules.
 - **Tests** run only through the package scripts, never the test runner directly: the scripts take one of the host's heavy-run slots through `scripts/slot`.
-- **Deletes.** A delete through a variable is written `rm -f "${VAR:?}"/...`, or with a literal path.
+- **Deletes.** A delete through a variable is written `rm -f "${VAR:?}"/...`, or with a literal path. No `rm` goes inside a `bash -c` or `sh -c` string: it runs as its own command.
 - **Cleanup.** Before a run posts its note, it tears down every worktree and scratch tree it created with `<worktree teardown command>`, so `git worktree list` shows only the main checkout, and deletes the local branch of each pull request it landed.
 - **Docs.** A change updates every doc it makes untrue in the same pull request, in the present tense.
   Knowledge goes into the doc "Where things live" names for it, and `scripts/check-docs` fails on any other markdown file; research, plans and history belong to the tracker and git.
