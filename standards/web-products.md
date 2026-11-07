@@ -87,7 +87,7 @@ Preference and familiarity do not qualify.
 
 **Convex canon** (one product is designated the canonical config and directory-layout reference):
 
-- Execution limits are design inputs consulted at planning time: 16,384-doc query cap, batch mutation budget, 4,096-read-call cap, 64-char index names.
+- Execution limits are design inputs consulted at planning time: 32,000 documents scanned per query or mutation (documents a `filter` drops count), 16 MiB read, 16,000 documents written, 4,096 `db.get` and `db.query` calls, 64-char index names.
 - The volume-rehearsal ladder is the proof a data-heavy change carries.
 - Components are per-product and namespaced (aggregates, migrations, rate-limiter adopted per need).
 - Testing: vitest edge-runtime with inlined `convex-test`.
